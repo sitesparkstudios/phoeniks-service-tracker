@@ -14,6 +14,7 @@ function renderAll() {
   renderParts();
   renderReports();
   renderActivity();
+  if (typeof updateNavBadges === 'function') updateNavBadges();
 }
 
 /* ── DASHBOARD ── */
@@ -24,8 +25,11 @@ function renderDashboard() {
   const avgTotal  = done.length ? Math.round(done.reduce((a,j) => a + (getTotalDays(j)||0), 0) / done.length) : null;
   const yearSpend = jobs.reduce((a,j) => a + (parseFloat(j.value)||0), 0);
 
-  document.getElementById('dash-date').textContent =
-    new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const _now = new Date();
+  const _ord = n => { const s=['th','st','nd','rd'],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); };
+  const _day = _now.toLocaleDateString('en-AU', { weekday:'long' });
+  const _month = _now.toLocaleDateString('en-AU', { month:'long', year:'numeric' });
+  document.getElementById('dash-date').textContent = `${_day}, ${_ord(_now.getDate())} ${_month}`;
 
   document.getElementById('kpi-grid').innerHTML = `
     <div class="metric-card accent-blue">
@@ -545,7 +549,13 @@ function openJobModal(id) {
   const hist  = j.history || [];
   const total = getTotalDays(j);
 
-  document.getElementById('modal-po').textContent   = j.po;
+  const poEl = document.getElementById('modal-po');
+  poEl.textContent = j.po;
+  poEl.style.cursor = 'pointer';
+  poEl.title = 'Click to copy PO number';
+  poEl.onclick = () => {
+    navigator.clipboard.writeText(j.po).then(() => showToast('PO number copied: ' + j.po));
+  };
   document.getElementById('modal-ref').textContent  = j.ref || '';
   document.getElementById('modal-edit-btn').onclick = () => editJob(id);
   document.getElementById('modal-del-btn').onclick  = () => deleteJob(id);

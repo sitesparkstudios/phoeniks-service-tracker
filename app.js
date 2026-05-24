@@ -36,6 +36,25 @@ function showPage(name) {
   if (name === 'add')        populateSupplierDatalist();
 }
 
+/* ── NAV BADGES ── */
+function updateNavBadges() {
+  const openJobs  = jobs.filter(j => j.status !== 'Job Done').length;
+  const waiting   = jobs.filter(j => j.status === 'Waiting for Parts').length;
+
+  const jobsBadge  = document.getElementById('nav-badge-jobs');
+  const partsBadge = document.getElementById('nav-badge-parts');
+
+  if (jobsBadge) {
+    jobsBadge.textContent = openJobs || '';
+    jobsBadge.style.display = openJobs > 0 ? 'inline-block' : 'none';
+  }
+  if (partsBadge) {
+    partsBadge.textContent = waiting || '';
+    partsBadge.style.display = waiting > 0 ? 'inline-block' : 'none';
+  }
+}
+
+
 function populateSupplierDatalist() {
   const dl = document.getElementById('supplier-datalist');
   if (!dl) return;
@@ -187,18 +206,28 @@ document.addEventListener('keydown', e => {
 });
 
 /* ── SIDEBAR DATE — shows day + date ── */
+function ordinal(n) {
+  const s = ['th','st','nd','rd'], v = n % 100;
+  return n + (s[(v-20)%10] || s[v] || s[0]);
+}
+
 function updateSidebarDate() {
   const el = document.getElementById('sidebar-date-display');
   if (!el) return;
-  const now  = new Date();
-  const day  = now.toLocaleDateString('en-AU', { weekday: 'long' });
-  const date = now.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
-  el.innerHTML = `<span style="color:rgba(255,255,255,0.5);font-weight:600">${day}</span> <span>${date}</span>`;
+  const now   = new Date();
+  const day   = now.toLocaleDateString('en-AU', { weekday: 'long' });
+  const month = now.toLocaleDateString('en-AU', { month: 'long' });
+  const date  = ordinal(now.getDate());
+  el.innerHTML = `
+    <div style="color:rgba(255,255,255,0.45);font-size:10px;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:2px">${day}</div>
+    <div style="color:rgba(255,255,255,0.7);font-size:13px;font-weight:500">${date} ${month}</div>
+  `;
 }
 
 /* ── INIT ── */
 loadData();
 updateSidebarDate();
+updateNavBadges();
 renderDashboard();
 
 /* Reset localStorage to load demo data if needed */
