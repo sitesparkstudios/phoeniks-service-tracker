@@ -390,8 +390,17 @@ function renderParts() {
     const pd      = partsData[j.id] || {};
     const waiting = daysBetween(j.poDate, null);
     const eta     = pd.eta || '';
-    const etaDays = eta ? daysBetween(today(), eta) : null;
-    const etaOverdue = eta && etaDays !== null && etaDays < 0;
+    const etaDays = eta ? daysUntil(eta) : null;
+    const etaOverdue = etaDays !== null && etaDays < 0;
+    const etaToday   = etaDays !== null && etaDays === 0;
+    let etaLabel = '';
+    if (etaOverdue) {
+      etaLabel = `<div style="font-size:10px;color:var(--red);margin-top:2px;font-weight:600">${Math.abs(etaDays)}d OVERDUE</div>`;
+    } else if (etaToday) {
+      etaLabel = `<div style="font-size:10px;color:var(--amber);margin-top:2px;font-weight:600">DUE TODAY</div>`;
+    } else if (etaDays !== null) {
+      etaLabel = `<div style="font-size:10px;color:var(--text3);margin-top:2px">${etaDays}d away</div>`;
+    }
     return `<tr onclick="openJobModal('${j.id}')">
       <td><span class="po-link">${esc(j.po)}</span></td>
       <td class="ref-cell">${esc(j.ref||'—')}</td>
@@ -407,9 +416,8 @@ function renderParts() {
         <input class="parts-eta-input" type="date"
           value="${eta}"
           onchange="updatePartsData('${j.id}','eta',this.value)"
-          style="${etaOverdue?'border-color:var(--red);color:var(--red)':''}">
-        ${etaOverdue ? '<div style="font-size:10px;color:var(--red);margin-top:2px;font-weight:600">OVERDUE</div>' : ''}
-        ${eta && !etaOverdue && etaDays !== null ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">${etaDays}d away</div>` : ''}
+          style="${etaOverdue?'border-color:var(--red);color:var(--red)':etaToday?'border-color:var(--amber);color:var(--amber)':''}">
+        ${etaLabel}
       </td>
       <td>${badge(j.status)}</td>
     </tr>`;
@@ -446,7 +454,7 @@ function renderSuppliers() {
     return `<div class="card supplier-card">
       <div class="flex-between mb-12">
         <div class="supplier-name">${esc(s)}</div>
-        ${stuck > 0 ? `<span class="badge b-waiting">${stuck} overdue</span>` : '<span class="badge b-done">On track</span>'}
+        ${stuck > 0 ? `<span class="badge b-waiting" style="cursor:pointer" onclick="openSupplierModal('${s}','overdue');event.stopPropagation()" title="Click to see overdue jobs">${stuck} overdue ↗</span>` : '<span class="badge b-done">On track</span>'}
       </div>
       <div class="supplier-meta">${sj.length} total · ${open.length} open · ${done.length} completed</div>
       <div class="supplier-stats">
@@ -473,6 +481,10 @@ function renderSuppliers() {
         }).join('')}
       </div>
       <div class="completion-bar"><div class="completion-fill" style="width:${pct}%"></div></div>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        ${open.length ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:4px 10px" onclick="openSupplierModal('${s}','open');event.stopPropagation()">View open jobs (${open.length})</button>` : ''}
+        ${done.length ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:4px 10px" onclick="openSupplierModal('${s}','all');event.stopPropagation()">All jobs (${sj.length})</button>` : ''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -574,6 +586,62 @@ function openJobModal(id) {
   `;
   document.getElementById('job-modal').classList.remove('hidden');
 }
+
+/* ── SUPPLIER JOBS MODAL ── */
+function openSupplierModal(supplier, filter) {
+  const sj = jobs.filter(j => j.supplier === supplier);
+  let filtered, subtitle;
+  if (filter === 'overdue') {
+    filtered = sj.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 14)
+                  .sort((a,b) => daysBetween(b.poDate,null) - daysBetween(a.poDate,null));
+    subtitle = `${filtered.length} overdue job${filtered.length !== 1 ? 's' : ''} (open > 14 days)`;
+  } else if (filter === 'open') {
+    filtered = sj.filter(j => j.status !== 'Job Done')
+                  .sort((a,b) => daysBetween(b.poDate,null) - daysBetween(a.poDate,null));
+    subtitle = `${filtered.length} open job${filtered.length !== 1 ? 's' : ''}`;
+  } else {
+    filtered = [...sj].sort((a,b) => (b.poDate||'').localeCompare(a.poDate||''));
+    subtitle = `${filtered.length} total job${filtered.length !== 1 ? 's' : ''}`;
+  }
+
+  document.getElementById('supplier-modal-title').textContent = supplier;
+  document.getElementById('supplier-modal-sub').textContent = subtitle;
+
+  if (!filtered.length) {
+    document.getElementById('supplier-modal-body').innerHTML =
+      '<div class="empty-state" style="padding:24px"><p>No jobs in this category.</p></div>';
+  } else {
+    document.getElementById('supplier-modal-body').innerHTML = `
+      <table style="margin-top:0">
+        <thead><tr>
+          <th style="width:120px">PO</th>
+          <th>Reference</th>
+          <th style="width:120px">Status</th>
+          <th style="width:68px">Open</th>
+          <th style="width:90px">Value</th>
+        </tr></thead>
+        <tbody>${filtered.map(j => {
+          const open = daysBetween(j.poDate, j.status === 'Job Done' ? j.history?.[j.history.length-1]?.date : null);
+          const isDone = j.status === 'Job Done';
+          const flagged = !isDone && (open||0) > 14;
+          return `<tr class="${flagged?'flagged':''}" onclick="openJobModal('${j.id}');closeSupplierModal()" style="cursor:pointer">
+            <td><span class="po-link">${esc(j.po)}</span></td>
+            <td class="ref-cell">${esc(j.ref||'—')}</td>
+            <td>${badge(j.status)}</td>
+            <td>${dayChip(open, isDone)}</td>
+            <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text3)">${fmtValue(j.value)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+  }
+
+  document.getElementById('supplier-modal').classList.remove('hidden');
+}
+
+function closeSupplierModal() {
+  document.getElementById('supplier-modal').classList.add('hidden');
+}
+
 
 function closeModal() {
   document.getElementById('job-modal').classList.add('hidden');

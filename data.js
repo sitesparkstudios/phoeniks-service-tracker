@@ -131,15 +131,21 @@ function saveReport() {
 
 /* ── MONTHLY SPEND ── */
 function getMonthlySpend() {
-  const now    = new Date();
+  const now = new Date();
+  // Find earliest job date so we always show relevant data
+  const jobDates = jobs.filter(j => j.poDate).map(j => j.poDate).sort();
+  const earliest = jobDates.length ? new Date(jobDates[0] + 'T12:00:00') : new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  // Show from earliest month (up to 24 months back) through current month
+  const startMonth = new Date(Math.max(earliest.getTime(), new Date(now.getFullYear(), now.getMonth() - 23, 1).getTime()));
   const months = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+  let d = new Date(startMonth.getFullYear(), startMonth.getMonth(), 1);
+  while (d <= now) {
     months.push({
       key:   `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
       label: d.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }),
       total: 0,
     });
+    d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
   }
   jobs.forEach(j => {
     if (!j.poDate || !j.value) return;
@@ -160,6 +166,15 @@ function daysBetween(a, b) {
   const end   = b ? new Date(b + 'T12:00:00') : new Date();
   const start = new Date(a + 'T12:00:00');
   return Math.max(0, Math.round((end - start) / 86400000));
+}
+
+// Like daysBetween but returns negative if end is before start (used for ETA countdown)
+function daysUntil(target) {
+  if (!target) return null;
+  const now = new Date();
+  now.setHours(12,0,0,0);
+  const t = new Date(target + 'T12:00:00');
+  return Math.round((t - now) / 86400000);
 }
 
 function getDwellTimes(job) {
