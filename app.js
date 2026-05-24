@@ -1,31 +1,38 @@
 /* ============================================================
-   app.js — UI routing, CRUD (save/edit/delete job),
-             form handling, toast, confirm dialog, keyboard nav
+   app.js — UI routing, CRUD, form handling, toast, confirm
    ============================================================ */
 
 /* ── PAGE ROUTING ── */
 const PAGE_TITLES = {
   dashboard:  'Dashboard',
+  activity:   'Weekly Activity',
   bottleneck: 'Bottleneck Report',
   jobs:       'All Jobs',
-  add:        'Add / Edit Job',
+  parts:      'Parts Tracker',
   suppliers:  'Suppliers',
+  reports:    'Meeting Reports',
   import:     'Odoo Import',
+  add:        'Add / Edit Job',
 };
-const NAV_ORDER = ['dashboard','bottleneck','jobs','suppliers','import','add'];
+
+const NAV_ORDER = ['dashboard','activity','bottleneck','jobs','parts','suppliers','reports','import','add'];
 
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach((n, i) => {
     n.classList.toggle('active', NAV_ORDER[i] === name);
   });
-  document.getElementById('page-' + name).classList.add('active');
+  const pg = document.getElementById('page-' + name);
+  if (pg) pg.classList.add('active');
   document.getElementById('topbar-title').textContent = PAGE_TITLES[name] || name;
 
   if (name === 'dashboard')  renderDashboard();
+  if (name === 'activity')   renderActivity();
   if (name === 'bottleneck') renderBottleneck();
   if (name === 'jobs')       { renderJobs(); populateSupplierDatalist(); }
+  if (name === 'parts')      renderParts();
   if (name === 'suppliers')  renderSuppliers();
+  if (name === 'reports')    renderReports();
   if (name === 'add')        populateSupplierDatalist();
 }
 
@@ -36,22 +43,22 @@ function populateSupplierDatalist() {
   dl.innerHTML = suppliers.map(s => `<option value="${esc(s)}">`).join('');
 }
 
-/* ── CRUD — SAVE / EDIT / DELETE ── */
+/* ── CRUD ── */
 function saveJob() {
-  const po       = document.getElementById('f-po').value.trim();
-  const supplier = document.getElementById('f-supplier').value.trim();
-  const poDate   = document.getElementById('f-po-date').value;
-  const status   = document.getElementById('f-status').value;
-  const notes    = document.getElementById('f-notes').value.trim();
-  const ref      = document.getElementById('f-ref').value.trim();
-  const equip    = document.getElementById('f-equipment').value.trim();
-  const value    = document.getElementById('f-value').value.trim();
-  const buyer    = document.getElementById('f-buyer').value.trim();
-  const chatter  = document.getElementById('f-chatter').value;
+  const po      = document.getElementById('f-po').value.trim();
+  const supplier= document.getElementById('f-supplier').value.trim();
+  const poDate  = document.getElementById('f-po-date').value;
+  const status  = document.getElementById('f-status').value;
+  const notes   = document.getElementById('f-notes').value.trim();
+  const ref     = document.getElementById('f-ref').value.trim();
+  const equip   = document.getElementById('f-equipment').value.trim();
+  const value   = document.getElementById('f-value').value.trim();
+  const buyer   = document.getElementById('f-buyer').value.trim();
+  const chatter = document.getElementById('f-chatter').value;
 
   const msgEl = document.getElementById('form-validation-msg');
   if (!po || !supplier || !poDate) {
-    msgEl.textContent  = 'PO number, supplier and PO date are required.';
+    msgEl.textContent   = 'PO number, supplier and PO date are required.';
     msgEl.style.display = 'block';
     return;
   }
@@ -67,7 +74,7 @@ function saveJob() {
       j.poDate = poDate; j.notes = allNotes; j.value = value; j.buyer = buyer;
       if (transitions.length) {
         j.history = buildHistoryFromTransitions(poDate, transitions);
-        j.status  = j.history[j.history.length - 1].status;
+        j.status  = j.history[j.history.length-1].status;
       } else if (j.status !== status) {
         if (!j.history || !j.history.length) j.history = [{ status: j.status, date: j.poDate }];
         j.history.push({ status, date: today() });
@@ -80,8 +87,10 @@ function saveJob() {
   } else {
     jobs.push({
       id:        'j' + Date.now(),
-      po, supplier, ref, equipment: equip, poDate, notes: allNotes, value, buyer,
-      status:    transitions.length ? transitions[transitions.length - 1].to : status,
+      po, supplier, ref, equipment: equip, poDate,
+      notes: allNotes, value, buyer,
+      addedDate: today(),
+      status:    transitions.length ? transitions[transitions.length-1].to : status,
       history:   transitions.length ? buildHistoryFromTransitions(poDate, transitions) : [{ status, date: poDate }],
     });
   }
@@ -131,7 +140,9 @@ async function deleteJob(id) {
   const confirmed = await showConfirm('Delete this job?', 'This action cannot be undone.');
   if (!confirmed) return;
   jobs = jobs.filter(j => j.id !== id);
+  delete partsData[id];
   saveData();
+  savePartsData();
   closeModal();
   renderJobs();
   renderDashboard();
@@ -169,16 +180,31 @@ document.addEventListener('keydown', e => {
     closeMeeting();
     document.getElementById('confirm-overlay').classList.add('hidden');
   }
-  // Arrow keys navigate meeting slides
   if (document.getElementById('meeting-overlay').classList.contains('active')) {
     if (e.key === 'ArrowRight') meetingNext();
     if (e.key === 'ArrowLeft')  meetingPrev();
   }
 });
 
-/* ── INIT ── */
-document.getElementById('sidebar-week').textContent =
-  new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+/* ── SIDEBAR DATE — shows day + date ── */
+function updateSidebarDate() {
+  const el = document.getElementById('sidebar-date-display');
+  if (!el) return;
+  const now  = new Date();
+  const day  = now.toLocaleDateString('en-AU', { weekday: 'long' });
+  const date = now.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  el.innerHTML = `<span style="color:rgba(255,255,255,0.5);font-weight:600">${day}</span> <span>${date}</span>`;
+}
 
+/* ── INIT ── */
 loadData();
+updateSidebarDate();
 renderDashboard();
+
+/* Reset localStorage to load demo data if needed */
+function resetToDemo() {
+  localStorage.removeItem('phoeniks_tracker_v2');
+  localStorage.removeItem('phoeniks_parts_v1');
+  localStorage.removeItem('phoeniks_reports_v1');
+  location.reload();
+}
