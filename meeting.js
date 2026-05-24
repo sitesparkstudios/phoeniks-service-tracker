@@ -7,8 +7,11 @@ let meetingSlide  = 0;
 const MEETING_TOTAL = 4;
 
 function openMeeting() {
-  document.getElementById('meeting-date-display').textContent =
-    new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const _mn = new Date();
+  const _mo = n => { const s=['th','st','nd','rd'],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); };
+  const _mday = _mn.toLocaleDateString('en-AU', { weekday:'long' });
+  const _mmonth = _mn.toLocaleDateString('en-AU', { month:'long', year:'numeric' });
+  document.getElementById('meeting-date-display').textContent = `${_mday}, ${_mo(_mn.getDate())} ${_mmonth}`;
   buildMeetingSlides();
   meetingSlide = 0;
   updateMeetingSlide();
@@ -56,7 +59,7 @@ function buildMeetingSlides() {
     </div>`;
   }).join('');
 
-  /* Supplier workload */
+  /* Service Co. workload */
   const suppliers = [...new Set(jobs.map(j => j.supplier))].sort();
   document.getElementById('meeting-supplier-list').innerHTML = suppliers.map(s => {
     const sj      = jobs.filter(j => j.supplier === s && j.status !== 'Job Done');
@@ -85,7 +88,7 @@ function buildMeetingSlides() {
         <thead><tr>
           <th style="width:100px">PO</th>
           <th>Site / Reference</th>
-          <th style="width:150px">Supplier</th>
+          <th style="width:150px">Service Co.</th>
           <th style="width:140px">Status</th>
           <th style="width:70px">Open</th>
           <th style="width:100px">Value</th>
@@ -139,7 +142,7 @@ function buildMeetingSlides() {
     return `<div class="meeting-stage-item">
       <div class="meeting-stage-name">${s}</div>
       <div class="meeting-stage-val" style="color:${isBad?'rgba(61,64,67,0.9)':'rgba(61,64,67,0.7)'}">${avgs[i]}d</div>
-      <div class="meeting-stage-sub">${totals[s].c} jobs · avg days in stage</div>
+      <div class="meeting-stage-sub">${totals[s].c} jobs · avg days in status</div>
       <div class="meeting-bar-bg">
         <div class="meeting-bar-fill" style="width:${pct}%"></div>
       </div>
