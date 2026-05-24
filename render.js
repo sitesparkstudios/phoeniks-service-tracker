@@ -361,7 +361,7 @@ function renderJobs() {
       <td>${esc(j.supplier)}</td>
       <td>${badge(j.status)}</td>
       <td>${dayChip(open,isDone)}</td>
-      <td>${inStage !== null ? dayChip(inStage,isDone) : '<span class="text-muted text-sm">—</span>'}</td>
+      <td>${!isDone && inStage !== null ? dayChip(inStage,false) : '<span class="text-muted text-sm">—</span>'}</td>
       <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text3)">${fmtValue(j.value)}</td>
       <td onclick="event.stopPropagation()" style="text-align:right">
         <button class="btn btn-ghost btn-sm btn-icon" title="Edit" onclick="editJob('${j.id}')">
@@ -568,6 +568,7 @@ function openJobModal(id) {
     const isDone    = j.status === 'Job Done';
     const dotClass  = isDone ? 'done' : isCurrent ? 'current' : '';
     const chipCls   = isDone ? 'ok' : days > 14 ? 'danger' : days > 7 ? 'warn' : '';
+    const isFinalDone = h.status === 'Job Done' && i === hist.length - 1;
     return `<div class="tl-item">
       <div class="tl-line-col">
         <div class="tl-dot ${dotClass}"></div>
@@ -576,7 +577,7 @@ function openJobModal(id) {
       <div class="tl-body">
         <div class="tl-status-name">${esc(h.status)} ${isCurrent ? badge(h.status) : ''}</div>
         <div class="tl-date">${h.date}${next?' → '+next.date:''}</div>
-        <span class="day-chip ${chipCls}" style="margin-top:4px;display:inline-block">${days}d${isCurrent?' (still here)':''}</span>
+        ${!isFinalDone ? `<span class="day-chip ${chipCls}" style="margin-top:4px;display:inline-block">${days}d${isCurrent?' (still here)':''}</span>` : ''}
       </div>
     </div>`;
   }).join('');
