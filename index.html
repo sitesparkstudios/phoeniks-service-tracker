@@ -75,6 +75,22 @@
       </div>
     </div>
 
+    <div id="sidebar-pulse" style="padding:10px 20px 0;flex-shrink:0">
+      <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;display:flex;flex-direction:column;gap:5px">
+        <div style="display:flex;justify-content:space-between;font-size:11px">
+          <span style="color:rgba(255,255,255,0.35)">Open jobs</span>
+          <span id="pulse-open" style="color:rgba(255,255,255,0.65);font-weight:600;font-family:'DM Mono',monospace">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px">
+          <span style="color:rgba(255,255,255,0.35)">Waiting on parts</span>
+          <span id="pulse-parts" style="color:#fcd34d;font-weight:600;font-family:'DM Mono',monospace">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px">
+          <span style="color:rgba(255,255,255,0.35)">Completed this week</span>
+          <span id="pulse-done" style="color:#86efac;font-weight:600;font-family:'DM Mono',monospace">—</span>
+        </div>
+      </div>
+    </div>
     <div class="sidebar-bottom">
       <div id="sidebar-date-display"></div>
       <div class="mono" style="margin-top:6px;color:rgba(255,255,255,0.25)">v3.0 · Odoo-connected</div>
@@ -215,7 +231,7 @@
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th style="width:90px">PO</th><th style="width:140px">Supplier</th><th>Reference</th>
+              <th style="width:90px">PO</th><th style="width:140px">Service Co.</th><th>Reference</th>
               <th style="width:75px">Incoming</th><th style="width:68px">Booked</th>
               <th style="width:75px">Waiting</th><th style="width:75px">Revisit</th>
               <th style="width:68px">Status</th><th style="width:65px">Total</th>
@@ -245,14 +261,14 @@
           <option>Waiting for Parts</option><option>Revisiting</option>
           <option>Job Done</option><option>Maintenance</option>
         </select>
-        <select id="filter-supplier" onchange="renderJobs()"><option value="">All suppliers</option></select>
+        <select id="filter-supplier" onchange="renderJobs()"><option value="">All service cos.</option></select>
         <input type="text" id="filter-search" placeholder="Search PO, reference, equipment..." oninput="renderJobs()" style="max-width:300px">
       </div>
       <div class="card">
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th style="width:90px">PO</th><th>Reference</th><th style="width:150px">Supplier</th>
+              <th style="width:90px">PO</th><th>Reference</th><th style="width:150px">Service Co.</th>
               <th style="width:130px">Status</th><th style="width:70px">Open</th>
               <th style="width:75px">In status</th><th style="width:100px">Value</th><th style="width:90px"></th>
             </tr></thead>
@@ -276,7 +292,7 @@
             <thead><tr>
               <th style="width:90px">PO</th>
               <th>Reference</th>
-              <th style="width:140px">Supplier</th>
+              <th style="width:140px">Service Co.</th>
               <th style="width:80px">Waiting</th>
               <th style="width:150px">Part / Notes</th>
               <th style="width:140px">ETA</th>

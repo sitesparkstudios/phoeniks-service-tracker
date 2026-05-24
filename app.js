@@ -9,7 +9,7 @@ const PAGE_TITLES = {
   bottleneck: 'Bottleneck Report',
   jobs:       'All Jobs',
   parts:      'Parts Tracker',
-  suppliers:  'Suppliers',
+  suppliers:  'Service Companies',
   reports:    'Meeting Reports',
   import:     'Odoo Import',
   add:        'Add / Edit Job',
@@ -25,6 +25,7 @@ function showPage(name) {
   const pg = document.getElementById('page-' + name);
   if (pg) pg.classList.add('active');
   document.getElementById('topbar-title').textContent = PAGE_TITLES[name] || name;
+  try { localStorage.setItem('phoeniks_last_page', name); } catch(e) {}
 
   if (name === 'dashboard')  renderDashboard();
   if (name === 'activity')   renderActivity();
@@ -41,6 +42,15 @@ function updateNavBadges() {
   const openJobs  = jobs.filter(j => j.status !== 'Job Done').length;
   const waiting   = jobs.filter(j => j.status === 'Waiting for Parts').length;
 
+  // Completed this week
+  const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); weekStart.setHours(0,0,0,0);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+  const doneThisWeek = jobs.filter(j => {
+    if (j.status !== 'Job Done') return false;
+    const last = j.history?.[j.history.length - 1];
+    return last && last.date >= weekStartStr;
+  }).length;
+
   const jobsBadge  = document.getElementById('nav-badge-jobs');
   const partsBadge = document.getElementById('nav-badge-parts');
 
@@ -52,6 +62,14 @@ function updateNavBadges() {
     partsBadge.textContent = waiting || '';
     partsBadge.style.display = waiting > 0 ? 'inline-block' : 'none';
   }
+
+  // Sidebar pulse strip
+  const pulseOpen  = document.getElementById('pulse-open');
+  const pulseParts = document.getElementById('pulse-parts');
+  const pulseDone  = document.getElementById('pulse-done');
+  if (pulseOpen)  pulseOpen.textContent  = openJobs;
+  if (pulseParts) pulseParts.textContent = waiting;
+  if (pulseDone)  pulseDone.textContent  = doneThisWeek;
 }
 
 
@@ -228,7 +246,8 @@ function updateSidebarDate() {
 loadData();
 updateSidebarDate();
 updateNavBadges();
-renderDashboard();
+const _lastPage = (() => { try { return localStorage.getItem('phoeniks_last_page'); } catch(e) { return null; } })();
+showPage(NAV_ORDER.includes(_lastPage) ? _lastPage : 'dashboard');
 
 /* Reset localStorage to load demo data if needed */
 function resetToDemo() {
