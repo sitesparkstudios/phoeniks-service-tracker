@@ -29,17 +29,22 @@ const STAGE_COLORS  = ['#3b82f6','#a855f7','#f59e0b','#ff5f1f','#22c55e','#6b728
 const ACTIVE_STAGES = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting'];
 
 const ODOO_MAP = {
-  'order reference':   'po',
-  'vendor reference':  'ref',
-  'vendor':            'supplier',
-  'confirmation date': 'poDate',
-  'job status':        'status',
-  'status':            'odooStatus',
-  'order deadline':    'deadline',
-  'total':             'value',
-  'receipt status':    'receiptStatus',
-  'priority':          'priority',
-  'buyer':             'buyer',
+  'order reference':    'po',
+  'vendor reference':   'ref',
+  'vendor':             'supplier',
+  'confirmation date':  'poDate',
+  'job status':         'status',
+  'status':             'odooStatus',
+  'order deadline':     'deadline',
+  'total':              'value',
+  'receipt status':     'receiptStatus',
+  'priority':           'priority',
+  'buyer':              'buyer',
+  'source document':    'sourceDoc',
+  'source':             'sourceDoc',
+  'notes':              'odooNotes',
+  'terms and conditions': 'odooNotes',
+  'purchase representative': 'buyer',  // alternate Odoo label for buyer
 };
 
 /* ── DEMO DATA ── */
@@ -302,6 +307,8 @@ function processCSVFile(file) {
         if (get('deadline'))      existing.deadline      = normalizeOdooDate(get('deadline'));
         if (get('priority'))      existing.priority      = get('priority');
         if (get('receiptStatus')) existing.receiptStatus = get('receiptStatus');
+        if (get('sourceDoc'))     existing.sourceDoc     = get('sourceDoc');
+        if (get('odooNotes') && !existing.notes) existing.notes = get('odooNotes'); // don't overwrite manual notes
         if (existing.status !== newStatus && existing.status !== 'Job Done') {
           if (!existing.history) existing.history = [{ status: existing.status, date: existing.poDate || today() }];
           existing.history.push({ status: newStatus, date: today() });
@@ -314,7 +321,9 @@ function processCSVFile(file) {
           po, supplier: get('supplier'), ref: get('ref'), equipment: '',
           poDate, status: newStatus, value: get('value'), buyer: get('buyer'),
           deadline: normalizeOdooDate(get('deadline')), priority: get('priority'),
-          receiptStatus: get('receiptStatus'), notes: '',
+          receiptStatus: get('receiptStatus'),
+          sourceDoc: get('sourceDoc') || '',
+          notes: get('odooNotes') || '',
           history: [{ status: newStatus, date: poDate }],
           addedDate: today(),
         });
@@ -334,8 +343,8 @@ function showImportResult(type, msg) {
 }
 
 function copyOdooTemplate() {
-  const fields = 'Order Reference,Vendor,Vendor Reference,Confirmation Date,Job Status,Status,Order Deadline,Total,Receipt Status,Priority,Buyer';
-  navigator.clipboard.writeText(fields).then(() => showToast('Field names copied to clipboard'));
+  const fields = 'Order Reference,Vendor,Vendor Reference,Confirmation Date,Job Status,Total,Buyer,Order Deadline,Source Document,Notes';
+  navigator.clipboard.writeText(fields).then(() => showToast('Field names copied — paste into Odoo export column selector'));
 }
 
 /* ── CSV EXPORT ── */

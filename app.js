@@ -248,6 +248,8 @@ updateSidebarDate();
 updateNavBadges();
 const _lastPage = (() => { try { return localStorage.getItem('phoeniks_last_page'); } catch(e) { return null; } })();
 showPage(NAV_ORDER.includes(_lastPage) ? _lastPage : 'dashboard');
+// Re-open meeting if it was open before refresh
+try { if (localStorage.getItem('phoeniks_meeting_open') === '1') { setTimeout(openMeeting, 100); } } catch(e) {}
 
 /* Reset localStorage to load demo data if needed */
 function resetToDemo() {

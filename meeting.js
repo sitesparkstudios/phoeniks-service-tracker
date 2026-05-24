@@ -16,10 +16,12 @@ function openMeeting() {
   meetingSlide = 0;
   updateMeetingSlide();
   document.getElementById('meeting-overlay').classList.add('active');
+  try { localStorage.setItem('phoeniks_meeting_open','1'); } catch(e) {}
 }
 
 function closeMeeting() {
   document.getElementById('meeting-overlay').classList.remove('active');
+  try { localStorage.removeItem('phoeniks_meeting_open'); } catch(e) {}
 }
 
 function buildMeetingSlides() {
@@ -30,12 +32,13 @@ function buildMeetingSlides() {
   const totalValue = open.reduce((a,j) => a + (parseFloat(j.value)||0), 0);
 
   /* ── SLIDE 1: KPIs ── */
+  const waitingParts = jobs.filter(j => j.status === 'Waiting for Parts').length;
   const kpiData = [
-    { val: open.length,                                                          label: 'Open Jobs' },
-    { val: stuck.length,                                                         label: 'Needs Attention' },
-    { val: avgTotal !== null ? avgTotal + 'd' : '—',                             label: 'Avg Duration' },
-    { val: totalValue > 0 ? '$' + Math.round(totalValue).toLocaleString() : '—', label: 'Open Value' },
-    { val: done.length,                                                          label: 'Completed' },
+    { val: open.length,                                  label: 'Open Jobs' },
+    { val: stuck.length,                                 label: 'Needs Attention' },
+    { val: avgTotal !== null ? avgTotal + 'd' : '—',     label: 'Avg Duration' },
+    { val: waitingParts,                                 label: 'Waiting on Parts' },
+    { val: done.length,                                  label: 'Completed' },
   ];
   document.getElementById('meeting-kpis').innerHTML = kpiData.map(k => `
     <div class="meeting-kpi">
@@ -50,8 +53,8 @@ function buildMeetingSlides() {
     const pct = open.length ? Math.round(n / open.length * 100) : 0;
     return `<div class="meeting-stage-bar-row">
       <div class="meeting-stage-bar-meta">
-        <span style="font-size:13px;color:#3d4043;font-weight:600">${s}</span>
-        <span style="font-family:'DM Mono',monospace;font-size:12px;color:rgba(61,64,67,0.6);font-weight:600">${n} jobs</span>
+        <span style="font-size:13px;color:#1f2937;font-weight:600">${s}</span>
+        <span style="font-family:'DM Mono',monospace;font-size:12px;color:#6b7280;font-weight:600">${n} jobs</span>
       </div>
       <div class="meeting-stage-bar-bg">
         <div class="meeting-stage-bar-fill" style="width:${pct}%"></div>
@@ -64,13 +67,13 @@ function buildMeetingSlides() {
   document.getElementById('meeting-supplier-list').innerHTML = suppliers.map(s => {
     const sj      = jobs.filter(j => j.supplier === s && j.status !== 'Job Done');
     const overdue = sj.filter(j => daysBetween(j.poDate, null) > 14).length;
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(61,64,67,0.12)">
-      <div style="font-size:13px;font-weight:600;color:#3d4043">${esc(s)}</div>
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #e5e7eb">
+      <div style="font-size:13px;font-weight:600;color:#1f2937">${esc(s)}</div>
       <div style="display:flex;gap:10px;align-items:center">
-        <span style="font-size:12px;color:rgba(61,64,67,0.5)">${sj.length} open</span>
+        <span style="font-size:12px;color:#6b7280">${sj.length} open</span>
         ${overdue > 0
-          ? `<span style="background:rgba(61,64,67,0.15);color:#3d4043;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">${overdue} overdue</span>`
-          : `<span style="background:rgba(61,64,67,0.1);color:rgba(61,64,67,0.5);font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">OK</span>`}
+          ? `<span style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">${overdue} overdue</span>`
+          : `<span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">On track</span>`}
       </div>
     </div>`;
   }).join('');

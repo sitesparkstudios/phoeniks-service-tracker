@@ -590,6 +590,7 @@ function openJobModal(id) {
       <div><div class="text-muted text-sm mb-4">Total Open</div><div class="mono" style="font-weight:700;color:var(--text)">${total !== null ? total+' days' : '—'}</div></div>
       ${j.value ? `<div><div class="text-muted text-sm mb-4">Value</div><div class="mono" style="color:var(--text)">${fmtValue(j.value)}</div></div>` : ''}
       ${j.buyer ? `<div><div class="text-muted text-sm mb-4">Buyer</div><div style="color:var(--text)">${esc(j.buyer)}</div></div>` : ''}
+      ${j.sourceDoc ? `<div><div class="text-muted text-sm mb-4">Source Doc</div><div class="mono" style="color:var(--text);font-size:12px">${esc(j.sourceDoc)}</div></div>` : ''}
     </div>
     ${j.notes ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--text2);margin-bottom:16px;white-space:pre-wrap">${esc(j.notes)}</div>` : ''}
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:12px">Status history</div>

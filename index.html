@@ -340,22 +340,27 @@
       </div>
       <div class="import-panel mb-24">
         <div class="import-panel-header">
-          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700">Required Odoo Export Fields</div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700">Odoo Export Fields</div>
           <button class="btn btn-xs btn-secondary" onclick="copyOdooTemplate()">Copy field names</button>
         </div>
         <div class="import-panel-body">
-          <div class="odoo-fields">
-            <span class="odoo-field">Order Reference</span>
-            <span class="odoo-field">Vendor</span>
-            <span class="odoo-field">Vendor Reference</span>
-            <span class="odoo-field">Confirmation Date</span>
-            <span class="odoo-field">Job Status</span>
-            <span class="odoo-field">Status</span>
-            <span class="odoo-field">Order Deadline</span>
-            <span class="odoo-field">Total</span>
-            <span class="odoo-field">Receipt Status</span>
-            <span class="odoo-field">Priority</span>
-            <span class="odoo-field">Buyer</span>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:14px">
+            In Odoo go to <strong style="color:var(--text2)">Purchases → Orders</strong>, select all rows, click <strong style="color:var(--text2)">Action → Export</strong> and add these columns. Click <em>Copy field names</em> to copy them ready to paste.
+          </div>
+          <div class="odoo-fields" style="margin-bottom:14px">
+            <span class="odoo-field odoo-field-required" title="PO number — used as unique job ID">Order Reference</span>
+            <span class="odoo-field odoo-field-required" title="Service company name">Vendor</span>
+            <span class="odoo-field odoo-field-required" title="Your job/site reference">Vendor Reference</span>
+            <span class="odoo-field odoo-field-required" title="Date PO was raised">Confirmation Date</span>
+            <span class="odoo-field odoo-field-required" title="Your custom job status field">Job Status</span>
+            <span class="odoo-field odoo-field-required" title="PO value">Total</span>
+            <span class="odoo-field odoo-field-required" title="Who raised the PO">Buyer</span>
+            <span class="odoo-field" title="Target completion date">Order Deadline</span>
+            <span class="odoo-field" title="Original job/sales order reference">Source Document</span>
+            <span class="odoo-field" title="Internal PO notes — imported as job notes">Notes</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3)">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:4px;vertical-align:middle"></span>Highlighted fields are essential — the rest add useful detail but won't break the import if missing.
           </div>
         </div>
       </div>
@@ -470,7 +475,7 @@
           <div id="meeting-stage-bars"></div>
         </div>
         <div>
-          <div class="meeting-sub-title">Supplier Workload</div>
+          <div class="meeting-sub-title">Service Co. Workload</div>
           <div id="meeting-supplier-list"></div>
         </div>
       </div>
