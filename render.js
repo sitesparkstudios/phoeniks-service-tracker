@@ -136,7 +136,7 @@ function renderDashboard() {
     ? '<div class="empty-state"><p>✓ No jobs overdue — great work!</p></div>'
     : `<table><thead><tr>
         <th style="width:90px">PO</th><th>Reference</th>
-        <th style="width:150px">Supplier</th><th style="width:130px">Status</th><th style="width:68px">Open</th>
+        <th style="width:150px">Service Co.</th><th style="width:130px">Status</th><th style="width:68px">Open</th>
       </tr></thead>
       <tbody>${attn.map(j => `<tr class="flagged" onclick="openJobModal('${j.id}')">
         <td><span class="po-link">${esc(j.po)}</span></td>

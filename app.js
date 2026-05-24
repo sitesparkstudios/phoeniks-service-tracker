@@ -95,7 +95,7 @@ function saveJob() {
 
   const msgEl = document.getElementById('form-validation-msg');
   if (!po || !supplier || !poDate) {
-    msgEl.textContent   = 'PO number, supplier and PO date are required.';
+    msgEl.textContent   = 'PO number, service co. and PO date are required.';
     msgEl.style.display = 'block';
     return;
   }

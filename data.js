@@ -3,9 +3,10 @@
               Odoo chatter parser, parts ETAs, reports
    ============================================================ */
 
-const SK        = 'phoeniks_tracker_v2';
-const SK_PARTS  = 'phoeniks_parts_v1';
-const SK_REPORTS= 'phoeniks_reports_v1';
+const SK        = 'phoeniks_tracker_v3';
+const SK_PARTS  = 'phoeniks_parts_v2';
+const SK_REPORTS= 'phoeniks_reports_v2';
+const SK_OLD    = ['phoeniks_tracker_v2','phoeniks_tracker_v1','phoeniks_parts_v1','phoeniks_reports_v1'];
 
 let jobs          = [];
 let partsData     = {};   // { jobId: { eta, notes } }
@@ -80,6 +81,9 @@ const DEMO_PARTS = {
 
 /* ── PERSISTENCE ── */
 function loadData() {
+  // Clear any old versioned keys so stale data never bleeds through
+  try { SK_OLD.forEach(k => localStorage.removeItem(k)); } catch(e) {}
+
   try {
     const raw = localStorage.getItem(SK);
     if (raw) {
@@ -291,14 +295,18 @@ function processCSVFile(file) {
     headers.forEach((h,i) => { const mapped = ODOO_MAP[h]; if (mapped) colIdx[mapped] = i; });
     if (colIdx.po === undefined) { showImportResult('warn',`Could not find "Order Reference" column.`); return; }
     let added = 0, updated = 0, skipped = 0;
+    const seenPOs = new Set(); // track POs already processed in this CSV
     lines.slice(1).forEach(line => {
       const cols = parseCSVLine(line);
       const get  = key => colIdx[key] !== undefined ? (cols[colIdx[key]]||'').trim() : '';
-      const po   = get('po').replace(/^"|"$/g,'');
+      const po   = get('po').replace(/^"|"$/g,'').trim().toUpperCase();
       if (!po) { skipped++; return; }
+      if (seenPOs.has(po)) { skipped++; return; } // skip duplicate rows in same CSV
+      seenPOs.add(po);
       const newStatus = mapOdooStatus(get('status')) || 'Incoming Job';
       const poDate    = normalizeOdooDate(get('poDate')) || today();
-      const existing  = jobs.find(j => j.po === po);
+      // Match existing job case-insensitively
+      const existing  = jobs.find(j => j.po.trim().toUpperCase() === po);
       if (existing) {
         if (get('supplier'))      existing.supplier      = get('supplier');
         if (get('ref'))           existing.ref           = get('ref');
@@ -318,7 +326,7 @@ function processCSVFile(file) {
       } else {
         jobs.push({
           id: 'j' + Date.now() + Math.random().toString(36).slice(2),
-          po, supplier: get('supplier'), ref: get('ref'), equipment: '',
+          po: po, supplier: get('supplier'), ref: get('ref'), equipment: '',
           poDate, status: newStatus, value: get('value'), buyer: get('buyer'),
           deadline: normalizeOdooDate(get('deadline')), priority: get('priority'),
           receiptStatus: get('receiptStatus'),
