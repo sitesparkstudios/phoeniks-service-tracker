@@ -55,22 +55,33 @@ const DEMO_PARTS = {};
 
 /* ── PERSISTENCE ── */
 function loadData() {
-  // Clear any old versioned keys so stale data never bleeds through
+  // Wipe all old versioned keys
   try { SK_OLD.forEach(k => localStorage.removeItem(k)); } catch(e) {}
 
   try {
     const raw = localStorage.getItem(SK);
     if (raw) {
-      jobs = JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      // If stored data contains demo jobs (id starts with 'demo-'), wipe it
+      const hasDemo = Array.isArray(parsed) && parsed.some(j => (j.id || '').startsWith('demo-'));
+      if (hasDemo) {
+        localStorage.removeItem(SK);
+        localStorage.removeItem(SK_PARTS);
+        localStorage.removeItem(SK_REPORTS);
+        jobs = [];
+        saveData();
+      } else {
+        jobs = parsed;
+      }
     } else {
-      jobs = DEMO_JOBS.map(j => Object.assign({}, j));
+      jobs = [];
       saveData();
     }
   } catch(e) { jobs = []; }
 
   try {
     const rp = localStorage.getItem(SK_PARTS);
-    partsData = rp ? JSON.parse(rp) : Object.assign({}, DEMO_PARTS);
+    partsData = rp ? JSON.parse(rp) : {};
     if (!rp) savePartsData();
   } catch(e) { partsData = {}; }
 
