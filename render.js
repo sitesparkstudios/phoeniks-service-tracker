@@ -658,3 +658,288 @@ function closeSupplierModal() {
 function closeModal() {
   document.getElementById('job-modal').classList.add('hidden');
 }
+
+/* ── PERFORMANCE PAGE ── */
+let perfThroughputInst, perfFixRateInst, perfDurationInst, perfSupplierInst;
+
+function renderPerformance() {
+  const periodEl = document.getElementById('perf-period');
+  const months   = periodEl ? parseInt(periodEl.value) || 999 : 6;
+  const now      = new Date();
+
+  // Date cutoff
+  const cutoff = isNaN(months) ? null : new Date(now.getFullYear(), now.getMonth() - months, 1);
+  const cutoffStr = cutoff ? cutoff.toISOString().split('T')[0] : '2000-01-01';
+
+  // Jobs completed in period
+  const donePeriod = jobs.filter(j => {
+    if (j.status !== 'Job Done') return false;
+    const last = j.history?.[j.history.length - 1];
+    return last && last.date >= cutoffStr;
+  });
+
+  // All jobs active in period (open or closed)
+  const activePeriod = jobs.filter(j => (j.poDate || '') >= cutoffStr || j.status !== 'Job Done');
+
+  // ── HELPER: get completion date ──
+  const completedOn = j => j.history?.[j.history.length - 1]?.date || null;
+
+  // ── SCORECARD METRICS ──
+  const totalDone    = donePeriod.length;
+  const revisited    = donePeriod.filter(j => j.history?.some(h => h.status === 'Revisiting')).length;
+  const fixRate      = totalDone > 0 ? Math.round((1 - revisited / totalDone) * 100) : null;
+  const avgDuration  = totalDone > 0
+    ? Math.round(donePeriod.reduce((a, j) => a + (getTotalDays(j) || 0), 0) / totalDone)
+    : null;
+
+  // Compare to previous period for trend arrows
+  const prevCutoff    = cutoff ? new Date(cutoff.getFullYear(), cutoff.getMonth() - months, 1) : null;
+  const prevCutoffStr = prevCutoff ? prevCutoff.toISOString().split('T')[0] : '2000-01-01';
+  const prevDone = prevCutoff ? jobs.filter(j => {
+    if (j.status !== 'Job Done') return false;
+    const last = j.history?.[j.history.length - 1];
+    return last && last.date >= prevCutoffStr && last.date < cutoffStr;
+  }) : [];
+  const prevFixRate   = prevDone.length > 0 ? Math.round((1 - prevDone.filter(j => j.history?.some(h => h.status === 'Revisiting')).length / prevDone.length) * 100) : null;
+  const prevAvgDur    = prevDone.length > 0 ? Math.round(prevDone.reduce((a, j) => a + (getTotalDays(j) || 0), 0) / prevDone.length) : null;
+
+  // Currently open jobs > 30 days
+  const longOpen = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 30).length;
+
+  // Avg wait time for parts (Waiting for Parts stage dwell, completed jobs)
+  const partsWaits = donePeriod.map(j => getDwellTimes(j)['Waiting for Parts']).filter(d => d !== undefined);
+  const avgPartsWait = partsWaits.length ? Math.round(partsWaits.reduce((a, b) => a + b, 0) / partsWaits.length) : null;
+
+  function trend(current, previous, lowerIsBetter = false) {
+    if (current === null || previous === null) return '';
+    const better = lowerIsBetter ? current < previous : current > previous;
+    const same   = current === previous;
+    if (same) return '<span style="color:var(--text3);font-size:12px;margin-left:6px">→ same</span>';
+    const arrow  = better ? '↑' : '↓';
+    const color  = better ? 'var(--green)' : 'var(--red)';
+    const diff   = Math.abs(current - previous);
+    return `<span style="color:${color};font-size:12px;font-weight:700;margin-left:6px">${arrow} ${diff}</span>`;
+  }
+
+  // ── RENDER SCORECARD ──
+  const scorecard = document.getElementById('perf-scorecard');
+  if (scorecard) {
+    const fixClass  = fixRate === null ? '' : fixRate >= 80 ? 'good' : fixRate >= 70 ? '' : 'warn';
+    const durClass  = avgDuration === null ? '' : avgDuration <= 14 ? 'good' : avgDuration <= 21 ? '' : 'warn';
+    const openClass = longOpen === 0 ? 'good' : longOpen <= 3 ? '' : 'warn';
+    scorecard.innerHTML = `
+      <div class="metric-card ${fixRate !== null && fixRate >= 80 ? 'accent-green' : fixRate !== null && fixRate < 70 ? 'danger' : 'accent-blue'}">
+        <div class="metric-label">First-Time Fix Rate</div>
+        <div class="metric-value ${fixClass}">${fixRate !== null ? fixRate + '%' : '—'}${trend(fixRate, prevFixRate)}</div>
+        <div class="metric-sub">Benchmark: 75–80% · ${revisited} revisit${revisited !== 1 ? 's' : ''} in period</div>
+      </div>
+      <div class="metric-card ${durClass === 'good' ? 'accent-green' : ''}">
+        <div class="metric-label">Avg Job Duration</div>
+        <div class="metric-value ${durClass}">${avgDuration !== null ? avgDuration + 'd' : '—'}${trend(avgDuration, prevAvgDur, true)}</div>
+        <div class="metric-sub">PO raised → completed · ${totalDone} jobs</div>
+      </div>
+      <div class="metric-card accent-blue">
+        <div class="metric-label">Jobs Completed</div>
+        <div class="metric-value">${totalDone}${trend(totalDone, prevDone.length)}</div>
+        <div class="metric-sub">In selected period</div>
+      </div>
+      <div class="metric-card ${openClass === 'good' ? 'accent-green' : openClass === 'warn' ? 'warn' : ''}">
+        <div class="metric-label">Open > 30 Days</div>
+        <div class="metric-value">${longOpen}</div>
+        <div class="metric-sub">Needs escalation</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Avg Parts Wait</div>
+        <div class="metric-value">${avgPartsWait !== null ? avgPartsWait + 'd' : '—'}</div>
+        <div class="metric-sub">Time stuck in Waiting for Parts</div>
+      </div>
+    `;
+  }
+
+  // ── BUILD MONTHLY BUCKETS ──
+  const buckets = [];
+  for (let i = (isNaN(months) ? 23 : months - 1); i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    buckets.push({
+      key:   `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
+      label: d.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }),
+      completed: 0, revisited: 0, totalDays: 0, durCount: 0,
+    });
+  }
+
+  donePeriod.forEach(j => {
+    const cd = completedOn(j);
+    if (!cd) return;
+    const key  = cd.substring(0, 7);
+    const slot = buckets.find(b => b.key === key);
+    if (!slot) return;
+    slot.completed++;
+    if (j.history?.some(h => h.status === 'Revisiting')) slot.revisited++;
+    const dur = getTotalDays(j);
+    if (dur !== null) { slot.totalDays += dur; slot.durCount++; }
+  });
+
+  const labels   = buckets.map(b => b.label);
+  const chartOpts = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true, ticks: { ...CHART_TICK }, grid: CHART_GRID },
+      x: { ticks: { ...CHART_TICK, maxRotation: 45 }, grid: { display: false } }
+    }
+  };
+
+  // ── THROUGHPUT CHART ──
+  if (perfThroughputInst) perfThroughputInst.destroy();
+  perfThroughputInst = new Chart(document.getElementById('perfThroughputChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: buckets.map(b => b.completed),
+        backgroundColor: buckets.map(b => b.completed > 0 ? 'rgba(37,99,235,0.75)' : 'rgba(0,0,0,0.05)'),
+        borderRadius: 6, borderWidth: 0,
+      }]
+    },
+    options: { ...chartOpts,
+      plugins: { ...chartOpts.plugins,
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw} job${ctx.raw !== 1 ? 's' : ''} completed` } }
+      }
+    }
+  });
+
+  // ── FIX RATE CHART ──
+  const fixRates = buckets.map(b => b.completed > 0 ? Math.round((1 - b.revisited / b.completed) * 100) : null);
+  if (perfFixRateInst) perfFixRateInst.destroy();
+  perfFixRateInst = new Chart(document.getElementById('perfFixRateChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          data: fixRates,
+          borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.08)',
+          tension: 0.35, fill: true, borderWidth: 2.5,
+          pointBackgroundColor: fixRates.map(v => v === null ? 'transparent' : v >= 75 ? '#16a34a' : '#dc2626'),
+          pointRadius: 4, spanGaps: true,
+        },
+        {
+          // benchmark line at 75%
+          data: buckets.map(() => 75),
+          borderColor: 'rgba(217,119,6,0.5)', borderDash: [6, 4],
+          borderWidth: 1.5, pointRadius: 0, fill: false,
+          label: '75% benchmark',
+        }
+      ]
+    },
+    options: { ...chartOpts,
+      plugins: { legend: { display: true, labels: { boxWidth: 12, font: { size: 11, family: 'Plus Jakarta Sans' }, color: '#9ba3af' } },
+        tooltip: { callbacks: { label: ctx => ctx.datasetIndex === 0 ? ` ${ctx.raw}% fix rate` : ' 75% benchmark' } }
+      },
+      scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 0, max: 100, ticks: { ...CHART_TICK, callback: v => v + '%' } } }
+    }
+  });
+
+  // ── AVG DURATION CHART ──
+  const avgDurs = buckets.map(b => b.durCount > 0 ? Math.round(b.totalDays / b.durCount) : null);
+  if (perfDurationInst) perfDurationInst.destroy();
+  perfDurationInst = new Chart(document.getElementById('perfDurationChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: avgDurs,
+        borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.07)',
+        tension: 0.35, fill: true, borderWidth: 2.5,
+        pointBackgroundColor: '#7c3aed', pointRadius: 4, spanGaps: true,
+      }]
+    },
+    options: { ...chartOpts,
+      plugins: { ...chartOpts.plugins,
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw}d avg` } }
+      },
+      scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, ticks: { ...CHART_TICK, callback: v => v + 'd' } } }
+    }
+  });
+
+  // ── SERVICE CO. LEAGUE TABLE + CHART ──
+  const suppliers = [...new Set(donePeriod.map(j => j.supplier))].sort();
+  const supData   = suppliers.map(s => {
+    const sj        = donePeriod.filter(j => j.supplier === s);
+    const revisits  = sj.filter(j => j.history?.some(h => h.status === 'Revisiting')).length;
+    const durations = sj.map(j => getTotalDays(j)).filter(d => d !== null);
+    const avg       = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : null;
+    const fastest   = durations.length ? Math.min(...durations) : null;
+    const slowest   = durations.length ? Math.max(...durations) : null;
+    const fix       = sj.length ? Math.round((1 - revisits / sj.length) * 100) : null;
+    return { s, count: sj.length, revisits, avg, fastest, slowest, fix };
+  }).sort((a, b) => (a.avg || 999) - (b.avg || 999));
+
+  if (perfSupplierInst) perfSupplierInst.destroy();
+  perfSupplierInst = new Chart(document.getElementById('perfSupplierChart'), {
+    type: 'bar',
+    data: {
+      labels: supData.map(d => d.s),
+      datasets: [{
+        data: supData.map(d => d.avg),
+        backgroundColor: supData.map(d =>
+          d.avg === null ? 'rgba(0,0,0,0.05)' :
+          d.avg <= 14 ? 'rgba(22,163,74,0.7)' :
+          d.avg <= 21 ? 'rgba(245,158,11,0.7)' : 'rgba(220,38,38,0.7)'
+        ),
+        borderRadius: 6, borderWidth: 0,
+      }]
+    },
+    options: { ...chartOpts, indexAxis: 'y',
+      plugins: { ...chartOpts.plugins,
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw}d avg` } }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { ...CHART_TICK, callback: v => v + 'd' }, grid: CHART_GRID },
+        y: { ticks: CHART_TICK, grid: { display: false } }
+      }
+    }
+  });
+
+  // ── SUPPLIER TBODY ──
+  const tbody = document.getElementById('perf-supplier-tbody');
+  if (tbody) {
+    tbody.innerHTML = !supData.length
+      ? '<tr><td colspan="7"><div class="empty-state"><p>No completed jobs in this period.</p></div></td></tr>'
+      : supData.map(d => {
+          const fixCls = d.fix === null ? '' : d.fix >= 80 ? 'color:var(--green)' : d.fix < 70 ? 'color:var(--red)' : 'color:var(--amber)';
+          const avgCls = d.avg === null ? '' : d.avg <= 14 ? 'color:var(--green)' : d.avg > 21 ? 'color:var(--red)' : '';
+          return `<tr onclick="openSupplierModal('${esc(d.s)}','all')" style="cursor:pointer">
+            <td style="font-weight:600">${esc(d.s)}</td>
+            <td style="text-align:center">${d.count}</td>
+            <td style="text-align:center">${d.revisits > 0 ? `<span style="color:var(--amber);font-weight:600">${d.revisits}</span>` : '<span style="color:var(--green)">0</span>'}</td>
+            <td style="text-align:center;font-weight:700;${fixCls}">${d.fix !== null ? d.fix + '%' : '—'}</td>
+            <td style="text-align:center;font-weight:700;${avgCls}">${d.avg !== null ? d.avg + 'd' : '—'}</td>
+            <td style="text-align:center;color:var(--green)">${d.fastest !== null ? d.fastest + 'd' : '—'}</td>
+            <td style="text-align:center;color:var(--red)">${d.slowest !== null ? d.slowest + 'd' : '—'}</td>
+          </tr>`;
+        }).join('');
+  }
+
+  // ── REVISIT LOG ──
+  const revisitJobs = jobs.filter(j => j.history?.some(h => h.status === 'Revisiting') && (j.poDate || '') >= cutoffStr)
+    .sort((a, b) => (b.poDate || '').localeCompare(a.poDate || ''));
+  const revisitEl = document.getElementById('perf-revisit-list');
+  if (revisitEl) {
+    revisitEl.innerHTML = !revisitJobs.length
+      ? '<div class="empty-state" style="padding:32px"><p>✓ No revisited jobs in this period.</p></div>'
+      : `<table><thead><tr>
+          <th style="width:110px">PO</th><th>Reference</th>
+          <th style="width:140px">Service Co.</th>
+          <th style="width:110px">Status</th>
+          <th style="width:80px">Total days</th>
+        </tr></thead>
+        <tbody>${revisitJobs.map(j => `<tr onclick="openJobModal('${j.id}')" style="cursor:pointer">
+          <td><span class="po-link">${esc(j.po)}</span></td>
+          <td class="ref-cell">${esc(j.ref || '—')}</td>
+          <td>${esc(j.supplier)}</td>
+          <td>${badge(j.status)}</td>
+          <td>${dayChip(getTotalDays(j), j.status === 'Job Done')}</td>
+        </tr>`).join('')}</tbody></table>`;
+  }
+}

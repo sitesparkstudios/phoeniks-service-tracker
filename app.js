@@ -7,6 +7,7 @@ const PAGE_TITLES = {
   dashboard:  'Dashboard',
   activity:   'Weekly Activity',
   bottleneck: 'Bottleneck Report',
+  performance: 'Performance',
   jobs:       'All Jobs',
   parts:      'Parts Tracker',
   suppliers:  'Service Companies',
@@ -15,7 +16,7 @@ const PAGE_TITLES = {
   add:        'Add / Edit Job',
 };
 
-const NAV_ORDER = ['dashboard','activity','bottleneck','jobs','parts','suppliers','reports','import','add'];
+const NAV_ORDER = ['dashboard','activity','bottleneck','performance','jobs','parts','suppliers','reports','import','add'];
 
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -30,6 +31,7 @@ function showPage(name) {
   if (name === 'dashboard')  renderDashboard();
   if (name === 'activity')   renderActivity();
   if (name === 'bottleneck') renderBottleneck();
+  if (name === 'performance') renderPerformance();
   if (name === 'jobs')       { renderJobs(); populateSupplierDatalist(); }
   if (name === 'parts')      renderParts();
   if (name === 'suppliers')  renderSuppliers();
