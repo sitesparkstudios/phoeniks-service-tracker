@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phoeniks — Service Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-inner">
+        <!-- Dot grid mark -->
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;flex-shrink:0">
+            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+            <div style="width:8px;height:8px;border-radius:50%;border:2px solid #3d4043"></div>
+          </div>
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#3d4043;letter-spacing:1px;line-height:1">PHOENIKS</div>
+        </div>
+        <div style="font-size:10px;color:rgba(61,64,67,0.55);letter-spacing:0.06em;text-transform:uppercase;margin-top:6px;font-family:'DM Sans',sans-serif">Electric Kitchen Specialists</div>
+      </div>
+    </div>
+
+    <div class="nav-section-label">Main</div>
+    <div class="sidebar-nav">
+      <div class="nav-item active" onclick="showPage('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" onclick="showPage('bottleneck')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Bottleneck Report
+      </div>
+      <div class="nav-item" onclick="showPage('jobs')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+        All Jobs
+      </div>
+      <div class="nav-item" onclick="showPage('suppliers')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        Suppliers
+      </div>
+      <div class="nav-section-label" style="padding-left:0">Data</div>
+      <div class="nav-item" onclick="showPage('import')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Odoo Import
+      </div>
+      <div class="nav-item" onclick="showPage('add')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Add / Edit Job
+      </div>
+    </div>
+
+    <div class="sidebar-bottom">
+      <div>Week of <span id="sidebar-week"></span></div>
+      <div class="mono" style="margin-top:2px">v2.0 · Odoo-connected</div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08)">
+        Created by <strong style="color:rgba(255,255,255,0.5)">Sean</strong><br>
+        Technical Service Manager
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <div class="topbar-actions">
+        <button class="btn btn-meeting" onclick="openMeeting()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          Monday Meeting
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="exportCSV()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="window.print()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print
+        </button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Overview</div>
+          <div class="section-sub" id="dash-date"></div>
+        </div>
+        <button class="btn btn-primary" onclick="showPage('add')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          Add job
+        </button>
+      </div>
+      <div id="kpi-grid" class="metric-grid"></div>
+      <div class="grid-2 mb-24">
+        <div class="card chart-card">
+          <div class="chart-title">Jobs by status</div>
+          <div class="chart-wrap" style="height:200px"><canvas id="statusChart"></canvas></div>
+        </div>
+        <div class="card" style="padding:20px">
+          <div class="chart-title">Current stage — avg days open</div>
+          <div id="stage-bars-dash"></div>
+        </div>
+      </div>
+      <div class="card chart-card mb-24">
+        <div class="chart-title">Monthly spend — last 12 months (from Odoo PO values)</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="spendChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Needs attention
+          </div>
+          <span class="text-sm text-muted">Open &gt; 14 days</span>
+        </div>
+        <div id="attention-table" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- BOTTLENECK -->
+    <div id="page-bottleneck" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Bottleneck Report</div>
+          <div class="section-sub">Average time in each stage — find where jobs stall</div>
+        </div>
+      </div>
+      <div class="card" style="padding:24px;margin-bottom:20px">
+        <div class="chart-title">Where time is being lost</div>
+        <div id="bottleneck-bars"></div>
+      </div>
+      <div class="grid-2 mb-20">
+        <div class="card chart-card">
+          <div class="chart-title">Avg dwell per stage</div>
+          <div class="chart-wrap" style="height:220px"><canvas id="dwellChart"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="chart-title">Avg total duration by supplier</div>
+          <div class="chart-wrap" style="height:220px"><canvas id="supplierChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:600">Stage dwell breakdown — all jobs</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:90px">PO</th><th style="width:140px">Supplier</th><th>Reference</th>
+              <th style="width:75px">Incoming</th><th style="width:68px">Booked</th>
+              <th style="width:75px">Waiting</th><th style="width:75px">Revisit</th>
+              <th style="width:68px">Status</th><th style="width:65px">Total</th>
+            </tr></thead>
+            <tbody id="dwell-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALL JOBS -->
+    <div id="page-jobs" class="page">
+      <div class="section-header mb-16">
+        <div>
+          <div class="section-title">All Jobs</div>
+          <div class="section-sub" id="jobs-count"></div>
+        </div>
+        <button class="btn btn-primary" onclick="showPage('add')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          Add job
+        </button>
+      </div>
+      <div class="filter-row">
+        <select id="filter-status" onchange="renderJobs()">
+          <option value="">All statuses</option>
+          <option>Incoming Job</option><option>Job Booked</option>
+          <option>Waiting for Parts</option><option>Revisiting</option>
+          <option>Job Done</option><option>Maintenance</option>
+        </select>
+        <select id="filter-supplier" onchange="renderJobs()"><option value="">All suppliers</option></select>
+        <input type="text" id="filter-search" placeholder="Search PO, reference, equipment..." oninput="renderJobs()" style="max-width:300px">
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:90px">PO</th><th>Reference</th><th style="width:150px">Supplier</th>
+              <th style="width:130px">Status</th><th style="width:70px">Open</th>
+              <th style="width:75px">In stage</th><th style="width:100px">Value</th><th style="width:90px"></th>
+            </tr></thead>
+            <tbody id="jobs-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ODOO IMPORT -->
+    <div id="page-import" class="page">
+      <div class="section-header mb-20">
+        <div>
+          <div class="section-title">Odoo CSV Import</div>
+          <div class="section-sub">Upload your weekly Odoo export — app auto-maps fields and updates existing jobs</div>
+        </div>
+      </div>
+      <div class="import-panel mb-24">
+        <div class="import-panel-header">
+          <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700">Required Odoo Export Fields</div>
+          <button class="btn btn-xs btn-secondary" onclick="copyOdooTemplate()">Copy field names</button>
+        </div>
+        <div class="import-panel-body">
+          <div class="odoo-fields">
+            <span class="odoo-field">Order Reference</span>
+            <span class="odoo-field">Vendor</span>
+            <span class="odoo-field">Vendor Reference</span>
+            <span class="odoo-field">Confirmation Date</span>
+            <span class="odoo-field">Job Status</span>
+            <span class="odoo-field">Status</span>
+            <span class="odoo-field">Order Deadline</span>
+            <span class="odoo-field">Total</span>
+            <span class="odoo-field">Receipt Status</span>
+            <span class="odoo-field">Priority</span>
+            <span class="odoo-field">Buyer</span>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="padding:24px;margin-bottom:20px">
+        <div class="chart-title" style="margin-bottom:16px">Upload CSV</div>
+        <div class="drop-zone" id="drop-zone"
+          ondragover="handleDragOver(event)" ondragleave="handleDragLeave()" ondrop="handleDrop(event)"
+          onclick="document.getElementById('csv-file').click()">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div style="font-weight:600;margin-bottom:4px">Drop CSV here or click to browse</div>
+          <div style="font-size:12px;color:var(--text3)">Exported from Odoo Purchase → Orders</div>
+        </div>
+        <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
+        <div id="import-result" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- ADD / EDIT JOB -->
+    <div id="page-add" class="page">
+      <div class="section-header mb-20">
+        <div>
+          <div class="section-title" id="form-page-title">Add New Job</div>
+          <div class="section-sub">Fill in manually or paste Odoo chatter below to auto-extract status history</div>
+        </div>
+      </div>
+      <div class="form-card">
+        <div class="form-section">
+          <div class="form-section-title">Job Details</div>
+          <div class="form-grid">
+            <div class="form-group"><label>PO Number *</label><input type="text" id="f-po" placeholder="PO00123"></div>
+            <div class="form-group">
+              <label>Supplier *</label>
+              <input type="text" id="f-supplier" placeholder="e.g. Moffat, Hobart" list="supplier-datalist">
+              <datalist id="supplier-datalist"></datalist>
+            </div>
+            <div class="form-group"><label>Reference / Site</label><input type="text" id="f-ref" placeholder="e.g. KFC Ringwood — oven repair"></div>
+            <div class="form-group"><label>Equipment</label><input type="text" id="f-equipment" placeholder="e.g. Combi Oven 20GN"></div>
+            <div class="form-group"><label>PO Date *</label><input type="date" id="f-po-date"></div>
+            <div class="form-group">
+              <label>Current Job Status</label>
+              <select id="f-status">
+                <option>Incoming Job</option><option>Job Booked</option>
+                <option>Waiting for Parts</option><option>Revisiting</option>
+                <option>Job Done</option><option>Maintenance</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Order Value ($)</label><input type="text" id="f-value" placeholder="0.00"></div>
+            <div class="form-group"><label>Buyer</label><input type="text" id="f-buyer" placeholder="Peter Houchin"></div>
+            <div class="form-group full"><label>Notes</label><textarea id="f-notes" placeholder="Serial numbers, loan machine details, technician notes..."></textarea></div>
+          </div>
+        </div>
+        <div class="form-section" style="margin-bottom:0">
+          <div class="form-section-title" style="display:flex;justify-content:space-between;align-items:center">
+            <span>Odoo Chatter Log <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">(optional — auto-extracts status history)</span></span>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('f-chatter').value='';document.getElementById('chatter-preview-box').innerHTML=''">Clear</button>
+          </div>
+          <div class="chatter-box">
+            <div class="chatter-box-header">
+              <span>Paste the chatter section from the Odoo PO page</span>
+              <span class="text-sm" style="color:var(--text3)" id="chatter-parse-status"></span>
+            </div>
+            <textarea id="f-chatter" placeholder="Paste Odoo chatter here to auto-extract status transitions..." oninput="liveParseChatter()"></textarea>
+            <div id="chatter-preview-box"></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="saveJob()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
+          <span id="save-btn-label">Save job</span>
+        </button>
+        <button class="btn btn-secondary" onclick="clearForm()">Cancel</button>
+      </div>
+      <div id="form-validation-msg" style="margin-top:10px;font-size:13px;color:var(--red);display:none"></div>
+    </div>
+
+    <!-- SUPPLIERS -->
+    <div id="page-suppliers" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Supplier Scorecards</div>
+          <div class="section-sub">Performance breakdown by repairer</div>
+        </div>
+      </div>
+      <div id="supplier-grid" class="supplier-grid"></div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ── MEETING MODE OVERLAY ── -->
+<div id="meeting-overlay" class="meeting-overlay">
+  <div class="meeting-header">
+    <div class="meeting-logo">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;flex-shrink:0">
+          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:7px;height:7px;border-radius:50%;border:2px solid #3d4043"></div>
+        </div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:#3d4043;letter-spacing:1px">PHOENIKS</div>
+      </div>
+      <div class="meeting-logo-text"><span>SERVICE MEETING</span></div>
+    </div>
+    <div class="meeting-date" id="meeting-date-display"></div>
+    <div class="meeting-close" onclick="closeMeeting()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </div>
+  </div>
+  <div class="meeting-body">
+    <div class="meeting-slide active" id="slide-0">
+      <div class="slide-label">Slide 1 of 4 — Weekly Overview</div>
+      <div class="meeting-section-title"><div class="dot"></div>This Week's Numbers</div>
+      <div class="meeting-kpi-grid" id="meeting-kpis"></div>
+      <div class="grid-2">
+        <div>
+          <div class="meeting-sub-title">Status Breakdown</div>
+          <div id="meeting-stage-bars"></div>
+        </div>
+        <div>
+          <div class="meeting-sub-title">Supplier Workload</div>
+          <div id="meeting-supplier-list"></div>
+        </div>
+      </div>
+    </div>
+    <div class="meeting-slide" id="slide-1">
+      <div class="slide-label">Slide 2 of 4 — Needs Attention</div>
+      <div class="meeting-section-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Jobs Needing Attention
+      </div>
+      <div id="meeting-attention-content"></div>
+    </div>
+    <div class="meeting-slide" id="slide-2">
+      <div class="slide-label">Slide 3 of 4 — Active Jobs by Stage</div>
+      <div class="meeting-section-title"><div class="dot" style="background:var(--blue)"></div>Active Jobs by Stage</div>
+      <div class="status-columns" id="meeting-stage-columns"></div>
+    </div>
+    <div class="meeting-slide" id="slide-3">
+      <div class="slide-label">Slide 4 of 4 — Performance</div>
+      <div class="meeting-section-title"><div class="dot" style="background:var(--purple)"></div>Where Are We Losing Time?</div>
+      <div class="meeting-bottleneck" id="meeting-bottleneck-content"></div>
+    </div>
+  </div>
+  <div class="meeting-nav">
+    <button class="btn btn-secondary btn-sm" onclick="meetingPrev()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      Prev
+    </button>
+    <div class="meeting-nav-dots" id="meeting-dots"></div>
+    <button class="btn btn-secondary btn-sm" onclick="meetingNext()">
+      Next
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Job detail modal -->
+<div id="job-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-po"></div>
+        <div class="modal-subtitle" id="modal-ref"></div>
+      </div>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="modal-del-btn">Delete</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+      <button class="btn btn-primary" id="modal-edit-btn">Edit job</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm dialog -->
+<div id="confirm-overlay" class="confirm-overlay hidden">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">Are you sure?</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-secondary" onclick="confirmResolve(false)">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmResolve(true)" id="confirm-ok-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="data.js"></script>
+<script src="render.js"></script>
+<script src="meeting.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
