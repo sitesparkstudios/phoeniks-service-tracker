@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Phoeniks — Service Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -16,7 +16,6 @@
   <aside class="sidebar">
     <div class="sidebar-logo">
       <div class="sidebar-logo-inner">
-        <!-- Dot grid mark -->
         <div style="display:flex;align-items:center;gap:10px">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;flex-shrink:0">
             <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
@@ -26,9 +25,9 @@
             <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
             <div style="width:8px;height:8px;border-radius:50%;border:2px solid #3d4043"></div>
           </div>
-          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#3d4043;letter-spacing:1px;line-height:1">PHOENIKS</div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:21px;color:#3d4043;letter-spacing:1px;line-height:1">PHOENIKS</div>
         </div>
-        <div style="font-size:10px;color:rgba(61,64,67,0.55);letter-spacing:0.06em;text-transform:uppercase;margin-top:6px;font-family:'DM Sans',sans-serif">Electric Kitchen Specialists</div>
+        <div style="font-size:10px;color:rgba(61,64,67,0.55);letter-spacing:0.06em;text-transform:uppercase;margin-top:6px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600">Electric Kitchen Specialists</div>
       </div>
     </div>
 
@@ -38,6 +37,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         Dashboard
       </div>
+      <div class="nav-item" onclick="showPage('activity')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Weekly Activity
+      </div>
       <div class="nav-item" onclick="showPage('bottleneck')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         Bottleneck Report
@@ -46,9 +49,17 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
         All Jobs
       </div>
+      <div class="nav-item" onclick="showPage('parts')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/><path d="M14.83 9.17a4 4 0 010 5.66M9.17 9.17a4 4 0 000 5.66"/></svg>
+        Parts Tracker
+      </div>
       <div class="nav-item" onclick="showPage('suppliers')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
         Suppliers
+      </div>
+      <div class="nav-item" onclick="showPage('reports')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13,2 13,9 20,9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
+        Reports
       </div>
       <div class="nav-section-label" style="padding-left:0">Data</div>
       <div class="nav-item" onclick="showPage('import')">
@@ -62,8 +73,8 @@
     </div>
 
     <div class="sidebar-bottom">
-      <div>Week of <span id="sidebar-week"></span></div>
-      <div class="mono" style="margin-top:2px">v2.0 · Odoo-connected</div>
+      <div id="sidebar-date-display"></div>
+      <div class="mono" style="margin-top:2px">v3.0 · Odoo-connected</div>
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08)">
         Created by <strong style="color:rgba(255,255,255,0.5)">Sean</strong><br>
         Technical Service Manager
@@ -104,6 +115,13 @@
         </button>
       </div>
       <div id="kpi-grid" class="metric-grid"></div>
+
+      <!-- Stage dwell — prominent at top -->
+      <div class="card mb-24" style="padding:24px">
+        <div class="chart-title">Stage dwell breakdown — where jobs are sitting right now</div>
+        <div id="stage-dwell-prominent"></div>
+      </div>
+
       <div class="grid-2 mb-24">
         <div class="card chart-card">
           <div class="chart-title">Jobs by status</div>
@@ -115,18 +133,53 @@
         </div>
       </div>
       <div class="card chart-card mb-24">
-        <div class="chart-title">Monthly spend — last 12 months (from Odoo PO values)</div>
+        <div class="chart-title">Monthly spend — last 12 months</div>
         <div class="chart-wrap" style="height:180px"><canvas id="spendChart"></canvas></div>
       </div>
       <div class="card">
         <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
+          <div style="font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             Needs attention
           </div>
           <span class="text-sm text-muted">Open &gt; 14 days</span>
         </div>
         <div id="attention-table" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- WEEKLY ACTIVITY -->
+    <div id="page-activity" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Weekly Activity</div>
+          <div class="section-sub">What's changed this week — new jobs, status moves, completions</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <select id="activity-range" onchange="renderActivity()" style="width:auto">
+            <option value="7">Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2 mb-24">
+        <div class="metric-card accent-blue">
+          <div class="metric-label">New jobs</div>
+          <div class="metric-value" id="act-new">—</div>
+          <div class="metric-sub">Added this period</div>
+        </div>
+        <div class="metric-card accent-green">
+          <div class="metric-label">Completed</div>
+          <div class="metric-value" id="act-done">—</div>
+          <div class="metric-sub">Marked job done</div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:700">Activity feed</div>
+        </div>
+        <div style="padding:20px" id="activity-feed"></div>
       </div>
     </div>
 
@@ -154,7 +207,7 @@
       </div>
       <div class="card">
         <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
-          <div style="font-size:13px;font-weight:600">Stage dwell breakdown — all jobs</div>
+          <div style="font-size:13px;font-weight:700">Stage dwell breakdown — all jobs</div>
         </div>
         <div class="table-wrap">
           <table>
@@ -206,6 +259,58 @@
       </div>
     </div>
 
+    <!-- PARTS TRACKER -->
+    <div id="page-parts" class="page">
+      <div class="section-header mb-16">
+        <div>
+          <div class="section-title">Parts Tracker</div>
+          <div class="section-sub">Jobs waiting on parts — add ETA and notes manually</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:90px">PO</th>
+              <th>Reference</th>
+              <th style="width:140px">Supplier</th>
+              <th style="width:80px">Waiting</th>
+              <th style="width:150px">Part / Notes</th>
+              <th style="width:140px">ETA</th>
+              <th style="width:80px">Status</th>
+            </tr></thead>
+            <tbody id="parts-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUPPLIERS -->
+    <div id="page-suppliers" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Supplier Scorecards</div>
+          <div class="section-sub">Performance breakdown by repairer</div>
+        </div>
+      </div>
+      <div id="supplier-grid" class="supplier-grid"></div>
+    </div>
+
+    <!-- REPORTS -->
+    <div id="page-reports" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Meeting Reports</div>
+          <div class="section-sub">Saved snapshots from each Monday meeting — track progress week to week</div>
+        </div>
+        <button class="btn btn-primary" onclick="saveReport()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
+          Save this week's snapshot
+        </button>
+      </div>
+      <div id="reports-list"></div>
+    </div>
+
     <!-- ODOO IMPORT -->
     <div id="page-import" class="page">
       <div class="section-header mb-20">
@@ -216,7 +321,7 @@
       </div>
       <div class="import-panel mb-24">
         <div class="import-panel-header">
-          <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700">Required Odoo Export Fields</div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700">Required Odoo Export Fields</div>
           <button class="btn btn-xs btn-secondary" onclick="copyOdooTemplate()">Copy field names</button>
         </div>
         <div class="import-panel-body">
@@ -241,7 +346,7 @@
           ondragover="handleDragOver(event)" ondragleave="handleDragLeave()" ondrop="handleDrop(event)"
           onclick="document.getElementById('csv-file').click()">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <div style="font-weight:600;margin-bottom:4px">Drop CSV here or click to browse</div>
+          <div style="font-weight:600;margin-bottom:4px;margin-top:10px">Drop CSV here or click to browse</div>
           <div style="font-size:12px;color:var(--text3)">Exported from Odoo Purchase → Orders</div>
         </div>
         <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
@@ -308,36 +413,27 @@
       <div id="form-validation-msg" style="margin-top:10px;font-size:13px;color:var(--red);display:none"></div>
     </div>
 
-    <!-- SUPPLIERS -->
-    <div id="page-suppliers" class="page">
-      <div class="section-header mb-24">
-        <div>
-          <div class="section-title">Supplier Scorecards</div>
-          <div class="section-sub">Performance breakdown by repairer</div>
-        </div>
-      </div>
-      <div id="supplier-grid" class="supplier-grid"></div>
-    </div>
-
   </div><!-- /main -->
 </div><!-- /app -->
 
-<!-- ── MEETING MODE OVERLAY ── -->
+<!-- ── MEETING MODE — BOLD YELLOW ── -->
 <div id="meeting-overlay" class="meeting-overlay">
   <div class="meeting-header">
     <div class="meeting-logo">
-      <div style="display:flex;align-items:center;gap:8px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;flex-shrink:0">
-          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:7px;height:7px;border-radius:50%;border:2px solid #3d4043"></div>
+      <div class="meeting-logo-inner">
+        <div class="meeting-logo-dots">
+          <div class="meeting-logo-dot"></div>
+          <div class="meeting-logo-dot"></div>
+          <div class="meeting-logo-dot"></div>
+          <div class="meeting-logo-dot"></div>
+          <div class="meeting-logo-dot"></div>
+          <div class="meeting-logo-dot hollow"></div>
         </div>
-        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:#3d4043;letter-spacing:1px">PHOENIKS</div>
+        <div>
+          <div class="meeting-logo-text-wrap">PHOENIKS</div>
+          <div class="meeting-logo-sub">Service Meeting</div>
+        </div>
       </div>
-      <div class="meeting-logo-text"><span>SERVICE MEETING</span></div>
     </div>
     <div class="meeting-date" id="meeting-date-display"></div>
     <div class="meeting-close" onclick="closeMeeting()">
@@ -363,19 +459,19 @@
     <div class="meeting-slide" id="slide-1">
       <div class="slide-label">Slide 2 of 4 — Needs Attention</div>
       <div class="meeting-section-title">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3d4043" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         Jobs Needing Attention
       </div>
       <div id="meeting-attention-content"></div>
     </div>
     <div class="meeting-slide" id="slide-2">
       <div class="slide-label">Slide 3 of 4 — Active Jobs by Stage</div>
-      <div class="meeting-section-title"><div class="dot" style="background:var(--blue)"></div>Active Jobs by Stage</div>
+      <div class="meeting-section-title"><div class="dot"></div>Active Jobs by Stage</div>
       <div class="status-columns" id="meeting-stage-columns"></div>
     </div>
     <div class="meeting-slide" id="slide-3">
       <div class="slide-label">Slide 4 of 4 — Performance</div>
-      <div class="meeting-section-title"><div class="dot" style="background:var(--purple)"></div>Where Are We Losing Time?</div>
+      <div class="meeting-section-title"><div class="dot"></div>Where Are We Losing Time?</div>
       <div class="meeting-bottleneck" id="meeting-bottleneck-content"></div>
     </div>
   </div>
