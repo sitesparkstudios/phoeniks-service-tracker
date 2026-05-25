@@ -1218,6 +1218,44 @@ function buildPrintReport() {
   const waitingBills = jobs.filter(j=>j.billingStatus==='Waiting Bills');
   const fullyBilled  = jobs.filter(j=>j.billingStatus==='Fully Billed').length;
 
+  // Week number
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const weekNum = Math.ceil(((now - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+
+  // Completed this week
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay() + 1); weekStart.setHours(0,0,0,0);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+  const completedThisWeek = done.filter(j => {
+    const last = j.history?.[j.history.length-1];
+    return last && last.date >= weekStartStr;
+  });
+
+  // Longest single open job
+  const longestJob = allOpen.length ? allOpen.reduce((a,b) => daysBetween(b.poDate,null) > daysBetween(a.poDate,null) ? b : a) : null;
+  const longestDays = longestJob ? daysBetween(longestJob.poDate,null) : 0;
+
+  // Fix rate trend — compare last 90d vs 90-180d
+  const now180 = new Date(); now180.setDate(now180.getDate()-180);
+  const cut180 = now180.toISOString().split('T')[0];
+  const prev90 = done.filter(j=>(j.poDate||'')>=cut180 && (j.poDate||'')<cut90);
+  const prevRevisited = prev90.filter(j=>j.history?.some(h=>h.status==='Revisiting')).length;
+  const prevFixRate   = prev90.length ? Math.round((1-prevRevisited/prev90.length)*100) : null;
+  const fixRateTrend  = fixRate !== null && prevFixRate !== null ? fixRate - prevFixRate : null;
+
+  // Auto-generated headline
+  const headlines = [];
+  if (critical.length > 0) headlines.push(`${critical.length} critical job${critical.length>1?'s':''} require immediate attention`);
+  if (revisiting.length > 0) headlines.push(`${revisiting.length} job${revisiting.length>1?'s':''} revisiting (avg ${avgRevisit}d open)`);
+  if (fixRateTrend !== null && fixRateTrend > 0) headlines.push(`Fix rate up ${fixRateTrend}% vs last quarter`);
+  else if (fixRateTrend !== null && fixRateTrend < 0) headlines.push(`Fix rate down ${Math.abs(fixRateTrend)}% vs last quarter`);
+  if (stageAvgs[0] && stageAvgs[0].avg > 21) headlines.push(`${stageAvgs[0].s} is the main bottleneck at ${stageAvgs[0].avg}d avg`);
+  const headline = headlines.length ? headlines.join(' · ') : 'All service jobs tracking normally';
+
+  // Most overdue service co.
+  const topSupplier = [...new Set(urgent.map(j=>j.supplier))]
+    .map(s=>({ s, count: urgent.filter(j=>j.supplier===s).length }))
+    .sort((a,b)=>b.count-a.count)[0] || null;
+
   // Monthly volume
   const mBuckets = [];
   for(let i=5;i>=0;i--){
@@ -1272,8 +1310,14 @@ function buildPrintReport() {
       </div>
       <div style="text-align:right">
         <div style="font-size:12px;font-weight:700">${dateStr}</div>
-        <div style="font-size:9px;color:#6b7280">${allOpen.length} open jobs · ${done.length} completed total</div>
+        <div style="font-size:9px;color:#6b7280">Week ${weekNum} · ${allOpen.length} open jobs · ${done.length} completed total</div>
+        <div style="font-size:8.5px;color:#9ba3af;margin-top:2px">Prepared by Sean Pickford · Technical Service Manager</div>
       </div>
+    </div>
+
+    <!-- HEADLINE SUMMARY -->
+    <div style="background:#f0f4ff;border:1px solid #c7d7f0;border-radius:6px;padding:8px 14px;margin-bottom:10px;font-size:9.5px;color:#1e3a5f">
+      <strong>Summary:</strong> ${headline}
     </div>
 
     <!-- KPI STRIP -->
@@ -1355,19 +1399,21 @@ function buildPrintReport() {
 
         <div style="margin-top:10px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:5px;padding:7px 8px;font-size:8.5px">
           <div style="font-weight:700;margin-bottom:4px;color:#3d4043">Quick Stats</div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#6b7280">Fix rate (90d)</span><strong style="color:${fixRate!==null&&fixRate>=75?'#16a34a':'#dc2626'}">${fixRate!==null?fixRate+'%':'—'}</strong></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#6b7280">Fix rate (90d)</span><strong style="color:${fixRate!==null&&fixRate>=75?'#16a34a':'#dc2626'}">${fixRate!==null?fixRate+'%':'—'}${fixRateTrend!==null?` <span style="font-size:7px;color:${fixRateTrend>=0?'#16a34a':'#dc2626'}">(${fixRateTrend>=0?'+':''}${fixRateTrend}%)</span>`:''}</strong></div>
           <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#6b7280">Avg duration (90d)</span><strong>${fmtD(avgDur)}</strong></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#6b7280">Completed this week</span><strong style="color:${completedThisWeek.length>0?'#16a34a':'#6b7280'}">${completedThisWeek.length}</strong></div>
           <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#6b7280">Fully billed jobs</span><strong>${fullyBilled}</strong></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">This month volume</span><strong>${mBuckets[mBuckets.length-1]?.count||0} jobs</strong></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#6b7280">This month volume</span><strong>${mBuckets[mBuckets.length-1]?.count||0} jobs</strong></div>
+          ${longestJob?`<div style="margin-top:6px;padding-top:6px;border-top:1px solid #e5e7eb;font-size:7.5px;color:#6b7280"><strong style="color:#dc2626">Longest open:</strong> ${esc(longestJob.ref||longestJob.po)} (${esc(longestJob.supplier)}) — <strong style="color:#dc2626">${longestDays}d</strong></div>`:''}
         </div>
       </div>
     </div>
 
     <!-- FOOTER -->
     <div style="border-top:1px solid #e5e7eb;margin-top:10px;padding-top:5px;display:flex;justify-content:space-between;font-size:7.5px;color:#9ba3af">
-      <span>Phoeniks Service Tracker — Confidential</span>
-      <span>${dateStr}</span>
-      <span>${stageAvgs[0]?`Biggest bottleneck: ${stageAvgs[0].s} at ${stageAvgs[0].avg}d avg`:''}</span>
+      <span>Prepared by <strong style="color:#3d4043">Sean Pickford</strong> · Technical Service Manager · Phoeniks Electric Kitchen Specialists</span>
+      <span>Week ${weekNum} · ${dateStr}</span>
+      <span>${topSupplier?`Most overdue: ${esc(topSupplier.s)} (${topSupplier.count} jobs)`:''}</span>
     </div>
   </div>`;
 
