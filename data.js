@@ -38,14 +38,18 @@ const ODOO_MAP = {
   'status':             'odooStatus',
   'order deadline':     'deadline',
   'total':              'value',
+  'untaxed amount':     'valueUntaxed',
   'receipt status':     'receiptStatus',
+  'billing status':     'billingStatus',
+  'amount to invoice':  'amountToInvoice',
   'priority':           'priority',
   'buyer':              'buyer',
   'source document':    'sourceDoc',
   'source':             'sourceDoc',
   'notes':              'odooNotes',
   'terms and conditions': 'odooNotes',
-  'purchase representative': 'buyer',  // alternate Odoo label for buyer
+  'purchase representative': 'buyer',
+  'product':            'equipment',
 };
 
 /* ── DEMO DATA ── */
@@ -307,8 +311,14 @@ function processCSVFile(file) {
         const dl = normalizeOdooDate(get('deadline')); if (dl && dl !== existing.poDate) existing.deadline = dl;
         if (get('priority'))      existing.priority      = get('priority');
         if (get('receiptStatus')) existing.receiptStatus = get('receiptStatus');
-        if (get('sourceDoc'))     existing.sourceDoc     = get('sourceDoc');
-        if (get('odooNotes') && !existing.notes) existing.notes = get('odooNotes'); // don't overwrite manual notes
+        if (get('sourceDoc'))        existing.sourceDoc      = get('sourceDoc');
+        if (get('odooNotes') && !existing.notes) existing.notes = get('odooNotes');
+        if (get('billingStatus'))    existing.billingStatus  = get('billingStatus');
+        if (get('amountToInvoice'))  existing.amountToInvoice= get('amountToInvoice');
+        if (get('valueUntaxed'))     existing.valueUntaxed   = get('valueUntaxed');
+        if (get('receiptStatus'))    existing.receiptStatus  = get('receiptStatus');
+        // Use value from Total; if 0 and untaxed has value, use that
+        if (!parseFloat(existing.value) && parseFloat(get('valueUntaxed'))) existing.value = get('valueUntaxed');
         if (existing.status !== newStatus && existing.status !== 'Job Done') {
           if (!existing.history) existing.history = [{ status: existing.status, date: existing.poDate || today() }];
           existing.history.push({ status: newStatus, date: today() });
@@ -322,8 +332,11 @@ function processCSVFile(file) {
           poDate, status: newStatus, value: get('value'), buyer: get('buyer'),
           deadline: (() => { const dl = normalizeOdooDate(get('deadline')); return (dl && dl !== poDate) ? dl : ''; })(), priority: get('priority'),
           receiptStatus: get('receiptStatus'),
-          sourceDoc: get('sourceDoc') || '',
-          notes: get('odooNotes') || '',
+          sourceDoc:       get('sourceDoc') || '',
+          notes:           get('odooNotes') || '',
+          billingStatus:   get('billingStatus') || '',
+          amountToInvoice: get('amountToInvoice') || '',
+          valueUntaxed:    get('valueUntaxed') || '',
           history: [{ status: newStatus, date: poDate }],
           addedDate: today(),
         });

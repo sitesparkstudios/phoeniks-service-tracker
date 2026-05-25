@@ -56,18 +56,31 @@ function renderDashboard() {
   const now90h  = new Date(); now90h.setDate(now90h.getDate()-90);
   const cut90h  = now90h.toISOString().split('T')[0];
   const last90h = jobs.filter(j=>(j.poDate||'')>=cut90h);
-  const inv90h  = last90h.filter(j=>parseFloat(j.value)>0).length;
-  const invRateH = last90h.length ? Math.round(inv90h/last90h.length*100) : null;
+  // Use billingStatus if available, else fall back to value>0
+  const fullyBilled = last90h.filter(j=>j.billingStatus==='Fully Billed' || parseFloat(j.value)>0).length;
+  const waitingBills = last90h.filter(j=>j.billingStatus==='Waiting Bills').length;
+  const nothingToBill = last90h.filter(j=>j.billingStatus==='Nothing to Bill').length;
+  const hasBillingData = last90h.some(j=>j.billingStatus);
+  const invRateH = last90h.length ? Math.round(fullyBilled/last90h.length*100) : null;
   const healthEl = document.getElementById('invoicing-health');
   if (healthEl && invRateH !== null) {
-    if (invRateH < 50) {
+    if (hasBillingData) {
+      // Rich billing status available
+      if (waitingBills > 0) {
+        healthEl.style.display = 'flex';
+        healthEl.innerHTML = `<span style="font-size:15px">⚠️</span>
+          <span><strong>${waitingBills} job${waitingBills!==1?'s':''} waiting on bills</strong> in last 90 days — invoices raised but not confirmed. ${fullyBilled} fully billed · ${nothingToBill} not yet invoiced.</span>`;
+      } else if (nothingToBill > last90h.length * 0.3) {
+        healthEl.style.display = 'flex';
+        healthEl.innerHTML = `<span style="font-size:15px">ℹ️</span>
+          <span><strong>Invoicing note:</strong> ${nothingToBill} of ${last90h.length} jobs in last 90 days have no invoice yet. ${fullyBilled} fully billed.</span>`;
+      } else {
+        healthEl.style.display = 'none';
+      }
+    } else if (invRateH < 50) {
       healthEl.style.display = 'flex';
       healthEl.innerHTML = `<span style="font-size:15px">⚠️</span>
-        <span><strong>Invoicing health alert:</strong> Only ${invRateH}% of jobs in the last 90 days have an invoice matched in Odoo (${inv90h} of ${last90h.length} jobs). Spend data is incomplete — raise with accounts.</span>`;
-    } else if (invRateH < 80) {
-      healthEl.style.display = 'flex';
-      healthEl.innerHTML = `<span style="font-size:15px">⚠️</span>
-        <span><strong>Invoicing rate low:</strong> ${invRateH}% of jobs invoiced in last 90 days — some spend data may be missing.</span>`;
+        <span><strong>Invoicing health alert:</strong> Only ${invRateH}% of jobs in last 90 days have a value in Odoo. Re-import with Billing Status column for better visibility.</span>`;
     } else {
       healthEl.style.display = 'none';
     }
@@ -703,6 +716,9 @@ function openJobModal(id) {
       ${j.value ? `<div><div class="text-muted text-sm mb-4">Value</div><div class="mono" style="color:var(--text)">${fmtValue(j.value)}</div></div>` : ''}
       ${j.buyer ? `<div><div class="text-muted text-sm mb-4">Buyer</div><div style="color:var(--text)">${esc(j.buyer)}</div></div>` : ''}
       ${j.sourceDoc ? `<div><div class="text-muted text-sm mb-4">Source Doc</div><div class="mono" style="color:var(--text);font-size:12px">${esc(j.sourceDoc)}</div></div>` : ''}
+      ${j.billingStatus ? `<div><div class="text-muted text-sm mb-4">Billing Status</div><div style="font-weight:600;color:${j.billingStatus==='Fully Billed'?'var(--green)':j.billingStatus==='Waiting Bills'?'var(--amber)':'var(--text2)'}">${esc(j.billingStatus)}</div></div>` : ''}
+      ${j.amountToInvoice && parseFloat(j.amountToInvoice) < 0 ? `<div><div class="text-muted text-sm mb-4">Amount Overbilled</div><div class="mono" style="color:var(--red);font-weight:700">${fmtValue(Math.abs(parseFloat(j.amountToInvoice)))}</div></div>` : ''}
+      ${j.amountToInvoice && parseFloat(j.amountToInvoice) > 0 ? `<div><div class="text-muted text-sm mb-4">Amount to Invoice</div><div class="mono" style="color:var(--amber);font-weight:700">${fmtValue(j.amountToInvoice)}</div></div>` : ''}
     </div>
     ${j.notes ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--text2);margin-bottom:16px;white-space:pre-wrap">${esc(j.notes)}</div>` : ''}
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:12px">Status history</div>
