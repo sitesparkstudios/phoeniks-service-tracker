@@ -4,7 +4,7 @@
    ============================================================ */
 
 let meetingSlide  = 0;
-const MEETING_TOTAL = 4;
+const MEETING_TOTAL = 5;
 
 function openMeeting() {
   const _mn = new Date();
@@ -28,7 +28,13 @@ function buildMeetingSlides() {
   const open       = jobs.filter(j => j.status !== 'Job Done');
   const done       = jobs.filter(j => j.status === 'Job Done');
   const stuck      = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 14);
-  const avgTotal   = done.length ? Math.round(done.reduce((a,j) => a + (getTotalDays(j)||0), 0) / done.length) : null;
+  // Avg duration: only jobs raised in last 90 days to avoid historical distortion
+  const now90 = new Date(); now90.setDate(now90.getDate() - 90);
+  const cutoff90 = now90.toISOString().split('T')[0];
+  const recentDone = done.filter(j => (j.poDate||'') >= cutoff90);
+  const avgTotal = recentDone.length
+    ? Math.round(recentDone.reduce((a,j) => a + (getTotalDays(j)||0), 0) / recentDone.length)
+    : (done.length ? Math.round(done.reduce((a,j) => a + (getTotalDays(j)||0), 0) / done.length) : null);
   const totalValue = open.reduce((a,j) => a + (parseFloat(j.value)||0), 0);
 
   /* ── SLIDE 1: KPIs ── */
@@ -36,7 +42,7 @@ function buildMeetingSlides() {
   const kpiData = [
     { val: open.length,                                  label: 'Open Jobs' },
     { val: stuck.length,                                 label: 'Needs Attention' },
-    { val: avgTotal !== null ? avgTotal + 'd' : '—',     label: 'Avg Duration' },
+    { val: avgTotal !== null ? avgTotal + 'd' : '—',     label: 'Avg Duration (90d)' },
     { val: waitingParts,                                 label: 'Waiting on Parts' },
     { val: done.length,                                  label: 'Completed' },
   ];
@@ -62,21 +68,27 @@ function buildMeetingSlides() {
     </div>`;
   }).join('');
 
-  /* Service Co. workload */
-  const suppliers = [...new Set(jobs.map(j => j.supplier))].sort();
-  document.getElementById('meeting-supplier-list').innerHTML = suppliers.map(s => {
-    const sj      = jobs.filter(j => j.supplier === s && j.status !== 'Job Done');
-    const overdue = sj.filter(j => daysBetween(j.poDate, null) > 14).length;
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #e5e7eb">
-      <div style="font-size:13px;font-weight:600;color:#1f2937">${esc(s)}</div>
-      <div style="display:flex;gap:10px;align-items:center">
-        <span style="font-size:12px;color:#6b7280">${sj.length} open</span>
-        ${overdue > 0
-          ? `<span style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">${overdue} overdue</span>`
-          : `<span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">On track</span>`}
-      </div>
-    </div>`;
-  }).join('');
+  /* Service Co. workload — open jobs only, sorted by count desc */
+  const supWorkload = [...new Set(open.map(j => j.supplier))]
+    .map(s => ({
+      s,
+      openCount: open.filter(j => j.supplier === s).length,
+      overdue:   open.filter(j => j.supplier === s && daysBetween(j.poDate, null) > 14).length,
+    }))
+    .filter(d => d.openCount > 0)
+    .sort((a, b) => b.openCount - a.openCount);
+
+  document.getElementById('meeting-supplier-list').innerHTML = supWorkload.length
+    ? supWorkload.map(d => `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #e5e7eb">
+        <div style="font-size:13px;font-weight:600;color:#1f2937">${esc(d.s)}</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <span style="font-size:12px;color:#6b7280">${d.openCount} open</span>
+          ${d.overdue > 0
+            ? `<span style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">${d.overdue} overdue</span>`
+            : `<span style="background:#f0fdf4;color:#166534;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">On track</span>`}
+        </div>
+      </div>`).join('')
+    : '<div style="padding:16px;color:#6b7280;font-size:13px">No open jobs.</div>';
 
   /* ── SLIDE 2: Needs Attention ── */
   const attn = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 14)
@@ -130,7 +142,34 @@ function buildMeetingSlides() {
     </div>`;
   }).join('');
 
-  /* ── SLIDE 4: Bottleneck ── */
+  /* ── SLIDE 4: Revisiting ── */
+  const revisitJobs = jobs.filter(j => j.status === 'Revisiting')
+    .sort((a, b) => daysBetween(b.poDate, null) - daysBetween(a.poDate, null));
+  const revisitEl = document.getElementById('meeting-revisit-content');
+  if (revisitEl) {
+    revisitEl.innerHTML = !revisitJobs.length
+      ? `<div class="meeting-attn-empty">
+           <div class="meeting-attn-empty-icon">✓</div>
+           <div class="meeting-attn-empty-title">No revisiting jobs</div>
+           <div class="meeting-attn-empty-sub">All jobs progressing normally.</div>
+         </div>`
+      : `<table class="meeting-table">
+          <thead><tr>
+            <th style="width:110px">PO</th>
+            <th>Reference</th>
+            <th style="width:160px">Service Co.</th>
+            <th style="width:80px">Days open</th>
+          </tr></thead>
+          <tbody>${revisitJobs.map(j => `<tr>
+            <td><span class="po-link">${esc(j.po)}</span></td>
+            <td class="ref-cell">${esc(j.ref||'—')}</td>
+            <td>${esc(j.supplier)}</td>
+            <td>${meetingDayChip(daysBetween(j.poDate,null))}</td>
+          </tr>`).join('')}</tbody>
+        </table>`;
+  }
+
+  /* ── SLIDE 5: Bottleneck ── */
   const totals = {};
   ACTIVE_STAGES.forEach(s => { totals[s] = { sum:0, c:0 }; });
   jobs.forEach(j => {

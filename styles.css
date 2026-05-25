@@ -478,7 +478,7 @@ select {
 }
 
 /* ── PERIOD FILTER BUTTONS ── */
-.bottleneck-period.active {
+.bottleneck-period.active, .dash-period.active {
   background: var(--phoenix-dark);
   color: #fff;
   border-color: var(--phoenix-dark);

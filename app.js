@@ -28,7 +28,7 @@ function showPage(name) {
   document.getElementById('topbar-title').textContent = PAGE_TITLES[name] || name;
   try { localStorage.setItem('phoeniks_last_page', name); } catch(e) {}
 
-  if (name === 'dashboard')  renderDashboard();
+  if (name === 'dashboard')  { if (typeof initDashPeriodFilter === 'function') initDashPeriodFilter(); renderDashboard(); }
   if (name === 'activity')   renderActivity();
   if (name === 'bottleneck') { if (typeof initBottleneckFilter === 'function') initBottleneckFilter(); renderBottleneck(); }
   if (name === 'performance') renderPerformance();
@@ -249,6 +249,8 @@ loadData();
 updateSidebarDate();
 updateNavBadges();
 const _lastPage = (() => { try { return localStorage.getItem('phoeniks_last_page'); } catch(e) { return null; } })();
+initDashPeriodFilter();
+initBottleneckFilter();
 showPage(NAV_ORDER.includes(_lastPage) ? _lastPage : 'dashboard');
 // Re-open meeting if it was open before refresh
 try { if (localStorage.getItem('phoeniks_meeting_open') === '1') { setTimeout(openMeeting, 100); } } catch(e) {}
