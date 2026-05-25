@@ -25,9 +25,9 @@ function closeMeeting() {
 }
 
 function buildMeetingSlides() {
-  const open       = jobs.filter(j => j.status !== 'Job Done');
+  const open       = jobs.filter(isOpenService);
   const done       = jobs.filter(j => j.status === 'Job Done');
-  const stuck      = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 14);
+  const stuck      = jobs.filter(j => isOpenService(j) && daysBetween(j.poDate, null) > 14);
   // Avg duration: only jobs raised in last 90 days to avoid historical distortion
   const now90 = new Date(); now90.setDate(now90.getDate() - 90);
   const cutoff90 = now90.toISOString().split('T')[0];

@@ -29,6 +29,10 @@ const STATUS_BADGE = {
 const STAGE_COLORS  = ['#3b82f6','#a855f7','#f59e0b','#ff5f1f','#22c55e','#6b7280'];
 const ACTIVE_STAGES = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting'];
 
+// Maintenance jobs are PPM/scheduled — excluded from KPIs and urgency tracking
+const isServiceJob = j => j.status !== 'Maintenance';
+const isOpenService = j => j.status !== 'Job Done' && j.status !== 'Maintenance';
+
 const ODOO_MAP = {
   'order reference':    'po',
   'vendor reference':   'ref',

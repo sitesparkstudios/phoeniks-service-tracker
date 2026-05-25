@@ -45,7 +45,7 @@ function showPage(name) {
 
 /* ── NAV BADGES ── */
 function updateNavBadges() {
-  const openJobs  = jobs.filter(j => j.status !== 'Job Done').length;
+  const openJobs  = jobs.filter(isOpenService).length;
   const waiting   = jobs.filter(j => j.status === 'Waiting for Parts').length;
 
   // Completed this week
@@ -57,7 +57,7 @@ function updateNavBadges() {
     return last && last.date >= weekStartStr;
   }).length;
 
-  const urgentCount = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) >= 21).length;
+  const urgentCount = jobs.filter(j => isOpenService(j) && daysBetween(j.poDate, null) >= 21).length;
 
   const jobsBadge   = document.getElementById('nav-badge-jobs');
   const partsBadge  = document.getElementById('nav-badge-parts');
@@ -80,9 +80,16 @@ function updateNavBadges() {
   const pulseOpen  = document.getElementById('pulse-open');
   const pulseParts = document.getElementById('pulse-parts');
   const pulseDone  = document.getElementById('pulse-done');
+  const maintCount = jobs.filter(j => j.status === 'Maintenance').length;
   if (pulseOpen)  pulseOpen.textContent  = openJobs;
   if (pulseParts) pulseParts.textContent = waiting;
   if (pulseDone)  pulseDone.textContent  = doneThisWeek;
+  // Show maintenance count separately if any exist
+  const pulseMaint = document.getElementById('pulse-maint');
+  if (pulseMaint) {
+    pulseMaint.parentElement.style.display = maintCount > 0 ? 'flex' : 'none';
+    pulseMaint.textContent = maintCount;
+  }
 }
 
 

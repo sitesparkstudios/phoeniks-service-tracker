@@ -39,10 +39,11 @@ function renderDashboard() {
     ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - dashPeriodDays).toISOString().split('T')[0]
     : null;
   const periodJobs = cutoff ? jobs.filter(j => (j.poDate||'') >= cutoff) : jobs;
-  const allOpen    = jobs.filter(j => j.status !== 'Job Done');
-  const open       = periodJobs.filter(j => j.status !== 'Job Done');
+  const allOpen    = jobs.filter(isOpenService);
+  const open       = periodJobs.filter(isOpenService);
   const done       = periodJobs.filter(j => j.status === 'Job Done');
-  const stuck      = periodJobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 14);
+  const stuck      = periodJobs.filter(j => isOpenService(j) && daysBetween(j.poDate, null) > 14);
+  const maintenance = jobs.filter(j => j.status === 'Maintenance').length;
   const avgTotal   = done.length ? Math.round(done.reduce((a,j) => a + (getTotalDays(j)||0), 0) / done.length) : null;
   const yearSpend  = periodJobs.reduce((a,j) => a + (parseFloat(j.value)||0), 0);
 
@@ -1085,7 +1086,7 @@ function renderPerformance() {
 function renderUrgent() {
   const threshold = parseInt(document.getElementById('urgent-threshold')?.value || 21);
   const urgentJobs = jobs
-    .filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) >= threshold)
+    .filter(j => isOpenService(j) && daysBetween(j.poDate, null) >= threshold)
     .sort((a, b) => daysBetween(b.poDate, null) - daysBetween(a.poDate, null));
 
   const criticalJobs = urgentJobs.filter(j => daysBetween(j.poDate, null) > 30);
@@ -1192,7 +1193,7 @@ function buildPrintReport() {
   const fmtD      = v => v != null ? v + 'd' : '—';
 
   // ── KEY METRICS ──
-  const allOpen   = jobs.filter(j => j.status !== 'Job Done');
+  const allOpen   = jobs.filter(isOpenService);
   const done      = jobs.filter(j => j.status === 'Job Done');
   const urgent    = allOpen.filter(j => daysBetween(j.poDate,null) >= 21);
   const critical  = allOpen.filter(j => daysBetween(j.poDate,null) >= 30);
