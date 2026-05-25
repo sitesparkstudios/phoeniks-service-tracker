@@ -279,7 +279,7 @@ function processCSVFile(file) {
     const colIdx  = {};
     headers.forEach((h,i) => { const mapped = ODOO_MAP[h]; if (mapped) colIdx[mapped] = i; });
     if (colIdx.po === undefined) { showImportResult('warn',`Could not find "Order Reference" column.`); return; }
-    let added = 0, updated = 0, skipped = 0;
+    let added = 0, updated = 0, skipped = 0, noStatus = 0;
     const seenPOs = new Set(); // track POs already processed in this CSV
     lines.slice(1).forEach(line => {
       const cols = parseCSVLine(line);
@@ -288,7 +288,10 @@ function processCSVFile(file) {
       if (!po) { skipped++; return; }
       if (seenPOs.has(po)) { skipped++; return; } // skip duplicate rows in same CSV
       seenPOs.add(po);
-      const newStatus = mapOdooStatus(get('status')) || 'Incoming Job';
+      const rawStatus = get('status');
+      const newStatus = mapOdooStatus(rawStatus);
+      // Skip POs with no Job Status — these are procurement/equipment POs, not service jobs
+      if (!newStatus) { skipped++; noStatus++; return; }
       const poDate    = normalizeOdooDate(get('poDate')) || today();
       // Match existing job case-insensitively
       const existing  = jobs.find(j => j.po.trim().toUpperCase() === po);
@@ -325,7 +328,8 @@ function processCSVFile(file) {
     });
     saveData();
     renderAll();
-    showImportResult('success',`Import complete — ${added} new job${added!==1?'s':''} added, ${updated} updated${skipped?`, ${skipped} skipped`:''}.`);
+    const skipNote = noStatus > 0 ? ` · ${noStatus} skipped (no Job Status — procurement POs)` : skipped > 0 ? ` · ${skipped} skipped` : '';
+    showImportResult('success', `Import complete — ${added} new job${added!==1?'s':''} added, ${updated} updated${skipNote}.`);
     showToast(`Import: +${added} new, ${updated} updated`);
   };
   reader.readAsText(file);
