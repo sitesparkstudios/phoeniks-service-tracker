@@ -25,7 +25,9 @@ function showPage(name) {
   });
   const pg = document.getElementById('page-' + name);
   if (pg) pg.classList.add('active');
-  document.getElementById('topbar-title').textContent = PAGE_TITLES[name] || name;
+  const pageTitle = PAGE_TITLES[name] || name;
+  document.getElementById('topbar-title').textContent = pageTitle;
+  document.body.setAttribute('data-print-page', pageTitle);
   try { localStorage.setItem('phoeniks_last_page', name); } catch(e) {}
 
   if (name === 'dashboard')  { if (typeof initDashPeriodFilter === 'function') initDashPeriodFilter(); renderDashboard(); }
