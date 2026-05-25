@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Phoeniks — Service Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -9,6 +12,22 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f5c842'/%3E%3Ccircle cx='10' cy='10' r='4' fill='%233d4043'/%3E%3Ccircle cx='22' cy='10' r='4' fill='%233d4043'/%3E%3Ccircle cx='10' cy='22' r='4' fill='%233d4043'/%3E%3Ccircle cx='22' cy='22' r='4' fill='none' stroke='%233d4043' stroke-width='2.5'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="styles.css?v=20260526">
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => {
+          // Check for updates on every load
+          reg.update();
+          reg.addEventListener('updatefound', () => {
+            const nw = reg.installing;
+            nw.addEventListener('statechange', () => {
+              if (nw.state === 'activated') window.location.reload();
+            });
+          });
+        });
+    }
+  </script>
 </head>
 <body>
 <div class="app">
