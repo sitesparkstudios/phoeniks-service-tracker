@@ -712,9 +712,12 @@ function renderPerformance() {
   // Currently open jobs > 30 days
   const longOpen = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 30).length;
 
-  // Avg wait time for parts (Waiting for Parts stage dwell, completed jobs)
-  const partsWaits = donePeriod.map(j => getDwellTimes(j)['Waiting for Parts']).filter(d => d !== undefined);
-  const avgPartsWait = partsWaits.length ? Math.round(partsWaits.reduce((a, b) => a + b, 0) / partsWaits.length) : null;
+  // Avg parts wait — use open Waiting for Parts jobs (daysBetween poDate→now) + done jobs with dwell history
+  const openPartsJobs = jobs.filter(j => j.status === 'Waiting for Parts' && (j.poDate||'') >= cutoffStr);
+  const openPartsWaits = openPartsJobs.map(j => daysBetween(j.poDate, null)).filter(d => d > 0);
+  const donePartsWaits = donePeriod.map(j => getDwellTimes(j)['Waiting for Parts']).filter(d => d !== undefined && d > 0);
+  const allPartsWaits = [...openPartsWaits, ...donePartsWaits];
+  const avgPartsWait = allPartsWaits.length ? Math.round(allPartsWaits.reduce((a, b) => a + b, 0) / allPartsWaits.length) : null;
 
   function trend(current, previous, lowerIsBetter = false) {
     if (current === null || previous === null) return '';
@@ -757,7 +760,7 @@ function renderPerformance() {
       <div class="metric-card">
         <div class="metric-label">Avg Parts Wait</div>
         <div class="metric-value">${avgPartsWait !== null ? avgPartsWait + 'd' : '—'}</div>
-        <div class="metric-sub">Time stuck in Waiting for Parts</div>
+        <div class="metric-sub">Avg days in Waiting for Parts · ${openPartsJobs.length} currently waiting</div>
       </div>
     `;
   }
