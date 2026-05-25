@@ -11,7 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f5c842'/%3E%3Ccircle cx='10' cy='10' r='4' fill='%233d4043'/%3E%3Ccircle cx='22' cy='10' r='4' fill='%233d4043'/%3E%3Ccircle cx='10' cy='22' r='4' fill='%233d4043'/%3E%3Ccircle cx='22' cy='22' r='4' fill='none' stroke='%233d4043' stroke-width='2.5'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=20260528">
+<link rel="stylesheet" href="styles.css?v=20260529">
 
   <script>
     // Unregister any old service workers that may be causing caching issues
@@ -80,7 +80,7 @@
       </div>
       <div class="nav-item" onclick="showPage('suppliers')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-        Suppliers
+        Service Cos.
       </div>
       <div class="nav-item" onclick="showPage('reports')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13,2 13,9 20,9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
@@ -571,6 +571,40 @@
         <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
         <div id="import-result" style="margin-top:12px"></div>
       </div>
+
+      <!-- INVOICE VALUE IMPORT -->
+      <div class="card" style="padding:24px;margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div>
+            <div class="chart-title" style="margin-bottom:4px">Invoice Value Import</div>
+            <div style="font-size:12px;color:var(--text3)">Upload warranty or non-warranty invoice export from Odoo Accounting → Journal Items.<br>
+            Matches on PO number and updates the job value. Jobs without a PO# in the file are skipped.</div>
+          </div>
+        </div>
+        <div class="import-panel-body" style="margin-bottom:16px">
+          <div class="odoo-fields">
+            <span class="odoo-field odoo-field-required" title="Invoice date">Date</span>
+            <span class="odoo-field odoo-field-required" title="Bill/invoice number">Number</span>
+            <span class="odoo-field odoo-field-required" title="Invoice amount">Debit</span>
+            <span class="odoo-field odoo-field-required" title="PO number reference e.g. P03312 (site description)">PO#</span>
+            <span class="odoo-field" title="Account code">Account</span>
+            <span class="odoo-field" title="Service company">Partner</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:8px">
+            Export from <strong style="color:var(--text2)">Odoo → Accounting → Journal Items</strong> — filter by account 57000 (warranty) or 57500 (non-warranty). Accepts XLSX or CSV.
+          </div>
+        </div>
+        <div class="drop-zone" id="invoice-drop-zone"
+          ondragover="handleDragOver(event)" ondragleave="handleDragLeave()"
+          ondrop="handleInvoiceDrop(event)"
+          onclick="document.getElementById('invoice-file').click()">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div style="font-weight:600;margin-bottom:4px;margin-top:8px">Drop invoice XLSX or CSV here</div>
+          <div style="font-size:12px;color:var(--text3)">Warranty and non-warranty both accepted</div>
+        </div>
+        <input type="file" id="invoice-file" accept=".xlsx,.csv" style="display:none" onchange="handleInvoiceImport(event)">
+        <div id="invoice-import-result" style="margin-top:12px"></div>
+      </div>
     </div>
 
     <!-- ADD / EDIT JOB -->
@@ -760,10 +794,10 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="data.js?v=20260528"></script>
-<script src="render.js?v=20260528"></script>
-<script src="meeting.js?v=20260528"></script>
-<script src="app.js?v=20260528"></script>
+<script src="data.js?v=20260529"></script>
+<script src="render.js?v=20260529"></script>
+<script src="meeting.js?v=20260529"></script>
+<script src="app.js?v=20260529"></script>
 
   <!-- ═══════════════════════════════════════════════
        PRINT REPORT — hidden on screen, print only

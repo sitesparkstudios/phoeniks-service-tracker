@@ -18,18 +18,60 @@ function renderAll() {
 }
 
 /* ── DASHBOARD ── */
+
+/* ── DASHBOARD PERIOD FILTER ── */
+let dashPeriodDays = 30;
+
+function initDashPeriodFilter() {
+  document.querySelectorAll('.dash-period').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.dash-period').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      dashPeriodDays = btn.dataset.days === 'all' ? null : parseInt(btn.dataset.days);
+      renderDashboard();
+    });
+  });
+}
+
 function renderDashboard() {
-  const open      = jobs.filter(j => j.status !== 'Job Done');
-  const done      = jobs.filter(j => j.status === 'Job Done');
-  const stuck     = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 14);
-  const avgTotal  = done.length ? Math.round(done.reduce((a,j) => a + (getTotalDays(j)||0), 0) / done.length) : null;
-  const yearSpend = jobs.reduce((a,j) => a + (parseFloat(j.value)||0), 0);
+  const now     = new Date();
+  const cutoff  = dashPeriodDays
+    ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - dashPeriodDays).toISOString().split('T')[0]
+    : null;
+  const periodJobs = cutoff ? jobs.filter(j => (j.poDate||'') >= cutoff) : jobs;
+  const allOpen    = jobs.filter(j => j.status !== 'Job Done');
+  const open       = periodJobs.filter(j => j.status !== 'Job Done');
+  const done       = periodJobs.filter(j => j.status === 'Job Done');
+  const stuck      = periodJobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 14);
+  const avgTotal   = done.length ? Math.round(done.reduce((a,j) => a + (getTotalDays(j)||0), 0) / done.length) : null;
+  const yearSpend  = periodJobs.reduce((a,j) => a + (parseFloat(j.value)||0), 0);
 
   const _now = new Date();
   const _ord = n => { const s=['th','st','nd','rd'],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); };
   const _day = _now.toLocaleDateString('en-AU', { weekday:'long' });
   const _month = _now.toLocaleDateString('en-AU', { month:'long', year:'numeric' });
   document.getElementById('dash-date').textContent = `${_day}, ${_ord(_now.getDate())} ${_month}`;
+
+  // ── INVOICING HEALTH BANNER ──
+  const now90h  = new Date(); now90h.setDate(now90h.getDate()-90);
+  const cut90h  = now90h.toISOString().split('T')[0];
+  const last90h = jobs.filter(j=>(j.poDate||'')>=cut90h);
+  const inv90h  = last90h.filter(j=>parseFloat(j.value)>0).length;
+  const invRateH = last90h.length ? Math.round(inv90h/last90h.length*100) : null;
+  const healthEl = document.getElementById('invoicing-health');
+  if (healthEl && invRateH !== null) {
+    if (invRateH < 50) {
+      healthEl.style.display = 'flex';
+      healthEl.innerHTML = `<span style="font-size:15px">⚠️</span>
+        <span><strong>Invoicing health alert:</strong> Only ${invRateH}% of jobs in the last 90 days have an invoice matched in Odoo (${inv90h} of ${last90h.length} jobs). Spend data is incomplete — raise with accounts.</span>`;
+    } else if (invRateH < 80) {
+      healthEl.style.display = 'flex';
+      healthEl.innerHTML = `<span style="font-size:15px">⚠️</span>
+        <span><strong>Invoicing rate low:</strong> ${invRateH}% of jobs invoiced in last 90 days — some spend data may be missing.</span>`;
+    } else {
+      healthEl.style.display = 'none';
+    }
+  }
 
   document.getElementById('kpi-grid').innerHTML = `
     <div class="metric-card accent-blue">
