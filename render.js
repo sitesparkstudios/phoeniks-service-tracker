@@ -1187,7 +1187,8 @@ function renderUrgent() {
 function buildPrintReport() {
   const now     = new Date();
   const ordinal = n => { const s=['th','st','nd','rd'],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); };
-  const dateStr = `${now.toLocaleDateString('en-AU',{weekday:'long'})}, ${ordinal(now.getDate())} ${now.toLocaleDateString('en-AU',{month:'long',year:'numeric'})}`;
+  const dateStr = `${ordinal(now.getDate())} ${now.toLocaleDateString('en-AU',{month:'long',year:'numeric'})}`;
+  const dayName = now.toLocaleDateString('en-AU',{weekday:'long'});
   const fmtD    = v => v != null ? v + 'd' : '—';
 
   const allOpen    = jobs.filter(isOpenService);
@@ -1265,155 +1266,249 @@ function buildPrintReport() {
     mBuckets.push({ label:d.toLocaleDateString('en-AU',{month:'short',year:'2-digit'}), count:mJobs.length });
   }
 
-  const th = (txt) => `<th style="padding:4px 6px;text-align:left;border-bottom:1px solid #ddd;font-size:8px;background:#f5f5f5;font-weight:700">${txt}</th>`;
+  // ── SERVICE CO. BREAKDOWN ──
+  const supplierNames = [...new Set(allOpen.map(j=>j.supplier).filter(Boolean))];
+  const supplierStats = supplierNames.map(s => {
+    const sJobs = allOpen.filter(j=>j.supplier===s);
+    const sUrgent = sJobs.filter(j=>daysBetween(j.poDate,null)>=21).length;
+    const sCritical = sJobs.filter(j=>daysBetween(j.poDate,null)>=30).length;
+    const sAvg = sJobs.length ? Math.round(sJobs.reduce((a,j)=>a+daysBetween(j.poDate,null),0)/sJobs.length) : 0;
+    return { s, total:sJobs.length, urgent:sUrgent, critical:sCritical, avg:sAvg };
+  }).filter(x=>x.total>0).sort((a,b)=>b.critical-a.critical||b.urgent-a.urgent||b.total-a.total);
+
+  /* ── HELPERS ── */
+  const th = (txt,align='left') => `<th style="padding:4px 6px;text-align:${align};border-bottom:1.5px solid #e5e7eb;font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;background:#fafafa">${txt}</th>`;
   const td = (txt,style='') => `<td style="padding:3px 6px;${style}">${txt}</td>`;
+
   const sHead = (title,color='#1e2024',sub='') => `
-    <div style="margin:14px 0 7px;border-bottom:2px solid ${color};padding-bottom:3px;display:flex;justify-content:space-between;align-items:baseline">
-      <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:${color}">${title}</span>
-      ${sub?`<span style="font-size:8px;color:#9ba3af">${sub}</span>`:''}
-    </div>`;
-  const kpi = (val,label,color='#1e2024',sub='') => `
-    <div style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:7px;padding:8px 10px;text-align:center">
-      <div style="font-size:20px;font-weight:800;color:${color};line-height:1.1">${val}</div>
-      <div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#6b7280;margin-top:2px">${label}</div>
-      ${sub?`<div style="font-size:7.5px;color:#9ba3af;margin-top:1px">${sub}</div>`:''}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px;padding-bottom:4px;border-bottom:2px solid ${color}">
+      <span style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:${color}">${title}</span>
+      ${sub?`<span style="font-size:7.5px;color:#9ba3af;font-weight:500">${sub}</span>`:''}
     </div>`;
 
-  const jobRow = (j, showNotes=false) => {
+  const kpi = (val, label, color='#1e2024', sub='', bg='#f8f9fa', border='#e5e7eb') => `
+    <div style="background:${bg};border:1px solid ${border};border-radius:8px;padding:9px 8px;text-align:center;position:relative;overflow:hidden">
+      <div style="font-size:22px;font-weight:800;color:${color};line-height:1;letter-spacing:-0.5px">${val}</div>
+      <div style="font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6b7280;margin-top:3px;line-height:1.3">${label}</div>
+      ${sub?`<div style="font-size:7px;color:#9ba3af;margin-top:2px">${sub}</div>`:''}
+    </div>`;
+
+  const pill = (txt, color, bg) => `<span style="display:inline-block;padding:1px 5px;border-radius:10px;font-size:7px;font-weight:700;background:${bg};color:${color}">${txt}</span>`;
+
+  const statusDot = (days) => {
+    if (days>=30) return `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#dc2626;flex-shrink:0"></span>`;
+    if (days>=21) return `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#d97706;flex-shrink:0"></span>`;
+    return `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#3b82f6;flex-shrink:0"></span>`;
+  };
+
+  const jobRow = (j) => {
     const d = daysBetween(j.poDate,null);
-    const bg = d>30?'#fff5f5':d>21?'#fffbf0':'';
-    const dayCol = d>30?'#dc2626':d>21?'#d97706':'#555';
-    return `<tr style="border-bottom:1px solid #f0f0f0;background:${bg}">
-      ${td(`<span style="font-family:monospace;font-size:8px">${esc(j.po)}</span>`)}
-      ${td(`<strong>${esc(j.ref||'—')}</strong>`,'max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
-      ${td(esc(j.supplier),'color:#6b7280;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
-      ${td(`<strong style="color:${dayCol}">${d}d</strong>`,'text-align:center')}
+    const rowBg = d>=30?'#fff8f8':d>=21?'#fffcf0':'';
+    const dayCol = d>=30?'#dc2626':d>=21?'#d97706':'#374151';
+    return `<tr style="border-bottom:1px solid #f3f4f6;background:${rowBg}">
+      <td style="padding:3px 5px;width:16px">${statusDot(d)}</td>
+      ${td(`<span style="font-family:'DM Mono',monospace;font-size:7.5px;color:#6b7280">${esc(j.po)}</span>`)}
+      ${td(`<span style="font-weight:600;font-size:8.5px">${esc(j.ref||'—')}</span>`,'max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
+      ${td(`<span style="color:#6b7280;font-size:8px">${esc(j.supplier)}</span>`,'max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
+      ${td(`<strong style="color:${dayCol};font-size:9px">${d}d</strong>`,'text-align:right;white-space:nowrap')}
     </tr>`;
   };
 
-  const html = `
-  <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:#1e2024">
+  // ── VOLUME SPARKLINE BARS ──
+  const maxVol = Math.max(...mBuckets.map(b=>b.count),1);
+  const volBars = mBuckets.map(b => {
+    const pct = Math.round(b.count/maxVol*100);
+    const isLatest = b === mBuckets[mBuckets.length-1];
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
+      <div style="font-size:8px;font-weight:${isLatest?'800':'600'};color:${isLatest?'#1e2024':'#6b7280'}">${b.count}</div>
+      <div style="width:100%;background:#e5e7eb;border-radius:3px 3px 0 0;height:24px;display:flex;align-items:flex-end">
+        <div style="width:100%;height:${Math.max(pct,5)}%;background:${isLatest?'#3d4043':'#d1d5db'};border-radius:3px 3px 0 0;transition:height 0.2s"></div>
+      </div>
+      <div style="font-size:6.5px;color:#9ba3af;text-align:center">${b.label}</div>
+    </div>`;
+  }).join('');
 
-    <!-- HEADER -->
-    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #3d4043;padding-bottom:8px;margin-bottom:10px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2.5px">
-          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:7px;height:7px;border-radius:50%;background:transparent;border:2px solid #3d4043;box-sizing:border-box"></div>
+  const html = `
+  <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:#1e2024;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+
+    <!-- ══ HEADER ══ -->
+    <div style="display:flex;justify-content:space-between;align-items:stretch;margin-bottom:11px;gap:0">
+
+      <!-- Brand block -->
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#1e2024;border-radius:8px;flex-shrink:0">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
+          <div style="width:8px;height:8px;border-radius:50%;background:#fff"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:#fff"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:#fff"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:transparent;border:2px solid rgba(255,255,255,0.4);box-sizing:border-box"></div>
         </div>
         <div>
-          <div style="font-size:16px;font-weight:800;letter-spacing:1px;color:#3d4043">PHOENIKS</div>
-          <div style="font-size:8px;font-weight:600;letter-spacing:0.15em;color:#9ba3af">SERVICE TRACKER — MONDAY MORNING REPORT</div>
+          <div style="font-size:18px;font-weight:800;letter-spacing:1.5px;color:#fff;line-height:1">PHOENIKS</div>
+          <div style="font-size:7px;font-weight:600;letter-spacing:0.18em;color:rgba(255,255,255,0.5);margin-top:2px">ELECTRIC KITCHEN SPECIALISTS</div>
         </div>
       </div>
-      <div style="text-align:right">
-        <div style="font-size:12px;font-weight:700">${dateStr}</div>
-        <div style="font-size:9px;color:#6b7280">Week ${weekNum} · ${allOpen.length} open jobs · ${done.length} completed total</div>
-        <div style="font-size:8.5px;color:#9ba3af;margin-top:2px">Prepared by Sean Pickford · Technical Service Manager</div>
+
+      <!-- Centre headline -->
+      <div style="flex:1;display:flex;align-items:center;padding:0 16px;background:#f8f9fa;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb">
+        <div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#9ba3af">Monday Morning Report</div>
+          <div style="font-size:13px;font-weight:700;color:#1e2024;margin-top:1px">${dayName}, ${dateStr}</div>
+          <div style="font-size:8px;color:#6b7280;margin-top:2px">${headline}</div>
+        </div>
+      </div>
+
+      <!-- Meta block -->
+      <div style="text-align:right;padding:10px 14px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:8px;display:flex;flex-direction:column;justify-content:center;gap:2px;flex-shrink:0;min-width:130px">
+        <div style="font-size:9px;font-weight:700;color:#1e2024">Week ${weekNum}</div>
+        <div style="font-size:8px;color:#6b7280">${allOpen.length} open · ${done.length} completed</div>
+        <div style="font-size:7.5px;color:#9ba3af;margin-top:3px;line-height:1.4">Sean Pickford<br>Technical Service Manager</div>
       </div>
     </div>
 
-    <!-- HEADLINE SUMMARY -->
-    <div style="background:#f0f4ff;border:1px solid #c7d7f0;border-radius:6px;padding:8px 14px;margin-bottom:10px;font-size:9.5px;color:#1e3a5f">
-      <strong>Summary:</strong> ${headline}
-    </div>
-
-    <!-- KPI STRIP -->
+    <!-- ══ KPI STRIP ══ -->
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:10px">
-      ${kpi(allOpen.length,'Open Jobs','#1e2024')}
-      ${kpi(urgent.length,'Overdue 21d+',urgent.length>0?'#dc2626':'#16a34a')}
-      ${kpi(critical.length,'Critical 30d+',critical.length>0?'#dc2626':'#16a34a')}
-      ${kpi(waiting.length,'Waiting Parts','#d97706',avgParts?`avg ${avgParts}d`:'')}
-      ${kpi(revisiting.length,'Revisiting',revisiting.length>0?'#d97706':'#16a34a',avgRevisit?`avg ${avgRevisit}d`:'')}
-      ${kpi(fixRate!==null?fixRate+'%':'—','1st Fix Rate',fixRate!==null&&fixRate>=75?'#16a34a':'#dc2626','90d benchmark 75%')}
-      ${kpi(avgDur!==null?avgDur+'d':'—','Avg Duration','#1e2024','last 90 days')}
+      ${kpi(allOpen.length,'Open Jobs','#1e2024','all service jobs','#f8f9fa')}
+      ${kpi(urgent.length,'Overdue 21d+',urgent.length>0?'#dc2626':'#16a34a',urgent.length>0?`${critical.length} critical`:'all on track',urgent.length>0?'#fff8f8':'#f0fdf4',urgent.length>0?'#fecaca':'#bbf7d0')}
+      ${kpi(critical.length,'Critical 30d+',critical.length>0?'#dc2626':'#16a34a','needs action now',critical.length>0?'#fff8f8':'#f8f9fa',critical.length>0?'#fecaca':'#e5e7eb')}
+      ${kpi(waiting.length,'Parts Waiting','#d97706',avgParts?`avg ${avgParts}d open`:'','#fffcf0','#fde68a')}
+      ${kpi(revisiting.length,'Revisiting',revisiting.length>0?'#d97706':'#16a34a',avgRevisit?`avg ${avgRevisit}d`:'none','#fffcf0','#fde68a')}
+      ${kpi(fixRate!==null?fixRate+'%':'—','1st Fix Rate',fixRate!==null&&fixRate>=75?'#16a34a':'#dc2626',fixRate!==null?(fixRateTrend!==null?(fixRateTrend>=0?`▲ +${fixRateTrend}% vs prev`:`▼ ${fixRateTrend}% vs prev`):'90d rolling'):'no data',fixRate!==null&&fixRate>=75?'#f0fdf4':'#fff8f8',fixRate!==null&&fixRate>=75?'#bbf7d0':'#fecaca')}
+      ${kpi(avgDur!==null?avgDur+'d':'—','Avg Duration','#1e2024','last 90 days','#f8f9fa')}
     </div>
 
-    <!-- THREE COLUMN LAYOUT -->
-    <div style="display:grid;grid-template-columns:1.1fr 1.1fr 0.8fr;gap:10px">
+    <!-- ══ THREE-COLUMN BODY ══ -->
+    <div style="display:grid;grid-template-columns:1.15fr 1.05fr 0.8fr;gap:10px;align-items:start">
 
-      <!-- COL 1: OVERDUE / CRITICAL JOBS -->
+      <!-- ── COL 1: OVERDUE ── -->
       <div>
-        ${sHead('Overdue Jobs — 21d+ open','#dc2626',urgent.length+' jobs')}
+        ${sHead(`Overdue Jobs <span style="font-weight:500">— 21d+ open</span>`,'#dc2626',urgent.length ? urgent.length+' jobs' : '')}
         ${urgent.length ? `
-        <table style="width:100%;border-collapse:collapse;font-size:9px">
-          <thead><tr>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Days')}</tr></thead>
-          <tbody>${urgent.slice(0,18).map(j=>jobRow(j)).join('')}</tbody>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
+          <tbody>${urgent.slice(0,16).map(j=>jobRow(j)).join('')}</tbody>
         </table>
-        ${urgent.length>18?`<div style="font-size:7.5px;color:#9ba3af;margin-top:3px">+${urgent.length-18} more — see Urgent page</div>`:''}
-        ` : `<div style="padding:10px;color:#16a34a;font-weight:700;font-size:9px">✓ No overdue jobs</div>`}
+        ${urgent.length>16?`<div style="font-size:7.5px;color:#9ba3af;padding:4px 0 0 5px;font-style:italic">+${urgent.length-16} more — see Urgent page</div>`:''}
+        ` : `
+        <div style="display:flex;align-items:center;gap:6px;padding:12px 8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;margin-top:4px">
+          <span style="font-size:14px">✓</span>
+          <span style="font-weight:700;color:#16a34a;font-size:9px">No overdue jobs</span>
+        </div>`}
+
+        ${sHead('Revisiting Jobs','#d97706',revisiting.length?`${revisiting.length} jobs · avg ${avgRevisit}d`:'')}
+        ${revisiting.length ? `
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
+          <tbody>${revisiting.slice(0,6).map(j=>jobRow(j)).join('')}</tbody>
+        </table>
+        <div style="font-size:7px;color:#9ba3af;margin-top:3px;font-style:italic;padding-left:4px">High age = not resolving on first visit</div>
+        ` : `
+        <div style="display:flex;align-items:center;gap:6px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;margin-top:4px">
+          <span style="font-size:12px">✓</span>
+          <span style="font-weight:700;color:#16a34a;font-size:9px">No revisiting jobs</span>
+        </div>`}
       </div>
 
-      <!-- COL 2: REVISITING + WAITING PARTS -->
+      <!-- ── COL 2: PARTS + SERVICE CO. ── -->
       <div>
-        ${sHead('Revisiting Jobs','#d97706',revisiting.length?`${revisiting.length} jobs · avg ${avgRevisit}d open`:'')}
-        ${revisiting.length ? `
-        <table style="width:100%;border-collapse:collapse;font-size:9px">
-          <thead><tr>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Days')}</tr></thead>
-          <tbody>${revisiting.map(j=>jobRow(j)).join('')}</tbody>
-        </table>
-        <div style="font-size:7.5px;color:#9ba3af;margin-top:3px;font-style:italic">High avg days = service cos. not resolving on first visit</div>
-        ` : `<div style="padding:8px 0;color:#16a34a;font-weight:700;font-size:9px">✓ No revisiting jobs</div>`}
-
         ${sHead('Waiting on Parts','#d97706',waiting.length?`${waiting.length} jobs · avg ${avgParts}d`:'')}
         ${waiting.length ? `
-        <table style="width:100%;border-collapse:collapse;font-size:9px">
-          <thead><tr>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Days')}</tr></thead>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
           <tbody>${waiting.slice(0,8).map(j=>jobRow(j)).join('')}</tbody>
         </table>
-        ${waiting.length>8?`<div style="font-size:7.5px;color:#9ba3af;margin-top:3px">+${waiting.length-8} more</div>`:''}
-        ` : `<div style="padding:8px 0;color:#16a34a;font-weight:700;font-size:9px">✓ No parts delays</div>`}
-      </div>
+        ${waiting.length>8?`<div style="font-size:7.5px;color:#9ba3af;padding:3px 0 0 5px;font-style:italic">+${waiting.length-8} more</div>`:''}
+        ` : `
+        <div style="display:flex;align-items:center;gap:6px;padding:10px 8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;margin-top:4px">
+          <span style="font-size:12px">✓</span>
+          <span style="font-weight:700;color:#16a34a;font-size:9px">No parts delays</span>
+        </div>`}
 
-      <!-- COL 3: BOTTLENECK + VOLUME + BILLING -->
-      <div>
-        ${sHead('Stage Bottleneck',stageAvgs[0]&&stageAvgs[0].avg>14?'#dc2626':'#1e2024')}
-        <table style="width:100%;border-collapse:collapse;font-size:9px">
-          <thead><tr>${th('Stage')}${th('Jobs')}${th('Avg')}</tr></thead>
-          <tbody>${stageAvgs.map(d=>`<tr style="border-bottom:1px solid #f0f0f0">
-            ${td(d.s)}${td(d.count,'text-align:center')}
-            ${td(`<strong style="color:${d.avg>21?'#dc2626':d.avg>14?'#d97706':'#16a34a'}">${d.avg}d</strong>`,'text-align:center')}
+        ${sHead('Service Co. Breakdown','#1e2024')}
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>${th('Company')}${th('Open','center')}${th('21d+','center')}${th('30d+','center')}${th('Avg','right')}</tr></thead>
+          <tbody>${supplierStats.slice(0,8).map(x=>`<tr style="border-bottom:1px solid #f3f4f6">
+            ${td(`<span style="font-size:8.5px;font-weight:600;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${esc(x.s)}</span>`)}
+            ${td(`<strong style="font-size:9px">${x.total}</strong>`,'text-align:center')}
+            ${td(x.urgent>0?`<span style="color:#d97706;font-weight:700;font-size:9px">${x.urgent}</span>`:`<span style="color:#d1d5db;font-size:9px">0</span>`,'text-align:center')}
+            ${td(x.critical>0?`<span style="color:#dc2626;font-weight:700;font-size:9px">${x.critical}</span>`:`<span style="color:#d1d5db;font-size:9px">0</span>`,'text-align:center')}
+            ${td(`<span style="font-size:8.5px;color:${x.avg>21?'#dc2626':x.avg>14?'#d97706':'#374151'};font-weight:600">${x.avg}d</span>`,'text-align:right')}
           </tr>`).join('')}
           </tbody>
         </table>
+      </div>
+
+      <!-- ── COL 3: INSIGHTS ── -->
+      <div>
+
+        ${sHead('Stage Bottleneck',stageAvgs[0]&&stageAvgs[0].avg>14?'#dc2626':'#1e2024')}
+        ${stageAvgs.length ? stageAvgs.map(d=>{
+          const maxA = stageAvgs[0].avg||1;
+          const barW = Math.round(d.avg/maxA*100);
+          const barC = d.avg>21?'#dc2626':d.avg>14?'#d97706':'#22c55e';
+          return `<div style="margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
+              <span style="font-size:7.5px;font-weight:600;color:#374151">${d.s}</span>
+              <span style="font-size:7.5px;font-weight:700;color:${barC}">${d.avg}d <span style="color:#9ba3af;font-weight:400">(${d.count})</span></span>
+            </div>
+            <div style="background:#f0f0f0;border-radius:3px;height:5px;overflow:hidden">
+              <div style="width:${barW}%;background:${barC};height:100%;border-radius:3px"></div>
+            </div>
+          </div>`;
+        }).join('') : '<div style="font-size:8px;color:#9ba3af;padding:6px 0">No open stage data</div>'}
 
         ${sHead('Monthly Volume')}
-        <table style="width:100%;border-collapse:collapse;font-size:9px">
-          <thead><tr>${mBuckets.map(b=>`<th style="padding:2px 3px;text-align:center;font-size:7.5px;border-bottom:1px solid #ddd;background:#f5f5f5">${b.label}</th>`).join('')}</tr></thead>
-          <tbody><tr>${mBuckets.map(b=>`<td style="padding:2px 3px;text-align:center;font-weight:700">${b.count}</td>`).join('')}</tr></tbody>
-        </table>
+        <div style="display:flex;align-items:flex-end;gap:3px;height:42px;margin-bottom:2px">
+          ${volBars}
+        </div>
+
+        ${sHead('Key Stats')}
+        <div style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:7px;padding:8px 9px;font-size:8px">
+          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Fix rate (90d)</span><strong style="color:${fixRate!==null&&fixRate>=75?'#16a34a':'#dc2626'}">${fixRate!==null?fixRate+'%':'—'}</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Fix rate trend</span><strong style="color:${fixRateTrend===null?'#374151':fixRateTrend>=0?'#16a34a':'#dc2626'}">${fixRateTrend!==null?(fixRateTrend>=0?'▲ +':'▼ ')+Math.abs(fixRateTrend)+'% vs prev':'—'}</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Avg duration (90d)</span><strong>${fmtD(avgDur)}</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Completed this week</span><strong style="color:${completedThisWeek.length>0?'#16a34a':'#374151'}">${completedThisWeek.length}</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Fully billed</span><strong>${fullyBilled}</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Waiting bills</span><strong style="color:${waitingBills.length>0?'#d97706':'#374151'}">${waitingBills.length}</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#6b7280">This month</span><strong>${mBuckets[mBuckets.length-1]?.count||0} jobs</strong></div>
+          ${longestJob?`
+          <div style="margin-top:6px;padding-top:6px;border-top:1px solid #e5e7eb">
+            <div style="font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#dc2626;margin-bottom:2px">Longest Open Job</div>
+            <div style="font-size:8px;font-weight:600;color:#1e2024">${esc(longestJob.ref||longestJob.po)}</div>
+            <div style="font-size:7.5px;color:#6b7280">${esc(longestJob.supplier)} · <strong style="color:#dc2626">${longestDays}d</strong></div>
+          </div>`:''}
+        </div>
 
         ${waitingBills.length > 0 ? `
         ${sHead('Waiting on Bills','#d97706',waitingBills.length+' jobs')}
-        <table style="width:100%;border-collapse:collapse;font-size:9px">
-          <thead><tr>${th('PO')}${th('Service Co.')}</tr></thead>
-          <tbody>${waitingBills.slice(0,6).map(j=>`<tr style="border-bottom:1px solid #f0f0f0">
-            ${td(`<span style="font-family:monospace;font-size:8px">${esc(j.po)}</span>`)}
-            ${td(esc(j.supplier),'color:#6b7280;font-size:8px')}
-          </tr>`).join('')}</tbody>
-        </table>
-        <div style="font-size:7.5px;color:#9ba3af;margin-top:3px;font-style:italic">Chase accounts to confirm these bills</div>
-        ` : ''}
-
-        <div style="margin-top:10px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:5px;padding:7px 8px;font-size:8.5px">
-          <div style="font-weight:700;margin-bottom:4px;color:#3d4043">Quick Stats</div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#6b7280">Fix rate (90d)</span><strong style="color:${fixRate!==null&&fixRate>=75?'#16a34a':'#dc2626'}">${fixRate!==null?fixRate+'%':'—'}${fixRateTrend!==null?` <span style="font-size:7px;color:${fixRateTrend>=0?'#16a34a':'#dc2626'}">(${fixRateTrend>=0?'+':''}${fixRateTrend}%)</span>`:''}</strong></div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#6b7280">Avg duration (90d)</span><strong>${fmtD(avgDur)}</strong></div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#6b7280">Completed this week</span><strong style="color:${completedThisWeek.length>0?'#16a34a':'#6b7280'}">${completedThisWeek.length}</strong></div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#6b7280">Fully billed jobs</span><strong>${fullyBilled}</strong></div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#6b7280">This month volume</span><strong>${mBuckets[mBuckets.length-1]?.count||0} jobs</strong></div>
-          ${longestJob?`<div style="margin-top:6px;padding-top:6px;border-top:1px solid #e5e7eb;font-size:7.5px;color:#6b7280"><strong style="color:#dc2626">Longest open:</strong> ${esc(longestJob.ref||longestJob.po)} (${esc(longestJob.supplier)}) — <strong style="color:#dc2626">${longestDays}d</strong></div>`:''}
-        </div>
+        <div style="background:#fffcf0;border:1px solid #fde68a;border-radius:6px;padding:6px 8px">
+          ${waitingBills.slice(0,5).map(j=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid #fef3c7;font-size:8px">
+            <span style="font-family:'DM Mono',monospace;font-size:7.5px;color:#92400e">${esc(j.po)}</span>
+            <span style="color:#78350f;font-size:7.5px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.supplier)}</span>
+          </div>`).join('')}
+          ${waitingBills.length>5?`<div style="font-size:7px;color:#9ba3af;margin-top:3px;font-style:italic">+${waitingBills.length-5} more — chase accounts</div>`:'<div style="font-size:7px;color:#9ba3af;margin-top:3px;font-style:italic">Chase accounts to confirm</div>'}
+        </div>` : ''}
       </div>
     </div>
 
-    <!-- FOOTER -->
-    <div style="border-top:1px solid #e5e7eb;margin-top:10px;padding-top:5px;display:flex;justify-content:space-between;font-size:7.5px;color:#9ba3af">
-      <span>Prepared by <strong style="color:#3d4043">Sean Pickford</strong> · Technical Service Manager · Phoeniks Electric Kitchen Specialists</span>
-      <span>Week ${weekNum} · ${dateStr}</span>
-      <span>${topSupplier?`Most overdue: ${esc(topSupplier.s)} (${topSupplier.count} jobs)`:''}</span>
+    <!-- ══ FOOTER ══ -->
+    <div style="margin-top:11px;padding-top:6px;border-top:1.5px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">
+          <div style="width:5px;height:5px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:5px;height:5px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:5px;height:5px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:5px;height:5px;border-radius:50%;background:transparent;border:1.5px solid #3d4043;box-sizing:border-box"></div>
+        </div>
+        <span style="font-size:7.5px;color:#9ba3af">Prepared by <strong style="color:#3d4043">Sean Pickford</strong> · Technical Service Manager · Phoeniks Electric Kitchen Specialists</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;align-items:center;gap:4px;font-size:7px;color:#9ba3af">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#dc2626"></span> Critical 30d+
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#d97706;margin-left:4px"></span> Overdue 21d+
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#3b82f6;margin-left:4px"></span> Active
+        </div>
+        <span style="font-size:7.5px;color:#9ba3af">Week ${weekNum} · ${dateStr}</span>
+      </div>
     </div>
   </div>`;
 

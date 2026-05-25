@@ -476,6 +476,12 @@ select {
     font-size: 10px !important;
     color: #1e2024 !important;
     background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  #print-report * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
 
