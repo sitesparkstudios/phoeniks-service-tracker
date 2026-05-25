@@ -30,7 +30,7 @@ function showPage(name) {
 
   if (name === 'dashboard')  renderDashboard();
   if (name === 'activity')   renderActivity();
-  if (name === 'bottleneck') renderBottleneck();
+  if (name === 'bottleneck') { if (typeof initBottleneckFilter === 'function') initBottleneckFilter(); renderBottleneck(); }
   if (name === 'performance') renderPerformance();
   if (name === 'jobs')       { renderJobs(); populateSupplierDatalist(); }
   if (name === 'parts')      renderParts();

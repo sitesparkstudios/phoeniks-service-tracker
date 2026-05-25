@@ -298,7 +298,14 @@
       <div class="section-header mb-24">
         <div>
           <div class="section-title">Bottleneck Report</div>
-          <div class="section-sub">Average time in each stage — find where jobs stall</div>
+          <div class="section-sub" id="bottleneck-period-sub">Average time in each stage — find where jobs stall</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-sm btn-secondary bottleneck-period active" data-days="7">7d</button>
+          <button class="btn btn-sm btn-secondary bottleneck-period" data-days="30">30d</button>
+          <button class="btn btn-sm btn-secondary bottleneck-period" data-days="90">90d</button>
+          <button class="btn btn-sm btn-secondary bottleneck-period" data-days="365">1yr</button>
+          <button class="btn btn-sm btn-secondary bottleneck-period" data-days="all">All</button>
         </div>
       </div>
       <div class="card" style="padding:24px;margin-bottom:20px">

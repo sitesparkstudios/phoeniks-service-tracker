@@ -252,24 +252,77 @@ function renderActivity() {
 }
 
 /* ── BOTTLENECK ── */
+let bottleneckDays = 7; // default to last 7 days
+
+function initBottleneckFilter() {
+  document.querySelectorAll('.bottleneck-period').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.bottleneck-period').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      bottleneckDays = btn.dataset.days === 'all' ? null : parseInt(btn.dataset.days);
+      renderBottleneck();
+    });
+  });
+}
+
 function renderBottleneck() {
+  // Filter jobs by period
+  const now = new Date();
+  const cutoff = bottleneckDays
+    ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - bottleneckDays).toISOString().split('T')[0]
+    : null;
+
+  // For dwell times: include jobs active in the period
+  // A job is "active in period" if it was raised before the period end AND is still open OR was completed after cutoff
+  const periodJobs = jobs.filter(j => {
+    if (!j.poDate) return false;
+    if (!cutoff) return true;
+    // Job raised within period, OR job still open and raised before period (shows current dwell)
+    const lastDate = j.history?.[j.history.length - 1]?.date || j.poDate;
+    return j.poDate >= cutoff || (j.status !== 'Job Done' && lastDate >= cutoff) || lastDate >= cutoff;
+  });
+
   const totals = {};
   ACTIVE_STAGES.forEach(s => { totals[s] = { sum:0, c:0 }; });
-  jobs.forEach(j => {
-    const dw = getDwellTimes(j);
-    ACTIVE_STAGES.forEach(s => { if (dw[s] !== undefined) { totals[s].sum += dw[s]; totals[s].c++; } });
+
+  periodJobs.forEach(j => {
+    // For open jobs: count days in CURRENT status only (more relevant for short periods)
+    if (j.status !== 'Job Done' && ACTIVE_STAGES.includes(j.status)) {
+      const daysInCurrent = daysBetween(j.poDate, null); // rough proxy
+      // Use getDwellTimes for richer history, fallback to current status
+      const dw = getDwellTimes(j);
+      if (Object.keys(dw).length > 1) {
+        ACTIVE_STAGES.forEach(s => { if (dw[s] !== undefined) { totals[s].sum += dw[s]; totals[s].c++; } });
+      } else {
+        // Single-entry job — count all time in current status
+        totals[j.status].sum += daysInCurrent;
+        totals[j.status].c++;
+      }
+    } else {
+      const dw = getDwellTimes(j);
+      ACTIVE_STAGES.forEach(s => { if (dw[s] !== undefined) { totals[s].sum += dw[s]; totals[s].c++; } });
+    }
   });
+
   const avgs   = ACTIVE_STAGES.map(s => totals[s].c ? Math.round(totals[s].sum / totals[s].c) : 0);
   const maxAvg = Math.max(...avgs, 1);
 
+  // Update subtitle
+  const periodLabel = bottleneckDays
+    ? `Last ${bottleneckDays} day${bottleneckDays !== 1 ? 's' : ''} · ${periodJobs.length} jobs`
+    : `All time · ${periodJobs.length} jobs`;
+  const subEl = document.getElementById('bottleneck-period-sub');
+  if (subEl) subEl.textContent = `Average time in each stage — ${periodLabel}`;
+
   document.getElementById('bottleneck-bars').innerHTML = ACTIVE_STAGES.map((s, i) => {
-    const pct = Math.round(avgs[i] / maxAvg * 100);
+    const pct     = Math.round(avgs[i] / maxAvg * 100);
+    const flagged = avgs[i] > 14;
     return `<div class="stage-bar-row">
       <div class="stage-bar-meta">
         <span class="stage-bar-name">${s}</span>
-        <span class="stage-bar-val">${avgs[i]}d avg · ${totals[s].c} jobs</span>
+        <span class="stage-bar-val" style="${flagged ? 'color:var(--red);font-weight:700' : ''}">${avgs[i]}d avg · ${totals[s].c} jobs</span>
       </div>
-      <div class="stage-bar-bg"><div class="stage-bar-fill" style="width:${pct}%;background:${STAGE_COLORS[i]}"></div></div>
+      <div class="stage-bar-bg"><div class="stage-bar-fill" style="width:${pct}%;background:${flagged ? 'var(--red)' : STAGE_COLORS[i]}"></div></div>
     </div>`;
   }).join('');
 
@@ -283,23 +336,40 @@ function renderBottleneck() {
   dwellChartInst = new Chart(document.getElementById('dwellChart'), {
     type: 'bar',
     data: { labels: ACTIVE_STAGES.map(s => s.replace('Waiting for ','Wait ')),
-      datasets: [{ label:'Avg days', data: avgs, backgroundColor: STAGE_COLORS.slice(0,4), borderRadius: 6, borderWidth: 0 }] },
-    options: chartOpts
+      datasets: [{ label:'Avg days', data: avgs,
+        backgroundColor: avgs.map((v, i) => v > 14 ? 'rgba(220,38,38,0.7)' : STAGE_COLORS[i]),
+        borderRadius: 6, borderWidth: 0 }] },
+    options: { ...chartOpts,
+      plugins: { ...chartOpts.plugins, tooltip: { callbacks: { label: ctx => ` ${ctx.raw}d avg` } } },
+      scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, ticks: { ...CHART_TICK, callback: v => v + 'd' } } }
+    }
   });
 
-  const suppliers = [...new Set(jobs.map(j => j.supplier))].sort();
+  const suppliers = [...new Set(periodJobs.map(j => j.supplier))].sort();
   const supAvg    = suppliers.map(s => {
-    const sj = jobs.filter(j => j.supplier === s && j.status === 'Job Done');
+    const sj = periodJobs.filter(j => j.supplier === s && j.status === 'Job Done');
     return sj.length ? Math.round(sj.reduce((a,j) => a + (getTotalDays(j)||0), 0) / sj.length) : 0;
-  });
+  }).map((v, i) => ({ s: suppliers[i], v }))
+    .filter(d => d.v > 0)
+    .sort((a, b) => b.v - a.v);
+
   if (supplierChartInst) supplierChartInst.destroy();
   supplierChartInst = new Chart(document.getElementById('supplierChart'), {
     type: 'bar',
-    data: { labels: suppliers, datasets: [{ label:'Avg days', data: supAvg, backgroundColor: '#a855f7', borderRadius: 6, borderWidth: 0 }] },
-    options: chartOpts
+    data: { labels: supAvg.map(d => d.s), datasets: [{ label:'Avg days',
+        data: supAvg.map(d => d.v),
+        backgroundColor: supAvg.map(d => d.v > 21 ? 'rgba(220,38,38,0.7)' : d.v > 14 ? 'rgba(217,119,6,0.7)' : 'rgba(22,163,74,0.7)'),
+        borderRadius: 6, borderWidth: 0 }] },
+    options: { ...chartOpts, indexAxis: 'y',
+      plugins: { ...chartOpts.plugins, tooltip: { callbacks: { label: ctx => ` ${ctx.raw}d avg` } } },
+      scales: {
+        x: { beginAtZero:true, ticks: { ...CHART_TICK, callback: v => v+'d' }, grid: CHART_GRID },
+        y: { ticks: CHART_TICK, grid: { display:false } }
+      }
+    }
   });
 
-  document.getElementById('dwell-tbody').innerHTML = jobs.map(j => {
+  document.getElementById('dwell-tbody').innerHTML = periodJobs.map(j => {
     const dw   = getDwellTimes(j);
     const done = j.status === 'Job Done';
     const total= getTotalDays(j);
