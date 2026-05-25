@@ -4,7 +4,7 @@
    ============================================================ */
 
 let meetingSlide  = 0;
-const MEETING_TOTAL = 5;
+const MEETING_TOTAL = 4;
 
 function openMeeting() {
   const _mn = new Date();
@@ -118,13 +118,21 @@ function buildMeetingSlides() {
         </tr>`).join('')}</tbody>
       </table>`;
 
-  /* ── SLIDE 3: Jobs by Stage ── */
-  const stageCols = ['Incoming Job','Job Booked','Waiting for Parts'];
-  document.getElementById('meeting-stage-columns').innerHTML = stageCols.map((s, i) => {
-    const sj = jobs.filter(j => j.status === s);
+  /* ── SLIDE 3: Jobs by Stage (inc. Revisiting) ── */
+  const STAGE_COLORS_MEETING = {
+    'Incoming Job':      '#2563eb',
+    'Job Booked':        '#7c3aed',
+    'Waiting for Parts': '#d97706',
+    'Revisiting':        '#b8960a',
+  };
+  const stageCols = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting'];
+  document.getElementById('meeting-stage-columns').innerHTML = stageCols.map(s => {
+    const sj = jobs.filter(j => j.status === s)
+                   .sort((a,b) => daysBetween(b.poDate,null) - daysBetween(a.poDate,null));
+    const col = STAGE_COLORS_MEETING[s] || '#6b7280';
     return `<div class="status-col">
-      <div class="status-col-header" style="border-top:3px solid rgba(61,64,67,0.4)">
-        <div class="status-col-title">${s}</div>
+      <div class="status-col-header" style="border-top:3px solid ${col}">
+        <div class="status-col-title" style="color:${col}">${s}</div>
         <div class="status-col-count">${sj.length} job${sj.length!==1?'s':''}</div>
       </div>
       <div class="status-col-body">
@@ -136,40 +144,13 @@ function buildMeetingSlides() {
                 ${meetingDayChip(daysBetween(j.poDate,null))}
               </div>
             </div>`).join('')
-          : '<div style="padding:16px;color:rgba(61,64,67,0.4);font-size:13px;text-align:center">No jobs</div>'
+          : `<div style="padding:16px;color:rgba(61,64,67,0.4);font-size:13px;text-align:center">No jobs</div>`
         }
       </div>
     </div>`;
   }).join('');
 
-  /* ── SLIDE 4: Revisiting ── */
-  const revisitJobs = jobs.filter(j => j.status === 'Revisiting')
-    .sort((a, b) => daysBetween(b.poDate, null) - daysBetween(a.poDate, null));
-  const revisitEl = document.getElementById('meeting-revisit-content');
-  if (revisitEl) {
-    revisitEl.innerHTML = !revisitJobs.length
-      ? `<div class="meeting-attn-empty">
-           <div class="meeting-attn-empty-icon">✓</div>
-           <div class="meeting-attn-empty-title">No revisiting jobs</div>
-           <div class="meeting-attn-empty-sub">All jobs progressing normally.</div>
-         </div>`
-      : `<table class="meeting-table">
-          <thead><tr>
-            <th style="width:110px">PO</th>
-            <th>Reference</th>
-            <th style="width:160px">Service Co.</th>
-            <th style="width:80px">Days open</th>
-          </tr></thead>
-          <tbody>${revisitJobs.map(j => `<tr>
-            <td><span class="po-link">${esc(j.po)}</span></td>
-            <td class="ref-cell">${esc(j.ref||'—')}</td>
-            <td>${esc(j.supplier)}</td>
-            <td>${meetingDayChip(daysBetween(j.poDate,null))}</td>
-          </tr>`).join('')}</tbody>
-        </table>`;
-  }
-
-  /* ── SLIDE 5: Bottleneck ── */
+  /* ── SLIDE 4: Bottleneck ── */
   const totals = {};
   ACTIVE_STAGES.forEach(s => { totals[s] = { sum:0, c:0 }; });
   jobs.forEach(j => {

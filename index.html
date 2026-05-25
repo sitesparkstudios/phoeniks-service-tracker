@@ -38,6 +38,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         Dashboard
       </div>
+      <div class="nav-item" onclick="showPage('urgent')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Urgent
+        <span id="nav-badge-urgent" class="nav-badge" style="display:none;background:rgba(220,38,38,0.2);color:#dc2626"></span>
+      </div>
       <div class="nav-item" onclick="showPage('activity')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         Weekly Activity
@@ -144,6 +149,22 @@
             Add job
           </button>
         </div>
+      </div>
+
+      <!-- COLOUR LEGEND -->
+      <div class="colour-legend card" style="padding:14px 20px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:20px;align-items:center">
+        <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em">Status</span>
+        <span class="badge b-incoming"><span class="badge-dot"></span>Incoming Job</span>
+        <span class="badge b-booked"><span class="badge-dot"></span>Job Booked</span>
+        <span class="badge b-waiting"><span class="badge-dot"></span>Waiting for Parts</span>
+        <span class="badge b-revisiting"><span class="badge-dot"></span>Revisiting</span>
+        <span class="badge b-done"><span class="badge-dot"></span>Job Done</span>
+        <div style="width:1px;height:20px;background:var(--border)"></div>
+        <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em">Days open</span>
+        <span class="day-chip" style="background:var(--surface2)">0–14d <span style="font-size:9px;color:var(--text3)">on track</span></span>
+        <span class="day-chip warn">15–21d <span style="font-size:9px">watch</span></span>
+        <span class="day-chip danger">&gt;21d <span style="font-size:9px">overdue</span></span>
+        <span class="day-chip ok">Xd <span style="font-size:9px">completed</span></span>
       </div>
       <div id="kpi-grid" class="metric-grid"></div>
 
@@ -298,6 +319,60 @@
           <div style="font-size:11px;color:var(--text3);margin-top:2px">Jobs that required a second visit — these directly impact your fix rate</div>
         </div>
         <div id="perf-revisit-list" class="table-wrap">
+        </div>
+      </div>
+    </div>
+
+
+    <!-- URGENT PAGE -->
+    <div id="page-urgent" class="page">
+      <div class="section-header mb-16">
+        <div>
+          <div class="section-title" style="color:var(--red)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Urgent — Jobs Needing Attention
+          </div>
+          <div class="section-sub" id="urgent-sub">Jobs overrunning or stalled — review and take action</div>
+        </div>
+        <select id="urgent-threshold" onchange="renderUrgent()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
+          <option value="14">Overdue: 14+ days</option>
+          <option value="21" selected>Overdue: 21+ days</option>
+          <option value="30">Overdue: 30+ days</option>
+          <option value="7">Overdue: 7+ days</option>
+        </select>
+      </div>
+
+      <!-- URGENT KPIs -->
+      <div id="urgent-kpis" class="metric-grid" style="margin-bottom:20px"></div>
+
+      <!-- BY SERVICE CO. -->
+      <div class="card mb-20">
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:13px;font-weight:700">Overdue by service co.</div>
+          <div style="font-size:11px;color:var(--text3)">Click a row to see their jobs</div>
+        </div>
+        <div id="urgent-by-supplier" class="table-wrap"></div>
+      </div>
+
+      <!-- FULL URGENT LIST -->
+      <div class="card">
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:13px;font-weight:700">All overdue jobs</div>
+          <div style="font-size:11px;color:var(--text3)">Sorted by days open — longest first</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:110px">PO</th>
+              <th>Reference / Site</th>
+              <th style="width:150px">Service Co.</th>
+              <th style="width:120px">Status</th>
+              <th style="width:75px">Days open</th>
+              <th style="width:90px">Value</th>
+              <th style="width:110px">Notes</th>
+            </tr></thead>
+            <tbody id="urgent-tbody"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -572,7 +647,7 @@
   </div>
   <div class="meeting-body">
     <div class="meeting-slide active" id="slide-0">
-      <div class="slide-label">Slide 1 of 5 — Weekly Overview</div>
+      <div class="slide-label">Slide 1 of 4 — Weekly Overview</div>
       <div class="meeting-section-title"><div class="dot"></div>This Week's Numbers</div>
       <div class="meeting-kpi-grid" id="meeting-kpis"></div>
       <div class="grid-2">
@@ -587,7 +662,7 @@
       </div>
     </div>
     <div class="meeting-slide" id="slide-1">
-      <div class="slide-label">Slide 2 of 5 — Needs Attention</div>
+      <div class="slide-label">Slide 2 of 4 — Needs Attention</div>
       <div class="meeting-section-title">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3d4043" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         Jobs Needing Attention
@@ -595,18 +670,12 @@
       <div id="meeting-attention-content"></div>
     </div>
     <div class="meeting-slide" id="slide-2">
-      <div class="slide-label">Slide 3 of 5 — Active Jobs by Stage</div>
+      <div class="slide-label">Slide 3 of 4 — Active Jobs by Stage</div>
       <div class="meeting-section-title"><div class="dot"></div>Active Jobs by Stage</div>
-      <div class="status-columns" id="meeting-stage-columns"></div>
+      <div class="status-columns" id="meeting-stage-columns" style="grid-template-columns:repeat(4,1fr)"></div>
     </div>
     <div class="meeting-slide" id="slide-3">
-      <div class="slide-label">Slide 4 of 5 — Revisiting</div>
-      <div class="meeting-section-title"><div class="dot"></div>Revisiting Jobs</div>
-      <div class="meeting-sub-title">Jobs requiring a second visit</div>
-      <div id="meeting-revisit-content"></div>
-    </div>
-    <div class="meeting-slide" id="slide-4">
-      <div class="slide-label">Slide 5 of 5 — Performance</div>
+      <div class="slide-label">Slide 4 of 4 — Performance</div>
       <div class="meeting-section-title"><div class="dot"></div>Where Are We Losing Time?</div>
       <div class="meeting-bottleneck" id="meeting-bottleneck-content"></div>
     </div>

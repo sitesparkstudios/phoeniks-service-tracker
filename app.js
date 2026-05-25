@@ -6,6 +6,7 @@
 const PAGE_TITLES = {
   dashboard:  'Dashboard',
   activity:   'Weekly Activity',
+  urgent:     'Urgent — Jobs Needing Attention',
   bottleneck: 'Bottleneck Report',
   performance: 'Performance',
   jobs:       'All Jobs',
@@ -16,7 +17,7 @@ const PAGE_TITLES = {
   add:        'Add / Edit Job',
 };
 
-const NAV_ORDER = ['dashboard','activity','bottleneck','performance','jobs','parts','suppliers','reports','import','add'];
+const NAV_ORDER = ['dashboard','urgent','activity','bottleneck','performance','jobs','parts','suppliers','reports','import','add'];
 
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -32,6 +33,7 @@ function showPage(name) {
 
   if (name === 'dashboard')  { if (typeof initDashPeriodFilter === 'function') initDashPeriodFilter(); renderDashboard(); }
   if (name === 'activity')   renderActivity();
+  if (name === 'urgent')     renderUrgent();
   if (name === 'bottleneck') { if (typeof initBottleneckFilter === 'function') initBottleneckFilter(); renderBottleneck(); }
   if (name === 'performance') renderPerformance();
   if (name === 'jobs')       { renderJobs(); populateSupplierDatalist(); }
@@ -55,8 +57,11 @@ function updateNavBadges() {
     return last && last.date >= weekStartStr;
   }).length;
 
-  const jobsBadge  = document.getElementById('nav-badge-jobs');
-  const partsBadge = document.getElementById('nav-badge-parts');
+  const urgentCount = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) >= 21).length;
+
+  const jobsBadge   = document.getElementById('nav-badge-jobs');
+  const partsBadge  = document.getElementById('nav-badge-parts');
+  const urgentBadge = document.getElementById('nav-badge-urgent');
 
   if (jobsBadge) {
     jobsBadge.textContent = openJobs || '';
@@ -65,6 +70,10 @@ function updateNavBadges() {
   if (partsBadge) {
     partsBadge.textContent = waiting || '';
     partsBadge.style.display = waiting > 0 ? 'inline-block' : 'none';
+  }
+  if (urgentBadge) {
+    urgentBadge.textContent = urgentCount || '';
+    urgentBadge.style.display = urgentCount > 0 ? 'inline-block' : 'none';
   }
 
   // Sidebar pulse strip

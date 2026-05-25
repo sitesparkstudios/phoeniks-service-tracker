@@ -1022,3 +1022,103 @@ function renderPerformance() {
         </tr>`).join('')}</tbody></table>`;
   }
 }
+
+/* ── URGENT PAGE ── */
+function renderUrgent() {
+  const threshold = parseInt(document.getElementById('urgent-threshold')?.value || 21);
+  const urgentJobs = jobs
+    .filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) >= threshold)
+    .sort((a, b) => daysBetween(b.poDate, null) - daysBetween(a.poDate, null));
+
+  const criticalJobs = urgentJobs.filter(j => daysBetween(j.poDate, null) > 30);
+  const revisiting   = urgentJobs.filter(j => j.status === 'Revisiting');
+  const waitingParts = urgentJobs.filter(j => j.status === 'Waiting for Parts');
+
+  // Sub label
+  const subEl = document.getElementById('urgent-sub');
+  if (subEl) subEl.textContent = `${urgentJobs.length} job${urgentJobs.length !== 1 ? 's' : ''} open ${threshold}+ days — review and take action`;
+
+  // KPIs
+  const kpiEl = document.getElementById('urgent-kpis');
+  if (kpiEl) {
+    kpiEl.innerHTML = `
+      <div class="metric-card danger accent-red" style="--accent:var(--red)">
+        <div class="metric-label">Total Overdue</div>
+        <div class="metric-value" style="color:var(--red)">${urgentJobs.length}</div>
+        <div class="metric-sub">Open ${threshold}+ days</div>
+      </div>
+      <div class="metric-card ${criticalJobs.length > 0 ? 'danger' : 'accent-green'}">
+        <div class="metric-label">Critical (30d+)</div>
+        <div class="metric-value" style="color:${criticalJobs.length > 0 ? 'var(--red)' : 'var(--green)'}">${criticalJobs.length}</div>
+        <div class="metric-sub">Needs escalation now</div>
+      </div>
+      <div class="metric-card ${revisiting.length > 0 ? 'warn' : 'accent-green'}">
+        <div class="metric-label">Revisiting</div>
+        <div class="metric-value" style="color:${revisiting.length > 0 ? 'var(--amber)' : 'var(--green)'}">${revisiting.length}</div>
+        <div class="metric-sub">Second visit required</div>
+      </div>
+      <div class="metric-card ${waitingParts.length > 0 ? 'warn' : 'accent-green'}">
+        <div class="metric-label">Waiting on Parts</div>
+        <div class="metric-value" style="color:${waitingParts.length > 0 ? 'var(--amber)' : 'var(--green)'}">${waitingParts.length}</div>
+        <div class="metric-sub">Parts delay overdue</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Avg Days Open</div>
+        <div class="metric-value" style="color:var(--red)">${urgentJobs.length ? Math.round(urgentJobs.reduce((a,j) => a + daysBetween(j.poDate,null), 0) / urgentJobs.length) + 'd' : '—'}</div>
+        <div class="metric-sub">Among overdue jobs</div>
+      </div>
+    `;
+  }
+
+  // By service co.
+  const supEl = document.getElementById('urgent-by-supplier');
+  if (supEl) {
+    const supBreakdown = [...new Set(urgentJobs.map(j => j.supplier))]
+      .map(s => {
+        const sj      = urgentJobs.filter(j => j.supplier === s);
+        const critical = sj.filter(j => daysBetween(j.poDate,null) > 30).length;
+        const maxDays  = Math.max(...sj.map(j => daysBetween(j.poDate,null)));
+        return { s, count: sj.length, critical, maxDays };
+      })
+      .sort((a, b) => b.count - a.count || b.maxDays - a.maxDays);
+
+    supEl.innerHTML = !supBreakdown.length
+      ? '<div class="empty-state" style="padding:24px"><p>No overdue jobs.</p></div>'
+      : `<table>
+          <thead><tr>
+            <th>Service Co.</th>
+            <th style="width:100px;text-align:center">Overdue jobs</th>
+            <th style="width:100px;text-align:center">Critical (30d+)</th>
+            <th style="width:110px;text-align:center">Longest open</th>
+          </tr></thead>
+          <tbody>${supBreakdown.map(d => `
+            <tr onclick="openSupplierModal('${esc(d.s)}','overdue')" style="cursor:pointer">
+              <td style="font-weight:600">${esc(d.s)}</td>
+              <td style="text-align:center"><span class="day-chip danger">${d.count}</span></td>
+              <td style="text-align:center">${d.critical > 0 ? `<span class="day-chip danger">${d.critical}</span>` : '<span style="color:var(--text3)">—</span>'}</td>
+              <td style="text-align:center">${dayChip(d.maxDays, false)}</td>
+            </tr>`).join('')}</tbody>
+        </table>`;
+  }
+
+  // Full list
+  const tbody = document.getElementById('urgent-tbody');
+  if (tbody) {
+    tbody.innerHTML = !urgentJobs.length
+      ? '<tr><td colspan="7"><div class="empty-state"><p>✓ No overdue jobs at this threshold.</p></div></td></tr>'
+      : urgentJobs.map(j => {
+          const days    = daysBetween(j.poDate, null);
+          const chipCls = days > 30 ? 'danger' : days > 21 ? 'warn' : '';
+          const rowCls  = days > 30 ? 'flagged' : '';
+          return `<tr class="${rowCls}" onclick="openJobModal('${j.id}')" style="cursor:pointer">
+            <td><span class="po-link">${esc(j.po)}</span></td>
+            <td class="ref-cell">${esc(j.ref || '—')}</td>
+            <td>${esc(j.supplier)}</td>
+            <td>${badge(j.status)}</td>
+            <td><span class="day-chip ${chipCls}">${days}d</span></td>
+            <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text3)">${fmtValue(j.value)}</td>
+            <td style="font-size:11px;color:var(--text3);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(j.notes||'')}">${esc(j.notes||'—')}</td>
+          </tr>`;
+        }).join('');
+  }
+}

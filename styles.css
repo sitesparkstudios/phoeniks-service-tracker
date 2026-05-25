@@ -563,3 +563,10 @@ select {
   border-color: var(--phoenix-dark);
 }
 
+/* ── URGENT / ACCENT RED ── */
+.metric-card.accent-red::before { background: var(--red); opacity: 1; }
+
+/* ── COLOUR LEGEND ── */
+.colour-legend { font-size: 12px; }
+.colour-legend .badge { cursor: default; }
+
