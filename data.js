@@ -438,3 +438,134 @@ function liveParseChatter() {
   h += '</div>';
   pe.innerHTML = h;
 }
+
+/* ══════════════════════════════════════════════
+   INVOICE VALUE IMPORT
+   Reads XLSX or CSV from Odoo vendor bills,
+   extracts PO# → value, updates matching jobs
+   ══════════════════════════════════════════════ */
+function handleInvoiceDrop(e) {
+  e.preventDefault();
+  document.getElementById('invoice-drop-zone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processInvoiceFile(file);
+}
+
+function handleInvoiceImport(e) {
+  const file = e.target.files[0];
+  if (file) processInvoiceFile(file);
+  e.target.value = '';
+}
+
+function processInvoiceFile(file) {
+  const resEl = document.getElementById('invoice-import-result');
+  resEl.innerHTML = '<div class="alert alert-info">Reading file…</div>';
+
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'csv') {
+    const reader = new FileReader();
+    reader.onload = e => parseInvoiceCSV(e.target.result);
+    reader.readAsText(file);
+  } else if (ext === 'xlsx') {
+    // Read XLSX using FileReader as ArrayBuffer, parse with a lightweight approach
+    const reader = new FileReader();
+    reader.onload = e => parseInvoiceXLSX(e.target.result);
+    reader.readAsArrayBuffer(file);
+  } else {
+    resEl.innerHTML = '<div class="alert alert-warn">Please upload a .xlsx or .csv file.</div>';
+  }
+}
+
+function parseInvoiceXLSX(buffer) {
+  // Use SheetJS (already available in the browser via CDN if loaded, else fallback to CSV message)
+  try {
+    if (typeof XLSX === 'undefined') {
+      // SheetJS not loaded — convert hint
+      document.getElementById('invoice-import-result').innerHTML =
+        '<div class="alert alert-warn">Please save the file as CSV from Excel and re-upload.</div>';
+      return;
+    }
+    const wb   = XLSX.read(buffer, { type: 'array', cellDates: true });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    applyInvoiceRows(rows);
+  } catch(err) {
+    document.getElementById('invoice-import-result').innerHTML =
+      `<div class="alert alert-warn">Could not read XLSX: ${err.message}. Try saving as CSV.</div>`;
+  }
+}
+
+function parseInvoiceCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) {
+    document.getElementById('invoice-import-result').innerHTML =
+      '<div class="alert alert-warn">File appears empty.</div>';
+    return;
+  }
+  const headers = parseCSVLine(lines[0]).map(h => h.trim());
+  const rows = lines.slice(1).map(line => {
+    const cols = parseCSVLine(line);
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (cols[i]||'').trim(); });
+    return obj;
+  });
+  applyInvoiceRows(rows);
+}
+
+function applyInvoiceRows(rows) {
+  let matched = 0, updated = 0, skipped = 0, noMatch = 0;
+
+  // Find column names flexibly
+  const firstRow = rows[0] || {};
+  const keys = Object.keys(firstRow);
+  const findCol = (...names) => keys.find(k => names.some(n => k.toLowerCase().trim() === n.toLowerCase())) || null;
+
+  const colPO     = findCol('po#', 'po', 'purchase order', 'order reference');
+  const colDebit  = findCol('debit', 'amount', 'total', 'untaxed amount');
+  const colDate   = findCol('date', 'invoice date');
+  const colType   = findCol('account', 'type');
+
+  if (!colPO || !colDebit) {
+    document.getElementById('invoice-import-result').innerHTML =
+      `<div class="alert alert-warn">Could not find required columns. Need "PO#" and "Debit" columns. Found: ${keys.join(', ')}</div>`;
+    return;
+  }
+
+  // Group by PO — sum all invoice lines for the same PO
+  const poTotals = {};
+  rows.forEach(row => {
+    const rawPO = (row[colPO] || '').toString().trim();
+    const poMatch = rawPO.match(/^(P\d+)/i);
+    if (!poMatch) { skipped++; return; }
+    const po = poMatch[1].toUpperCase();
+    const val = parseFloat((row[colDebit]||'0').toString().replace(/[,$]/g,'')) || 0;
+    if (!poTotals[po]) poTotals[po] = 0;
+    poTotals[po] += val;
+    matched++;
+  });
+
+  // Apply to jobs
+  const updatedPOs = [];
+  Object.entries(poTotals).forEach(([po, total]) => {
+    const job = jobs.find(j => j.po.trim().toUpperCase() === po);
+    if (!job) { noMatch++; return; }
+    if (total > 0) {
+      job.value = total.toFixed(2);
+      updatedPOs.push(po);
+      updated++;
+    }
+  });
+
+  if (updated > 0) {
+    saveData();
+    renderAll();
+  }
+
+  const msg = `Invoice import complete — <strong>${updated} jobs updated</strong> with invoice values · ${skipped} rows had no PO# · ${noMatch} POs not found in tracker.
+    ${updatedPOs.length ? `<div style="margin-top:6px;font-size:11px;color:var(--text3)">Updated: ${updatedPOs.slice(0,10).join(', ')}${updatedPOs.length>10?' …and '+(updatedPOs.length-10)+' more':''}</div>` : ''}`;
+  document.getElementById('invoice-import-result').innerHTML =
+    `<div class="alert alert-${updated > 0 ? 'success' : 'warn'}">${msg}</div>`;
+}
+
+
