@@ -684,6 +684,12 @@ function renderPerformance() {
   // ── HELPER: get completion date ──
   const completedOn = j => j.history?.[j.history.length - 1]?.date || null;
 
+  // ── DATA QUALITY NOTE ──
+  // Jobs imported from Odoo without chatter history have only one history entry (import date)
+  // For these jobs, getTotalDays counts from poDate → today for open jobs,
+  // or poDate → poDate (=0) for done jobs with no separate completion date.
+  // Duration metrics are most accurate for jobs where status changes have been tracked manually.
+
   // ── SCORECARD METRICS ──
   const totalDone    = donePeriod.length;
   const revisited    = donePeriod.filter(j => j.history?.some(h => h.status === 'Revisiting')).length;

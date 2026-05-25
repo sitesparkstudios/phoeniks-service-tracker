@@ -126,10 +126,8 @@ function saveReport() {
 /* ── MONTHLY SPEND ── */
 function getMonthlySpend() {
   const now = new Date();
-  // Find earliest job date so we always show relevant data
   const jobDates = jobs.filter(j => j.poDate).map(j => j.poDate).sort();
   const earliest = jobDates.length ? new Date(jobDates[0] + 'T12:00:00') : new Date(now.getFullYear(), now.getMonth() - 11, 1);
-  // Show from earliest month (up to 24 months back) through current month
   const startMonth = new Date(Math.max(earliest.getTime(), new Date(now.getFullYear(), now.getMonth() - 23, 1).getTime()));
   const months = [];
   let d = new Date(startMonth.getFullYear(), startMonth.getMonth(), 1);
@@ -138,16 +136,18 @@ function getMonthlySpend() {
       key:   `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
       label: d.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }),
       total: 0,
+      count: 0,
     });
     d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
   }
   jobs.forEach(j => {
-    if (!j.poDate || !j.value) return;
-    const val = parseFloat(j.value);
-    if (isNaN(val) || val <= 0) return;
+    if (!j.poDate) return;
     const key  = j.poDate.substring(0, 7);
     const slot = months.find(m => m.key === key);
-    if (slot) slot.total += val;
+    if (!slot) return;
+    slot.count++;
+    const val = parseFloat(j.value);
+    if (!isNaN(val) && val > 0) slot.total += val;
   });
   return months;
 }
@@ -185,9 +185,13 @@ function getDwellTimes(job) {
 
 function getTotalDays(job) {
   if (!job.poDate) return null;
-  const endDate = job.status === 'Job Done' && job.history
-    ? job.history[job.history.length - 1]?.date : null;
-  return daysBetween(job.poDate, endDate);
+  if (job.status === 'Job Done') {
+    // Use last history date as completion date if available and different from start
+    const lastDate = job.history?.[job.history.length - 1]?.date;
+    const endDate  = lastDate && lastDate !== job.poDate ? lastDate : null;
+    return daysBetween(job.poDate, endDate); // if no end date, counts to today (open duration)
+  }
+  return daysBetween(job.poDate, null); // open jobs: days since PO raised
 }
 
 /* ── RENDER HELPERS ── */
@@ -300,7 +304,7 @@ function processCSVFile(file) {
         if (get('ref'))           existing.ref           = get('ref');
         if (get('value'))         existing.value         = get('value');
         if (get('buyer'))         existing.buyer         = get('buyer');
-        if (get('deadline'))      existing.deadline      = normalizeOdooDate(get('deadline'));
+        const dl = normalizeOdooDate(get('deadline')); if (dl && dl !== existing.poDate) existing.deadline = dl;
         if (get('priority'))      existing.priority      = get('priority');
         if (get('receiptStatus')) existing.receiptStatus = get('receiptStatus');
         if (get('sourceDoc'))     existing.sourceDoc     = get('sourceDoc');
@@ -316,7 +320,7 @@ function processCSVFile(file) {
           id: 'j' + Date.now() + Math.random().toString(36).slice(2),
           po: po, supplier: get('supplier'), ref: get('ref'), equipment: '',
           poDate, status: newStatus, value: get('value'), buyer: get('buyer'),
-          deadline: normalizeOdooDate(get('deadline')), priority: get('priority'),
+          deadline: (() => { const dl = normalizeOdooDate(get('deadline')); return (dl && dl !== poDate) ? dl : ''; })(), priority: get('priority'),
           receiptStatus: get('receiptStatus'),
           sourceDoc: get('sourceDoc') || '',
           notes: get('odooNotes') || '',
