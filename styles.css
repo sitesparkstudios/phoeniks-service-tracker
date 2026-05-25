@@ -466,89 +466,16 @@ select {
 
 /* ── PRINT ── */
 @media print {
-  /* ── PAGE SETUP ── */
-  @page {
-    size: A4 landscape;
-    margin: 12mm 10mm;
-  }
+  @page { size: A4 portrait; margin: 10mm 12mm; }
 
-  /* ── HIDE CHROME ── */
-  .sidebar, .topbar, .btn, .filter-row, .meeting-overlay,
-  .modal-overlay, #supplier-modal, #job-modal,
-  .nav-badge, #sidebar-pulse, .topbar-actions,
-  .import-panel, .section-header .btn,
-  [onclick], button { display: none !important; }
-
-  /* ── LAYOUT ── */
-  body   { background: #fff !important; color: #111 !important; font-size: 10px !important; font-family: 'Plus Jakarta Sans', sans-serif !important; }
-  .main  { margin-left: 0 !important; padding: 0 !important; }
-  .page  { display: block !important; padding: 0 !important; break-inside: avoid; }
-  .page:not(.active) { display: none !important; }
-
-  /* ── CARDS ── */
-  .card, .metric-card {
-    border: 1px solid #ddd !important;
+  /* Hide everything except the print report */
+  body > * { display: none !important; }
+  #print-report {
+    display: block !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 10px !important;
+    color: #1e2024 !important;
     background: #fff !important;
-    box-shadow: none !important;
-    break-inside: avoid;
-    margin-bottom: 10px !important;
-    padding: 10px !important;
-  }
-
-  /* ── METRIC GRID ── */
-  .metric-grid, .kpi-grid {
-    display: grid !important;
-    grid-template-columns: repeat(5, 1fr) !important;
-    gap: 6px !important;
-    margin-bottom: 10px !important;
-  }
-  .metric-card { padding: 8px !important; }
-  .metric-value { font-size: 20px !important; }
-  .metric-label { font-size: 8px !important; }
-  .metric-card::before { display: none !important; }
-
-  /* ── TABLES ── */
-  table { width: 100% !important; border-collapse: collapse !important; font-size: 9px !important; break-inside: auto; }
-  thead { display: table-header-group; }
-  tr    { break-inside: avoid; }
-  th    { background: #f5f5f5 !important; color: #333 !important; padding: 5px 6px !important; font-size: 8px !important; border-bottom: 1px solid #ccc !important; }
-  td    { padding: 5px 6px !important; border-bottom: 1px solid #eee !important; color: #111 !important; }
-  .table-wrap { overflow: visible !important; max-height: none !important; }
-
-  /* ── BADGES ── */
-  .badge { border: 1px solid #999 !important; background: #fff !important; color: #333 !important; font-size: 8px !important; padding: 1px 5px !important; }
-  .badge-dot { display: none !important; }
-
-  /* ── DAY CHIPS ── */
-  .day-chip { border: 1px solid #999 !important; background: #fff !important; color: #333 !important; padding: 1px 5px !important; font-size: 8px !important; }
-
-  /* ── CHARTS — hide canvas, they don't print well ── */
-  .chart-wrap, canvas { display: none !important; }
-  .chart-card { display: none !important; }
-
-  /* ── GRID LAYOUTS ── */
-  .grid-2 { display: block !important; }
-  .grid-2 > * { margin-bottom: 8px !important; width: 100% !important; }
-
-  /* ── SECTION HEADERS ── */
-  .section-header { margin-bottom: 8px !important; }
-  .section-title  { font-size: 14px !important; font-weight: 700 !important; color: #111 !important; }
-  .section-sub    { font-size: 9px !important; color: #666 !important; }
-
-  /* ── STAGE BARS ── */
-  .stage-bar-bg, .completion-bar { border: 1px solid #ccc !important; background: #f5f5f5 !important; }
-  .stage-bar-fill, .completion-fill { background: #555 !important; }
-
-  /* ── PRINT HEADER — show company name ── */
-  body::before {
-    content: 'Phoeniks Service Tracker — ' attr(data-print-page);
-    display: block;
-    font-size: 11px;
-    font-weight: 700;
-    color: #111;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #111;
-    margin-bottom: 12px;
   }
 }
 

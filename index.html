@@ -123,7 +123,7 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
         </button>
-        <button class="btn btn-ghost btn-sm" onclick="window.print()">
+        <button class="btn btn-ghost btn-sm" onclick="buildPrintReport(); setTimeout(window.print, 120)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           Print
         </button>
@@ -166,6 +166,7 @@
         <span class="day-chip danger">&gt;21d <span style="font-size:9px">overdue</span></span>
         <span class="day-chip ok">Xd <span style="font-size:9px">completed</span></span>
       </div>
+      <div id="invoicing-health" style="display:none;background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:12px;font-size:12px;color:var(--red);gap:10px;align-items:center"></div>
       <div id="kpi-grid" class="metric-grid"></div>
 
       <!-- Stage dwell — prominent at top -->
@@ -749,5 +750,14 @@
 <script src="render.js?v=20260525"></script>
 <script src="meeting.js?v=20260525"></script>
 <script src="app.js?v=20260525"></script>
+
+  <!-- ═══════════════════════════════════════════════
+       PRINT REPORT — hidden on screen, print only
+       Rendered by buildPrintReport() before window.print()
+  ═══════════════════════════════════════════════════ -->
+  <div id="print-report" style="display:none">
+    <!-- content injected by buildPrintReport() -->
+  </div>
+
 </body>
 </html>
