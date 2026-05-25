@@ -357,7 +357,7 @@ function showImportResult(type, msg) {
 }
 
 function copyOdooTemplate() {
-  const fields = 'Order Reference,Vendor,Vendor Reference,Confirmation Date,Job Status,Total,Buyer,Order Deadline,Source Document,Notes';
+  const fields = 'Order Reference,Vendor,Vendor Reference,Confirmation Date,Job Status,Total,Untaxed Amount,Billing Status,Amount to Invoice,Receipt Status,Buyer,Order Deadline,Source Document,Terms and Conditions';
   navigator.clipboard.writeText(fields).then(() => showToast('Field names copied — paste into Odoo export column selector'));
 }
 
