@@ -260,9 +260,10 @@ loadData();
 updateSidebarDate();
 updateNavBadges();
 const _lastPage = (() => { try { return localStorage.getItem('phoeniks_last_page'); } catch(e) { return null; } })();
-initDashPeriodFilter();
-initBottleneckFilter();
 showPage(NAV_ORDER.includes(_lastPage) ? _lastPage : 'dashboard');
+// Init period filters after showPage has rendered the buttons
+if (typeof initDashPeriodFilter  === 'function') initDashPeriodFilter();
+if (typeof initBottleneckFilter  === 'function') initBottleneckFilter();
 // Re-open meeting if it was open before refresh
 try { if (localStorage.getItem('phoeniks_meeting_open') === '1') { setTimeout(openMeeting, 100); } } catch(e) {}
 
