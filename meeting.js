@@ -1,6 +1,10 @@
 /* ============================================================
    meeting.js — Monday morning meeting mode — Bold Yellow theme
    4 slides: Overview KPIs | Needs Attention | Jobs by Stage | Bottleneck
+
+   CHANGED FROM ORIGINAL:
+   - phoeniks_meeting_open pref still uses localStorage (UI state,
+     not data — no need to migrate to Supabase)
    ============================================================ */
 
 let meetingSlide  = 0;
@@ -28,7 +32,6 @@ function buildMeetingSlides() {
   const open       = jobs.filter(isOpenService);
   const done       = jobs.filter(j => j.status === 'Job Done');
   const stuck      = jobs.filter(j => isOpenService(j) && daysBetween(j.poDate, null) > 14);
-  // Avg duration: only jobs raised in last 90 days to avoid historical distortion
   const now90 = new Date(); now90.setDate(now90.getDate() - 90);
   const cutoff90 = now90.toISOString().split('T')[0];
   const recentDone = done.filter(j => (j.poDate||'') >= cutoff90);
@@ -53,7 +56,6 @@ function buildMeetingSlides() {
     </div>
   `).join('');
 
-  /* Status breakdown bars */
   document.getElementById('meeting-stage-bars').innerHTML = ACTIVE_STAGES.map((s, i) => {
     const n   = jobs.filter(j => j.status === s).length;
     const pct = open.length ? Math.round(n / open.length * 100) : 0;
@@ -68,7 +70,6 @@ function buildMeetingSlides() {
     </div>`;
   }).join('');
 
-  /* Service Co. workload — open jobs only, sorted by count desc */
   const supWorkload = [...new Set(open.map(j => j.supplier))]
     .map(s => ({
       s,
@@ -118,7 +119,7 @@ function buildMeetingSlides() {
         </tr>`).join('')}</tbody>
       </table>`;
 
-  /* ── SLIDE 3: Jobs by Stage (inc. Revisiting) ── */
+  /* ── SLIDE 3: Jobs by Stage ── */
   const STAGE_COLORS_MEETING = {
     'Incoming Job':      '#2563eb',
     'Job Booked':        '#7c3aed',
@@ -178,7 +179,6 @@ function buildMeetingSlides() {
   ).join('');
 }
 
-/* Yellow-mode badge and day chip for meeting slides */
 function meetingBadge(status) {
   return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(61,64,67,0.12);color:#3d4043">
     <span style="width:5px;height:5px;border-radius:50%;background:#3d4043;flex-shrink:0"></span>${status}
