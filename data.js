@@ -193,6 +193,13 @@ async function loadData() {
   // Wipe old localStorage data keys (keep UI prefs)
   try { SK_OLD.forEach(k => localStorage.removeItem(k)); } catch(e) {}
 
+  // Require authentication — show login wall if not signed in
+  if (!isAuthed()) {
+    showLoadingScreen(false);
+    showLoginWall();
+    return;
+  }
+
   try {
     // Jobs — order by po_date desc, then updated_at desc
     const { data: jobRows, error: jobErr } = await _sb
@@ -230,9 +237,95 @@ async function loadData() {
   showLoadingScreen(false);
 }
 
+const _loadingMessages = [
+  'Checking the job queue…',
+  'Counting the overdue ones…',
+  'Chasing up suppliers…',
+  'Reviewing the parts ETAs…',
+  'Almost ready…',
+];
+let _loadingMsgInterval = null;
+
 function showLoadingScreen(visible) {
-  const el = document.getElementById('loading-screen');
-  if (el) el.classList.toggle('hidden', !visible);
+  const el  = document.getElementById('loading-screen');
+  const msg = document.getElementById('loading-msg');
+  if (!el) return;
+
+  if (visible) {
+    el.classList.remove('hidden');
+    // Rotate messages
+    let i = 0;
+    if (msg) msg.textContent = _loadingMessages[0];
+    _loadingMsgInterval = setInterval(() => {
+      i = (i + 1) % _loadingMessages.length;
+      if (msg) msg.textContent = _loadingMessages[i];
+    }, 900);
+  } else {
+    clearInterval(_loadingMsgInterval);
+    el.classList.add('hidden');
+  }
+}
+
+function showLoginWall() {
+  // Hide the app, show a full-screen login prompt
+  const app = document.querySelector('.app');
+  if (app) app.style.display = 'none';
+
+  const wall = document.createElement('div');
+  wall.id = 'login-wall';
+  wall.style.cssText = 'position:fixed;inset:0;background:#FFD100;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999';
+  wall.innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;flex-shrink:0">
+        <div style="width:12px;height:12px;border-radius:50%;background:#3d4043"></div>
+        <div style="width:12px;height:12px;border-radius:50%;background:#3d4043"></div>
+        <div style="width:12px;height:12px;border-radius:50%;background:#3d4043"></div>
+        <div style="width:12px;height:12px;border-radius:50%;background:#3d4043"></div>
+        <div style="width:12px;height:12px;border-radius:50%;background:#3d4043"></div>
+        <div style="width:12px;height:12px;border-radius:50%;border:2.5px solid #3d4043;box-sizing:border-box"></div>
+      </div>
+      <div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:32px;color:#3d4043;letter-spacing:2px;line-height:1">PHOENIKS</div>
+        <div style="font-size:11px;color:rgba(61,64,67,0.6);letter-spacing:0.12em;text-transform:uppercase;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;margin-top:3px">Electric Kitchen Specialists</div>
+      </div>
+    </div>
+    <div style="width:60px;height:2px;background:rgba(61,64,67,0.2);border-radius:2px;margin-bottom:28px"></div>
+    <div style="background:white;border-radius:14px;padding:32px;width:340px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.15);text-align:center">
+      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;color:#1e2024;margin-bottom:6px">Service Tracker</div>
+      <div style="font-size:13px;color:#6b7280;margin-bottom:24px">Sign in to view service data</div>
+      <input id="wall-email" type="email" placeholder="your@email.com" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:11px 14px;font-size:14px;margin-bottom:12px;font-family:'Plus Jakarta Sans',sans-serif">
+      <button id="wall-btn" onclick="wallSignIn()" style="width:100%;background:#3d4043;color:white;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">Send magic link</button>
+      <div id="wall-msg" style="margin-top:12px;font-size:12px;color:#6b7280;min-height:16px"></div>
+    </div>
+    <div style="position:absolute;bottom:28px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;color:rgba(61,64,67,0.45);text-align:center;line-height:1.6">
+      Created by <strong style="color:rgba(61,64,67,0.65)">Sean Pickford</strong> · Technical Service Manager<br>
+      Tracking Phoeniks service levels, one job at a time 🔥
+    </div>
+  `;
+  document.body.appendChild(wall);
+
+  // Enter key on email field
+  document.getElementById('wall-email').addEventListener('keydown', e => {
+    if (e.key === 'Enter') wallSignIn();
+  });
+}
+
+async function wallSignIn() {
+  const email = document.getElementById('wall-email').value.trim();
+  const btn   = document.getElementById('wall-btn');
+  const msg   = document.getElementById('wall-msg');
+  if (!email) { msg.textContent = 'Please enter your email'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  const error = await sendMagicLink(email);
+  if (error) {
+    msg.textContent = 'Error: ' + error.message;
+    btn.disabled = false;
+    btn.textContent = 'Send magic link';
+  } else {
+    msg.textContent = '✓ Check your email and click the link to sign in';
+    btn.textContent = 'Link sent!';
+  }
 }
 
 /* ── SAVE SINGLE JOB ────────────────────────────────────────
