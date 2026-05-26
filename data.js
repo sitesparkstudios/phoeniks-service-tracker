@@ -194,10 +194,17 @@ function getDwellTimes(job) {
 function getTotalDays(job) {
   if (!job.poDate) return null;
   if (job.status === 'Job Done') {
-    // Use last history date as completion date if available and different from start
-    const lastDate = job.history?.[job.history.length - 1]?.date;
-    const endDate  = lastDate && lastDate !== job.poDate ? lastDate : null;
-    return daysBetween(job.poDate, endDate); // if no end date, counts to today (open duration)
+    // Only count duration when we have a real tracked completion (history length > 1)
+    // Jobs imported without chatter have only one entry = import date, which is unreliable.
+    // Counting to today for a done job inflates averages massively (the 450d BakerGroup bug).
+    const hist = job.history || [];
+    if (hist.length > 1) {
+      const lastDate = hist[hist.length - 1]?.date;
+      if (lastDate && lastDate !== job.poDate) {
+        return daysBetween(job.poDate, lastDate);
+      }
+    }
+    return null; // exclude from duration averages — no reliable completion date
   }
   return daysBetween(job.poDate, null); // open jobs: days since PO raised
 }

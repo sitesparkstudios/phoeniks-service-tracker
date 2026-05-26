@@ -264,6 +264,7 @@
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           <select id="perf-period" onchange="renderPerformance()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
+            <option value="1">This month</option>
             <option value="3">Last 3 months</option>
             <option value="6" selected>Last 6 months</option>
             <option value="12">Last 12 months</option>
@@ -509,6 +510,25 @@
         <div>
           <div class="section-title">Service Co. Scorecards</div>
           <div class="section-sub">Performance breakdown by repairer</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="supplier-sort" onchange="renderSuppliers()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
+            <option value="name">Sort: A–Z</option>
+            <option value="overdue">Sort: Most Overdue</option>
+            <option value="open">Sort: Most Open</option>
+            <option value="avg">Sort: Avg Duration</option>
+          </select>
+          <select id="supplier-state" onchange="renderSuppliers()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
+            <option value="">All States</option>
+            <option value="VIC">VIC</option>
+            <option value="NSW">NSW</option>
+            <option value="QLD">QLD</option>
+            <option value="SA">SA</option>
+            <option value="WA">WA</option>
+            <option value="TAS">TAS</option>
+            <option value="ACT">ACT</option>
+            <option value="NT">NT</option>
+          </select>
         </div>
       </div>
       <div id="supplier-grid" class="supplier-grid"></div>

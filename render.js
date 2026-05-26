@@ -561,17 +561,41 @@ function updatePartsData(jobId, field, value) {
 
 /* ── SUPPLIERS ── */
 function renderSuppliers() {
-  const suppliers = [...new Set(jobs.map(j => j.supplier))].sort();
+  const sortEl  = document.getElementById('supplier-sort');
+  const stateEl = document.getElementById('supplier-state');
+  const sortBy  = sortEl ? sortEl.value : 'name';
+  const stateFilter = stateEl ? stateEl.value : '';
+
+  // Extract state from supplier name if it contains a state code in brackets or suffix
+  // e.g. "BakerGroup VIC" or "Norfolk (NSW)" — fallback: no filter
+  const getState = s => {
+    const m = s.match(/(VIC|NSW|QLD|SA|WA|TAS|ACT|NT)/i);
+    return m ? m[1].toUpperCase() : '';
+  };
+
+  let suppliers = [...new Set(jobs.map(j => j.supplier).filter(Boolean))];
+
+  // State filter
+  if (stateFilter) {
+    suppliers = suppliers.filter(s => getState(s) === stateFilter);
+  }
+
   if (!suppliers.length) {
-    document.getElementById('supplier-grid').innerHTML = '<div class="empty-state"><p>No jobs yet.</p></div>';
+    document.getElementById('supplier-grid').innerHTML = stateFilter
+      ? '<div class="empty-state"><p>No service companies found for ' + stateFilter + '. State is detected from the company name (e.g. "BakerGroup VIC").</p></div>'
+      : '<div class="empty-state"><p>No jobs yet.</p></div>';
     return;
   }
-  document.getElementById('supplier-grid').innerHTML = suppliers.map(s => {
+
+  // Build stats for sorting
+  const stats = suppliers.map(s => {
     const sj      = jobs.filter(j => j.supplier === s);
     const done    = sj.filter(j => j.status === 'Job Done');
-    const open    = sj.filter(j => j.status !== 'Job Done');
-    const stuck   = open.filter(j => daysBetween(j.poDate,null) > 14).length;
-    const avgTotal= done.length ? Math.round(done.reduce((a,j) => a + (getTotalDays(j)||0), 0) / done.length) : null;
+    const open    = sj.filter(j => j.status !== 'Job Done' && j.status !== 'Maintenance');
+    const overdue = open.filter(j => daysBetween(j.poDate,null) > 14).length;
+    const critical= open.filter(j => daysBetween(j.poDate,null) > 30).length;
+    const doneWithDur = done.filter(j => getTotalDays(j) !== null);
+    const avgTotal= doneWithDur.length ? Math.round(doneWithDur.reduce((a,j) => a + getTotalDays(j), 0) / doneWithDur.length) : null;
     const pct     = sj.length ? Math.round(done.length / sj.length * 100) : 0;
     const st      = {};
     ACTIVE_STAGES.forEach(x => { st[x] = { sum:0, c:0 }; });
@@ -579,10 +603,24 @@ function renderSuppliers() {
       const dw = getDwellTimes(j);
       ACTIVE_STAGES.forEach(x => { if (dw[x] !== undefined) { st[x].sum += dw[x]; st[x].c++; } });
     });
+    return { s, sj, done, open, overdue, critical, avgTotal, pct, st };
+  });
+
+  // Sort
+  if (sortBy === 'overdue') stats.sort((a,b) => b.overdue - a.overdue || b.open.length - a.open.length);
+  else if (sortBy === 'open') stats.sort((a,b) => b.open.length - a.open.length || b.overdue - a.overdue);
+  else if (sortBy === 'avg') stats.sort((a,b) => (b.avgTotal||0) - (a.avgTotal||0));
+  else stats.sort((a,b) => a.s.localeCompare(b.s));
+
+  document.getElementById('supplier-grid').innerHTML = stats.map(({ s, sj, done, open, overdue, critical, avgTotal, pct, st }) => {
     return `<div class="card supplier-card">
       <div class="flex-between mb-12">
         <div class="supplier-name">${esc(s)}</div>
-        ${stuck > 0 ? `<span class="badge b-waiting" style="cursor:pointer" onclick="openSupplierModal('${s}','overdue');event.stopPropagation()" title="Click to see overdue jobs">${stuck} overdue ↗</span>` : '<span class="badge b-done">On track</span>'}
+        ${critical > 0
+          ? `<span class="badge b-waiting" style="cursor:pointer;background:var(--red);color:#fff" onclick="openSupplierModal('${s}','overdue');event.stopPropagation()" title="Click to see overdue jobs">${critical} critical ↗</span>`
+          : overdue > 0
+            ? `<span class="badge b-waiting" style="cursor:pointer" onclick="openSupplierModal('${s}','overdue');event.stopPropagation()" title="Click to see overdue jobs">${overdue} overdue ↗</span>`
+            : '<span class="badge b-done">On track</span>'}
       </div>
       <div class="supplier-meta">${sj.length} total · ${open.length} open · ${done.length} completed</div>
       <div class="supplier-stats">
@@ -595,8 +633,8 @@ function renderSuppliers() {
           <div class="supplier-stat-label">Avg duration</div>
         </div>
         <div class="supplier-stat">
-          <div class="supplier-stat-val" style="color:${stuck>0?'var(--amber)':'var(--text)'}">${stuck}</div>
-          <div class="supplier-stat-label" style="color:${stuck>0?'var(--amber)':'inherit'}">Overdue</div>
+          <div class="supplier-stat-val" style="color:${overdue>0?'var(--amber)':'var(--text)'}">${overdue}</div>
+          <div class="supplier-stat-label" style="color:${overdue>0?'var(--amber)':'inherit'}">Overdue</div>
         </div>
       </div>
       <div style="margin-bottom:14px">
@@ -1311,6 +1349,12 @@ function buildPrintReport() {
       ${td(`<span style="font-weight:600;font-size:8.5px">${esc(j.ref||'—')}</span>`,'max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
       ${td(`<span style="color:#6b7280;font-size:8px">${esc(j.supplier)}</span>`,'max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
       ${td(`<strong style="color:${dayCol};font-size:9px">${d}d</strong>`,'text-align:right;white-space:nowrap')}
+    </tr>
+    <tr style="background:${rowBg}">
+      <td colspan="5" style="padding:2px 5px 5px 22px;border-bottom:1px solid #e5e7eb">
+        <span style="font-size:7px;color:#c0c4cc;font-style:italic">Notes: </span>
+        <span style="display:inline-block;border-bottom:1px solid #d1d5db;width:calc(100% - 42px);height:8px;vertical-align:bottom"></span>
+      </td>
     </tr>`;
   };
 
@@ -1481,11 +1525,11 @@ function buildPrintReport() {
         ${waitingBills.length > 0 ? `
         ${sHead('Waiting on Bills','#d97706',waitingBills.length+' jobs')}
         <div style="background:#fffcf0;border:1px solid #fde68a;border-radius:6px;padding:6px 8px">
-          ${waitingBills.slice(0,5).map(j=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid #fef3c7;font-size:8px">
+          ${waitingBills.map(j=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid #fef3c7;font-size:8px">
             <span style="font-family:'DM Mono',monospace;font-size:7.5px;color:#92400e">${esc(j.po)}</span>
             <span style="color:#78350f;font-size:7.5px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.supplier)}</span>
           </div>`).join('')}
-          ${waitingBills.length>5?`<div style="font-size:7px;color:#9ba3af;margin-top:3px;font-style:italic">+${waitingBills.length-5} more — chase accounts</div>`:'<div style="font-size:7px;color:#9ba3af;margin-top:3px;font-style:italic">Chase accounts to confirm</div>'}
+          <div style="font-size:7px;color:#9ba3af;margin-top:3px;font-style:italic">Chase accounts to confirm all ${waitingBills.length}</div>
         </div>` : ''}
       </div>
     </div>
