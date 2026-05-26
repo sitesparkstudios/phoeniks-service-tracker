@@ -278,6 +278,9 @@ function showLoadingScreen(visible) {
 }
 
 function showLoginWall() {
+  // Guard — never create the wall twice
+  if (document.getElementById('login-wall')) return;
+
   // Hide the app, show a full-screen login prompt
   const app = document.querySelector('.app');
   if (app) app.style.display = 'none';

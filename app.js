@@ -476,27 +476,6 @@ async function adminRemoveUser(id, email) {
 }
 
 
-/* ── INIT ── */
-(async () => {
-  await initAuth();     // set _currentSession, wire onAuthStateChange
-  await loadData();     // fetch from Supabase
-  updateAuthUI();
-  // Show admin nav only when signed in
-  const navAdmin = document.getElementById('nav-admin');
-  if (navAdmin) navAdmin.style.display = isAuthed() ? 'flex' : 'none';
-  updateSidebarDate();
-  updateNavBadges();
-
-  const _lastPage = (() => { try { return localStorage.getItem('phoeniks_last_page'); } catch(e) { return null; } })();
-  showPage(NAV_ORDER.includes(_lastPage) ? _lastPage : 'dashboard');
-
-  if (typeof initDashPeriodFilter  === 'function') initDashPeriodFilter();
-  if (typeof initBottleneckFilter  === 'function') initBottleneckFilter();
-
-  // Re-open meeting if it was open before refresh
-  try { if (localStorage.getItem('phoeniks_meeting_open') === '1') { setTimeout(openMeeting, 100); } } catch(e) {}
-})();
-
 /* ── ADMIN PAGE ── */
 const SUPABASE_ADMIN_URL = 'https://hoeiwbotdkjqzrygmdhs.supabase.co';
 const SUPABASE_ADMIN_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvZWl3Ym90ZGtqcXpyeWdtZGhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzM5NDQsImV4cCI6MjA5NTMwOTk0NH0.u9yyk578jkoPv1QQJqZGmRL8A9RoS2prJtW4KnefxZk';
