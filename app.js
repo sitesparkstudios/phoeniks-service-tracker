@@ -327,111 +327,149 @@ function updateSidebarDate() {
 })();
 
 /* ── ADMIN PAGE ── */
-const SUPABASE_ADMIN_URL = 'https://hoeiwbotdkjqzrygmdhs.supabase.co';
-const SUPABASE_ADMIN_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvZWl3Ym90ZGtqcXpyeWdtZGhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzM5NDQsImV4cCI6MjA5NTMwOTk0NH0.u9yyk578jkoPv1QQJqZGmRL8A9RoS2prJtW4KnefxZk';
 
 async function renderAdmin() {
   if (!isAuthed()) { showPage('dashboard'); showToast('Sign in to access admin'); return; }
 
-  // Show admin nav item
   const navAdmin = document.getElementById('nav-admin');
   if (navAdmin) navAdmin.style.display = 'flex';
 
-  // Show your email
-  const emailEl = document.getElementById('admin-your-email');
-  if (emailEl) emailEl.textContent = _currentSession?.user?.email || '—';
+  const emailEl    = document.getElementById('admin-your-email');
+  const countEl    = document.getElementById('admin-user-count');
+  const jobCountEl = document.getElementById('admin-job-count');
+  const listEl     = document.getElementById('admin-users-list');
+  const metaEl     = document.getElementById('admin-users-meta');
 
-  // Load users via Supabase admin API
-  const listEl  = document.getElementById('admin-users-list');
-  const countEl = document.getElementById('admin-user-count');
-  const metaEl  = document.getElementById('admin-users-meta');
+  if (emailEl)    emailEl.textContent    = _currentSession?.user?.email || '—';
+  if (jobCountEl) jobCountEl.textContent = jobs.length;
 
-  if (listEl) listEl.innerHTML = '<div class="empty-state"><p>Loading users…</p></div>';
+  if (listEl) listEl.innerHTML = '<div class="empty-state"><p>Loading…</p></div>';
+  if (metaEl) metaEl.textContent = 'Loading…';
 
   try {
-    // Use the auth.users view via REST — requires anon key + RLS allows reading own profile
-    // We fetch from auth.users using the service role isn't available client-side,
-    // so we use a profiles approach: list sessions we know about
-    // Best we can do client-side: show current user + any profiles stored
     const { data: { user } } = await _sb.auth.getUser();
 
-    // Try to get user list from a profiles table if it exists, otherwise show current user only
+    // Try profiles table first, fall back to current user only
     const { data: profiles, error } = await _sb
       .from('user_profiles')
       .select('*')
       .order('created_at', { ascending: false });
 
-    let users = [];
-    if (!error && profiles) {
-      users = profiles;
-    } else {
-      // Fallback: just show current user
-      users = [{ email: user.email, id: user.id, created_at: user.created_at, last_sign_in_at: user.last_sign_in_at }];
-    }
+    const users = (!error && profiles && profiles.length)
+      ? profiles
+      : [{ email: user.email, id: user.id, created_at: user.created_at, last_sign_in_at: user.last_sign_in_at }];
 
     if (countEl) countEl.textContent = users.length;
-    if (metaEl)  metaEl.textContent  = `${users.length} user${users.length !== 1 ? 's' : ''}`;
+    if (metaEl)  metaEl.textContent  = `${users.length} user${users.length !== 1 ? 's' : ''} with access`;
 
-    if (listEl) {
-      if (!users.length) {
-        listEl.innerHTML = '<div class="empty-state"><p>No users found.</p></div>';
-        return;
-      }
-      listEl.innerHTML = users.map(u => {
-        const isYou = u.email === (_currentSession?.user?.email);
-        const lastSeen = u.last_sign_in_at
-          ? new Date(u.last_sign_in_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
-          : 'Never signed in';
-        const joined = u.created_at
-          ? new Date(u.created_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
-          : '—';
-        return `
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border)">
-            <div style="display:flex;align-items:center;gap:12px">
-              <div style="width:34px;height:34px;border-radius:50%;background:${isYou ? 'var(--phoenix)' : 'var(--surface3)'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:${isYou ? 'var(--phoenix-dark)' : 'var(--text2)'}">
-                ${(u.email || '?')[0].toUpperCase()}
-              </div>
-              <div>
-                <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(u.email || '—')} ${isYou ? '<span style="background:#fef9c3;color:#854d0e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px">You</span>' : ''}</div>
-                <div style="font-size:11px;color:var(--text3);margin-top:2px">Joined ${joined} · Last sign in: ${lastSeen}</div>
-              </div>
-            </div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700">Admin</span>
-              ${!isYou ? `<button class="btn btn-danger btn-sm" onclick="adminRemoveUser('${u.id}','${esc(u.email)}')">Remove</button>` : ''}
-            </div>
-          </div>`;
-      }).join('');
-    }
+    if (!listEl) return;
+    if (!users.length) { listEl.innerHTML = '<div class="empty-state"><p>No users found.</p></div>'; return; }
+
+    listEl.innerHTML = `
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border)">
+              <th style="padding:10px 20px;text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);background:var(--surface2)">User</th>
+              <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);background:var(--surface2)">Access</th>
+              <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);background:var(--surface2)">Joined</th>
+              <th style="padding:10px 16px;text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);background:var(--surface2)">Last sign in</th>
+              <th style="padding:10px 16px;text-align:right;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);background:var(--surface2)"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.map(u => {
+              const isYou    = u.email === (_currentSession?.user?.email);
+              const lastSeen = u.last_sign_in_at
+                ? (() => {
+                    const d = new Date(u.last_sign_in_at);
+                    const diffMs = Date.now() - d;
+                    const diffH  = Math.floor(diffMs / 3600000);
+                    const diffD  = Math.floor(diffMs / 86400000);
+                    if (diffH < 1)  return 'Just now';
+                    if (diffH < 24) return diffH + 'h ago';
+                    if (diffD < 7)  return diffD + 'd ago';
+                    return d.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
+                  })()
+                : 'Never';
+              const joined = u.created_at
+                ? new Date(u.created_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
+                : '—';
+              const initial = (u.email || '?')[0].toUpperCase();
+              return \`<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:14px 20px">
+                  <div style="display:flex;align-items:center;gap:12px">
+                    <div style="width:36px;height:36px;border-radius:50%;background:\${isYou ? 'var(--phoenix)' : 'var(--surface3)'};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:\${isYou ? 'var(--phoenix-dark)' : 'var(--text2)'};flex-shrink:0">\${initial}</div>
+                    <div>
+                      <div style="font-weight:600;color:var(--text)">\${esc(u.email || '—')}</div>
+                      \${isYou ? '<div style="font-size:11px;color:var(--text3);margin-top:1px">That's you</div>' : ''}
+                    </div>
+                  </div>
+                </td>
+                <td style="padding:14px 16px"><span style="background:#fef9c3;color:#854d0e;padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700">Admin</span></td>
+                <td style="padding:14px 16px;color:var(--text3);font-size:12px">\${joined}</td>
+                <td style="padding:14px 16px">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div style="width:7px;height:7px;border-radius:50%;background:\${lastSeen === 'Just now' || lastSeen.includes('h ago') ? 'var(--green)' : lastSeen === 'Never' ? 'var(--text3)' : 'var(--blue)'};flex-shrink:0"></div>
+                    <span style="font-size:12px;color:var(--text2)">\${lastSeen}</span>
+                  </div>
+                </td>
+                <td style="padding:14px 16px;text-align:right">
+                  \${!isYou ? \`<button class="btn btn-danger btn-xs" onclick="adminRemoveUser('\${u.id}','\${esc(u.email)}')">Remove</button>\` : ''}
+                </td>
+              </tr>\`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
   } catch(err) {
-    if (listEl) listEl.innerHTML = `<div class="empty-state"><p>Could not load users. You may need a service role key for full user management.</p></div>`;
+    if (listEl) listEl.innerHTML = \`<div style="padding:20px 24px">
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">Your account</div>
+      <div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--surface2);border-radius:var(--radius-sm)">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--phoenix);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--phoenix-dark)">\${(_currentSession?.user?.email||'?')[0].toUpperCase()}</div>
+        <div>
+          <div style="font-weight:600;color:var(--text)">\${esc(_currentSession?.user?.email||'—')}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">Full admin access · To manage other users, visit Supabase dashboard</div>
+        </div>
+      </div>
+    </div>\`;
     if (countEl) countEl.textContent = '1';
-    console.error('Admin load error:', err);
+    if (metaEl)  metaEl.textContent  = '1 user (you)';
+  }
+}
+
+async function adminInviteFromInput() {
+  const input  = document.getElementById('admin-invite-email');
+  const result = document.getElementById('admin-invite-result');
+  const email  = input?.value.trim();
+  if (!email || !email.includes('@')) {
+    if (result) result.innerHTML = '<span style="color:var(--red)">Please enter a valid email address.</span>';
+    return;
+  }
+  if (result) result.innerHTML = '<span style="color:var(--text3)">Sending invite…</span>';
+
+  const { error } = await _sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin + window.location.pathname, shouldCreateUser: true }
+  });
+
+  if (error) {
+    if (result) result.innerHTML = \`<span style="color:var(--red)">Error: \${error.message}</span>\`;
+  } else {
+    if (result) result.innerHTML = \`<span style="color:var(--green)">✓ Invite sent to \${esc(email)}</span>\`;
+    if (input)  input.value = '';
+    setTimeout(renderAdmin, 1000);
   }
 }
 
 async function adminInvitePrompt() {
-  const email = prompt('Enter email address to invite:');
-  if (!email || !email.includes('@')) { showToast('Invalid email'); return; }
-
-  const { error } = await _sb.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: window.location.origin + window.location.pathname,
-      shouldCreateUser: true
-    }
-  });
-
-  if (error) {
-    showToast('Error: ' + error.message);
-  } else {
-    showToast(`Invite sent to ${email}`);
-    renderAdmin();
-  }
+  // Focus the inline input instead
+  const input = document.getElementById('admin-invite-email');
+  if (input) { input.focus(); input.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 }
 
 async function adminRemoveUser(id, email) {
-  const confirmed = await showConfirm(`Remove ${email}?`, 'They will no longer be able to sign in.');
+  const confirmed = await showConfirm(\`Remove \${email}?\`, 'They will no longer be able to sign in. This cannot be undone.');
   if (!confirmed) return;
-  showToast('User removal requires Supabase dashboard — go to Authentication → Users');
+  showToast('To remove a user: Supabase dashboard → Authentication → Users → delete');
 }
