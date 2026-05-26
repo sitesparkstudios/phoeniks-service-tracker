@@ -971,11 +971,40 @@ function renderPerformance() {
   // ── HELPER: get completion date ──
   const completedOn = j => j.history?.[j.history.length - 1]?.date || null;
 
-  // ── DATA QUALITY NOTE ──
-  // Jobs imported from Odoo without chatter history have only one history entry (import date)
-  // For these jobs, getTotalDays counts from poDate → today for open jobs,
-  // or poDate → poDate (=0) for done jobs with no separate completion date.
-  // Duration metrics are most accurate for jobs where status changes have been tracked manually.
+  // ── DATA QUALITY BANNER ──
+  const doneJobs        = jobs.filter(j => j.status === 'Job Done');
+  const withDuration    = doneJobs.filter(j => getTotalDays(j) !== null).length;
+  const withHistory     = doneJobs.filter(j => (j.history||[]).length > 1).length;
+  const noHistory       = doneJobs.length - withHistory;
+  const durPct          = doneJobs.length ? Math.round(withDuration / doneJobs.length * 100) : 0;
+  const histPct         = doneJobs.length ? Math.round(withHistory / doneJobs.length * 100) : 0;
+  const openNoHistory   = jobs.filter(j => j.status !== 'Job Done' && (j.history||[]).length <= 1).length;
+  const dataNote        = document.getElementById('perf-data-note');
+  if (dataNote) {
+    if (doneJobs.length === 0) {
+      dataNote.style.display = 'none';
+    } else if (durPct >= 80 && histPct >= 80) {
+      // Good data — green banner
+      dataNote.style.background = 'var(--green-dim)';
+      dataNote.style.borderColor = 'rgba(22,163,74,0.2)';
+      dataNote.innerHTML = \`<span style="font-size:16px;flex-shrink:0">✅</span>
+        <span style="color:var(--green)"><strong>Good data quality</strong> — \${durPct}% of completed jobs have duration data. Metrics are reliable.</span>\`;
+    } else {
+      // Needs improvement — amber banner with specific actions
+      const isRevisitedFn = j => j.history?.some(h => h.status === 'Revisiting') || j.status === 'Revisiting';
+      dataNote.style.background = 'rgba(217,119,6,0.08)';
+      dataNote.style.borderColor = 'rgba(217,119,6,0.25)';
+      dataNote.innerHTML = \`<span style="font-size:16px;flex-shrink:0">⚠️</span>
+        <div style="color:var(--text2)">
+          <div style="font-weight:700;color:var(--text);margin-bottom:6px">Data quality check — some metrics may be incomplete</div>
+          <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+            \${durPct < 80 ? \`<div>📅 <strong>\${noHistory} completed job\${noHistory !== 1 ? 's' : ''}</strong> have no chatter history — duration and fix rate data is missing for these. <span style="color:var(--blue);cursor:pointer;text-decoration:underline" onclick="showPage('add')">Add status history via the job editor →</span></div>\` : ''}
+            \${openNoHistory > 0 ? \`<div>📋 <strong>\${openNoHistory} open job\${openNoHistory !== 1 ? 's' : ''}</strong> only have their import date tracked — status changes haven't been recorded yet.</div>\` : ''}
+            <div style="color:var(--text3);margin-top:2px">To improve accuracy: open each job → Edit → paste the Odoo chatter notes to auto-extract status history. Duration data: <strong>\${durPct}%</strong> complete · History: <strong>\${histPct}%</strong> complete.</div>
+          </div>
+        </div>\`;
+    }
+  }
 
   // ── SCORECARD METRICS ──
   const totalDone    = donePeriod.length;
@@ -1768,6 +1797,14 @@ function renderDashHealthBanner(avgs, totals) {
   if (hotSites.length) {
     issues.push({ label: `${hotSites[0].name} has had ${hotSites[0].count} callouts this year`, color: 'var(--red)', page: 'sites' });
     if (hotSites.length > 1) issues.push({ label: `${hotSites.length} sites with 3+ callouts this year`, color: 'var(--amber)', page: 'sites' });
+  }
+
+  // Add data quality warning if significant gaps exist
+  const _doneAll = jobs.filter(j => j.status === 'Job Done');
+  const _withHist = _doneAll.filter(j => (j.history||[]).length > 1).length;
+  const _histPct = _doneAll.length ? Math.round(_withHist / _doneAll.length * 100) : 100;
+  if (_histPct < 60 && _doneAll.length > 5) {
+    issues.push({ label: `Only ${_histPct}% of completed jobs have status history — duration & fix rate data incomplete`, color: 'var(--blue)', page: 'performance' });
   }
 
   if (!issues.length) {
