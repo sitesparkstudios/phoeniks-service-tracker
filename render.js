@@ -1477,7 +1477,7 @@ function buildPrintReport() {
     return `<tr style="border-bottom:1px solid #f3f4f6;background:${rowBg}">
       <td style="padding:3px 5px;width:16px">${statusDot(d)}</td>
       ${td(`<span style="font-family:'DM Mono',monospace;font-size:7.5px;color:#6b7280">${esc(j.po)}</span>`)}
-      ${td(`<span style="font-weight:600;font-size:8.5px">${esc(j.ref||'—')}</span>`,'max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
+      ${td(`<span style="font-weight:600;font-size:8.5px">${esc(j.ref||'—')}</span>`,'max-width:180px;word-wrap:break-word;white-space:normal')}
       ${td(`<span style="color:#6b7280;font-size:8px">${esc(j.supplier)}</span>`,'max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
       ${td(`<strong style="color:${dayCol};font-size:9px">${d}d</strong>`,'text-align:right;white-space:nowrap')}
     </tr>
@@ -1534,9 +1534,7 @@ function buildPrintReport() {
 
       <!-- Meta block -->
       <div style="text-align:right;padding:10px 14px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:8px;display:flex;flex-direction:column;justify-content:center;gap:2px;flex-shrink:0;min-width:130px">
-        <div style="font-size:9px;font-weight:700;color:#1e2024">Week ${weekNum}</div>
-        <div style="font-size:8px;color:#6b7280">${allOpen.length} open · ${done.length} completed</div>
-        <div style="font-size:7.5px;color:#9ba3af;margin-top:3px;line-height:1.4">Sean Pickford<br>Technical Service Manager</div>
+        <div style="font-size:7.5px;color:#9ba3af;line-height:1.4">Sean Pickford<br>Technical Service Manager</div>
       </div>
     </div>
 
@@ -1698,7 +1696,7 @@ function buildPrintReport() {
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#d97706;margin-left:4px"></span> Overdue 21d+
           <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#3b82f6;margin-left:4px"></span> Active
         </div>
-        <span style="font-size:7.5px;color:#9ba3af">Week ${weekNum} · ${dateStr}</span>
+        <span style="font-size:7.5px;color:#9ba3af">${dateStr}</span>
       </div>
     </div>
   </div>`;
