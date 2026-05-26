@@ -327,7 +327,7 @@ async function wallSignIn() {
     if (error.status === 429 || (error.message && error.message.toLowerCase().includes('rate'))) {
       msg.textContent = 'Too many requests — email rate limit reached. Please wait 30–60 minutes and try again.';
     } else if (error.message && error.message.toLowerCase().includes('not found')) {
-      msg.textContent = 'That email isn't registered. Contact your admin to be invited.';
+      msg.textContent = "That email isn't registered. Contact your admin to be invited.";
     } else {
       msg.textContent = 'Error: ' + error.message;
     }
