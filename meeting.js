@@ -8,7 +8,7 @@
    ============================================================ */
 
 let meetingSlide  = 0;
-const MEETING_TOTAL = 4;
+const MEETING_TOTAL = 5;
 
 function openMeeting() {
   const _mn = new Date();
@@ -172,6 +172,43 @@ function buildMeetingSlides() {
       </div>
     </div>`;
   }).join('');
+
+  /* ── SLIDE 5: Ops Health ── */
+  const _ohOpen = jobs.filter(isOpenService);
+  const _ohTotals = {};
+  ACTIVE_STAGES.forEach(s => { _ohTotals[s] = { sum:0, c:0 }; });
+  _ohOpen.forEach(j => {
+    const dw = getDwellTimes(j);
+    if (Object.keys(dw).length > 1) {
+      ACTIVE_STAGES.forEach(s => { if (dw[s]!==undefined) { _ohTotals[s].sum+=dw[s]; _ohTotals[s].c++; } });
+    } else if (ACTIVE_STAGES.includes(j.status)) {
+      _ohTotals[j.status].sum += daysBetween(j.poDate,null);
+      _ohTotals[j.status].c++;
+    }
+  });
+  const _ohAvgs = ACTIVE_STAGES.map(s => _ohTotals[s].c ? Math.round(_ohTotals[s].sum/_ohTotals[s].c) : 0);
+  const ohIssues = [];
+  if (_ohAvgs[0] > 7)  ohIssues.push({ label:`Incoming Job averaging ${_ohAvgs[0]}d before booked`, bad: _ohAvgs[0]>14 });
+  if (_ohAvgs[1] > 10) ohIssues.push({ label:`Job Booked averaging ${_ohAvgs[1]}d before work starts`, bad: _ohAvgs[1]>21 });
+  if (_ohAvgs[2] > 14) ohIssues.push({ label:`${_ohTotals['Waiting for Parts']?.c||0} jobs waiting on parts (avg ${_ohAvgs[2]}d)`, bad: _ohAvgs[2]>21 });
+  if (_ohAvgs[3] > 7)  ohIssues.push({ label:`${_ohTotals['Revisiting']?.c||0} revisiting jobs (avg ${_ohAvgs[3]}d)`, bad: _ohAvgs[3]>14 });
+
+  const ohEl = document.getElementById('meeting-health-content');
+  if (ohEl) {
+    if (!ohIssues.length) {
+      ohEl.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px 0">
+        <div style="font-size:56px">✅</div>
+        <div style="font-size:22px;font-weight:800;color:rgba(61,64,67,0.9)">Operations Healthy</div>
+        <div style="font-size:15px;color:rgba(61,64,67,0.6)">No bottlenecks or recurring issues detected</div>
+      </div>`;
+    } else {
+      ohEl.innerHTML = ohIssues.map(i => `
+        <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;background:${i.bad ? 'rgba(220,38,38,0.06)' : 'rgba(217,119,6,0.06)'};border-radius:10px;margin-bottom:10px">
+          <div style="width:10px;height:10px;border-radius:50%;background:${i.bad ? '#dc2626' : '#d97706'};flex-shrink:0"></div>
+          <div style="font-size:16px;font-weight:600;color:rgba(61,64,67,0.9)">${i.label}</div>
+        </div>`).join('');
+    }
+  }
 
   /* Nav dots */
   document.getElementById('meeting-dots').innerHTML = Array.from({ length: MEETING_TOTAL }, (_,i) =>
