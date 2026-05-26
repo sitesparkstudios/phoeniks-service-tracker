@@ -287,16 +287,13 @@ function showLoadingScreen(visible) {
 }
 
 function showLoginWall() {
-  // Guard — never create the wall twice
   if (document.getElementById('login-wall')) return;
-
-  // Hide the app, show a full-screen login prompt
   const app = document.querySelector('.app');
   if (app) app.style.display = 'none';
 
   const wall = document.createElement('div');
   wall.id = 'login-wall';
-  wall.style.cssText = 'position:fixed;inset:0;background:#FFD100;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999';
+  wall.style.cssText = 'position:fixed;inset:0;background:#FFD100;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;padding:16px';
   wall.innerHTML = `
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;flex-shrink:0">
@@ -308,26 +305,43 @@ function showLoginWall() {
         <div style="width:12px;height:12px;border-radius:50%;border:2.5px solid #3d4043;box-sizing:border-box"></div>
       </div>
       <div>
-        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:32px;color:#3d4043;letter-spacing:2px;line-height:1">PHOENIKS</div>
-        <div style="font-size:11px;color:rgba(61,64,67,0.6);letter-spacing:0.12em;text-transform:uppercase;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;margin-top:3px">Electric Kitchen Specialists</div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:28px;color:#3d4043;letter-spacing:2px;line-height:1">PHOENIKS</div>
+        <div style="font-size:10px;color:rgba(61,64,67,0.6);letter-spacing:0.12em;text-transform:uppercase;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;margin-top:3px">Electric Kitchen Specialists</div>
       </div>
     </div>
-    <div style="width:60px;height:2px;background:rgba(61,64,67,0.2);border-radius:2px;margin-bottom:28px"></div>
-    <div style="background:white;border-radius:14px;padding:32px;width:340px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.15);text-align:center">
-      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;color:#1e2024;margin-bottom:6px">Service Tracker</div>
-      <div style="font-size:13px;color:#6b7280;margin-bottom:24px">Sign in to view service data</div>
-      <input id="wall-email" type="email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')wallSignIn()" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:11px 14px;font-size:14px;margin-bottom:12px;font-family:'Plus Jakarta Sans',sans-serif" autofocus>
-      <button id="wall-btn" onclick="wallSignIn()" style="width:100%;background:#3d4043;color:white;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">Send magic link</button>
+    <div style="width:60px;height:2px;background:rgba(61,64,67,0.2);border-radius:2px;margin-bottom:24px"></div>
+    <div style="background:white;border-radius:14px;padding:28px;width:340px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.15);text-align:center">
+      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:17px;font-weight:800;color:#1e2024;margin-bottom:4px">Service Tracker</div>
+      <div style="font-size:12px;color:#6b7280;margin-bottom:20px">Sign in to view service data</div>
+
+      <!-- Tabs -->
+      <div style="display:flex;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:20px">
+        <button id="wall-tab-magic" onclick="wallSetTab('magic')" style="flex:1;padding:8px;font-size:12px;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;border:none;cursor:pointer;background:#3d4043;color:white;transition:all 0.15s">Magic Link</button>
+        <button id="wall-tab-password" onclick="wallSetTab('password')" style="flex:1;padding:8px;font-size:12px;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;border:none;cursor:pointer;background:white;color:#6b7280;transition:all 0.15s">Password</button>
+      </div>
+
+      <!-- Magic link form -->
+      <div id="wall-form-magic">
+        <input id="wall-email" type="email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')wallSignIn()" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:11px 14px;font-size:14px;margin-bottom:12px;font-family:'Plus Jakarta Sans',sans-serif">
+        <button id="wall-btn" onclick="wallSignIn()" style="width:100%;background:#3d4043;color:white;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">Send magic link</button>
+      </div>
+
+      <!-- Password form -->
+      <div id="wall-form-password" style="display:none">
+        <input id="wall-pw-email" type="email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')wallPasswordSignIn()" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:11px 14px;font-size:14px;margin-bottom:10px;font-family:'Plus Jakarta Sans',sans-serif">
+        <input id="wall-pw-pass" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')wallPasswordSignIn()" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:11px 14px;font-size:14px;margin-bottom:12px;font-family:'Plus Jakarta Sans',sans-serif">
+        <button id="wall-pw-btn" onclick="wallPasswordSignIn()" style="width:100%;background:#3d4043;color:white;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">Sign in</button>
+      </div>
+
       <div id="wall-msg" style="margin-top:12px;font-size:12px;color:#6b7280;min-height:16px"></div>
     </div>
-    <div style="position:absolute;bottom:28px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;color:rgba(61,64,67,0.45);text-align:center;line-height:1.6">
+    <div style="position:absolute;bottom:20px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;color:rgba(61,64,67,0.45);text-align:center;line-height:1.6">
       Created by <strong style="color:rgba(61,64,67,0.65)">Sean Pickford</strong> · Technical Service Manager<br>
       Tracking Phoeniks service levels, one job at a time 🔥
     </div>
   `;
   document.body.appendChild(wall);
 
-  // Enter key on email field — belt AND suspenders
   setTimeout(() => {
     const emailEl = document.getElementById('wall-email');
     if (emailEl) {
@@ -337,6 +351,56 @@ function showLoginWall() {
       });
     }
   }, 50);
+}
+
+function wallSetTab(tab) {
+  const isMagic = tab === 'magic';
+  document.getElementById('wall-form-magic').style.display    = isMagic ? 'block' : 'none';
+  document.getElementById('wall-form-password').style.display = isMagic ? 'none'  : 'block';
+  document.getElementById('wall-tab-magic').style.background    = isMagic ? '#3d4043' : 'white';
+  document.getElementById('wall-tab-magic').style.color         = isMagic ? 'white'   : '#6b7280';
+  document.getElementById('wall-tab-password').style.background = isMagic ? 'white'   : '#3d4043';
+  document.getElementById('wall-tab-password').style.color      = isMagic ? '#6b7280' : 'white';
+  document.getElementById('wall-msg').textContent = '';
+  // Focus the email field of whichever tab
+  setTimeout(() => {
+    const el = document.getElementById(isMagic ? 'wall-email' : 'wall-pw-email');
+    if (el) el.focus();
+  }, 50);
+}
+
+async function wallPasswordSignIn() {
+  const emailEl = document.getElementById('wall-pw-email');
+  const passEl  = document.getElementById('wall-pw-pass');
+  const btn     = document.getElementById('wall-pw-btn');
+  const msg     = document.getElementById('wall-msg');
+  const email   = emailEl ? emailEl.value.trim() : '';
+  const password= passEl  ? passEl.value : '';
+
+  if (!email || !password) {
+    if (msg) { msg.style.color = '#dc2626'; msg.textContent = 'Please enter your email and password.'; }
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Signing in…'; }
+  if (msg) { msg.style.color = '#6b7280'; msg.textContent = ''; }
+
+  try {
+    const { error } = await _sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    // Success — auth state change will handle the rest
+  } catch(err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
+    if (msg) {
+      msg.style.color = '#dc2626';
+      const m = (err.message || '').toLowerCase();
+      if (m.includes('invalid') || m.includes('credentials') || m.includes('wrong')) {
+        msg.textContent = 'Incorrect email or password.';
+      } else {
+        msg.textContent = 'Error: ' + (err.message || 'Something went wrong.');
+      }
+    }
+  }
 }
 
 async function wallSignIn() {
@@ -367,7 +431,7 @@ async function wallSignIn() {
       const errMsg = (error.message || '').toLowerCase();
       const errStatus = error.status || error.statusCode || 0;
       if (errStatus === 429 || errMsg.includes('rate') || errMsg.includes('too many')) {
-        msg.textContent = '⏳ Too many requests — rate limit reached. Please wait 60 minutes and try again.';
+        msg.textContent = '⏳ Rate limit reached — please wait 60 minutes and try again.';
       } else if (errMsg.includes('not found') || errMsg.includes('invalid') || errMsg.includes('not registered')) {
         msg.textContent = "That email isn't authorised. Contact Sean to be added.";
       } else if (errMsg.includes('network') || errMsg.includes('fetch')) {
