@@ -1,5 +1,11 @@
 /* ============================================================
    app.js — UI routing, CRUD, form handling, toast, confirm
+   CHANGED FROM ORIGINAL:
+   - saveJob() / deleteJob() are now async (await Supabase)
+   - Removed resetToDemo() (Supabase doesn't use demo data)
+   - init sequence awaits loadData()
+   - last_page still uses localStorage (tiny UI pref, not data)
+   - Auth modal wired up
    ============================================================ */
 
 /* ── PAGE ROUTING ── */
@@ -52,7 +58,6 @@ function updateNavBadges() {
   const openJobs  = jobs.filter(isOpenService).length;
   const waiting   = jobs.filter(j => j.status === 'Waiting for Parts').length;
 
-  // Completed this week
   const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); weekStart.setHours(0,0,0,0);
   const weekStartStr = weekStart.toISOString().split('T')[0];
   const doneThisWeek = jobs.filter(j => {
@@ -67,20 +72,10 @@ function updateNavBadges() {
   const partsBadge  = document.getElementById('nav-badge-parts');
   const urgentBadge = document.getElementById('nav-badge-urgent');
 
-  if (jobsBadge) {
-    jobsBadge.textContent = openJobs || '';
-    jobsBadge.style.display = openJobs > 0 ? 'inline-block' : 'none';
-  }
-  if (partsBadge) {
-    partsBadge.textContent = waiting || '';
-    partsBadge.style.display = waiting > 0 ? 'inline-block' : 'none';
-  }
-  if (urgentBadge) {
-    urgentBadge.textContent = urgentCount || '';
-    urgentBadge.style.display = urgentCount > 0 ? 'inline-block' : 'none';
-  }
+  if (jobsBadge)   { jobsBadge.textContent   = openJobs || '';    jobsBadge.style.display   = openJobs   > 0 ? 'inline-block' : 'none'; }
+  if (partsBadge)  { partsBadge.textContent  = waiting  || '';    partsBadge.style.display  = waiting    > 0 ? 'inline-block' : 'none'; }
+  if (urgentBadge) { urgentBadge.textContent = urgentCount || ''; urgentBadge.style.display = urgentCount > 0 ? 'inline-block' : 'none'; }
 
-  // Sidebar pulse strip
   const pulseOpen  = document.getElementById('pulse-open');
   const pulseParts = document.getElementById('pulse-parts');
   const pulseDone  = document.getElementById('pulse-done');
@@ -88,14 +83,12 @@ function updateNavBadges() {
   if (pulseOpen)  pulseOpen.textContent  = openJobs;
   if (pulseParts) pulseParts.textContent = waiting;
   if (pulseDone)  pulseDone.textContent  = doneThisWeek;
-  // Show maintenance count separately if any exist
   const pulseMaint = document.getElementById('pulse-maint');
   if (pulseMaint) {
     pulseMaint.parentElement.style.display = maintCount > 0 ? 'flex' : 'none';
     pulseMaint.textContent = maintCount;
   }
 }
-
 
 function populateSupplierDatalist() {
   const dl = document.getElementById('supplier-datalist');
@@ -105,7 +98,9 @@ function populateSupplierDatalist() {
 }
 
 /* ── CRUD ── */
-function saveJob() {
+async function saveJob() {
+  if (!isAuthed()) { showToast('Sign in to add or edit jobs'); openAuthModal(); return; }
+
   const po      = document.getElementById('f-po').value.trim();
   const supplier= document.getElementById('f-supplier').value.trim();
   const poDate  = document.getElementById('f-po-date').value;
@@ -128,6 +123,8 @@ function saveJob() {
   const { transitions, notes: cn } = parseChatter(chatter);
   const allNotes = [notes, ...cn.map(n => n.text)].filter(Boolean).join('\n');
 
+  let savedJob;
+
   if (editingId) {
     const j = jobs.find(x => x.id === editingId);
     if (j) {
@@ -143,20 +140,22 @@ function saveJob() {
       } else {
         j.status = status;
       }
+      savedJob = j;
     }
     editingId = null;
   } else {
-    jobs.push({
+    savedJob = {
       id:        'j' + Date.now(),
       po, supplier, ref, equipment: equip, poDate,
       notes: allNotes, value, buyer,
       addedDate: today(),
       status:    transitions.length ? transitions[transitions.length-1].to : status,
       history:   transitions.length ? buildHistoryFromTransitions(poDate, transitions) : [{ status, date: poDate }],
-    });
+    };
+    jobs.push(savedJob);
   }
 
-  saveData();
+  await saveOneJob(savedJob);   // fast single-row upsert
   clearForm();
   showToast('Job saved');
   showPage('jobs');
@@ -198,16 +197,54 @@ function clearForm() {
 }
 
 async function deleteJob(id) {
+  if (!isAuthed()) { showToast('Sign in to delete jobs'); return; }
   const confirmed = await showConfirm('Delete this job?', 'This action cannot be undone.');
   if (!confirmed) return;
   jobs = jobs.filter(j => j.id !== id);
   delete partsData[id];
-  saveData();
-  savePartsData();
+  await deleteJobFromDB(id);    // Supabase delete (parts cascade)
   closeModal();
   renderJobs();
   renderDashboard();
   showToast('Job deleted');
+}
+
+/* ── AUTH MODAL ── */
+function openAuthModal() {
+  const el = document.getElementById('auth-modal-overlay');
+  if (el) el.classList.remove('hidden');
+}
+
+function closeAuthModal() {
+  const el = document.getElementById('auth-modal-overlay');
+  if (el) el.classList.add('hidden');
+  document.getElementById('auth-magic-sent')?.classList.add('hidden');
+  document.getElementById('auth-modal-form')?.classList.remove('hidden');
+}
+
+async function submitMagicLink() {
+  const emailEl = document.getElementById('auth-modal-email');
+  const email = emailEl?.value.trim();
+  if (!email) { showToast('Enter your email'); return; }
+
+  const btn = document.getElementById('auth-modal-submit');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+  const error = await sendMagicLink(email);
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Send magic link'; }
+
+  if (error) {
+    showToast('Error: ' + error.message);
+  } else {
+    document.getElementById('auth-modal-form')?.classList.add('hidden');
+    document.getElementById('auth-magic-sent')?.classList.remove('hidden');
+  }
+}
+
+async function handleSignOut() {
+  await signOut();
+  showToast('Signed out');
 }
 
 /* ── TOAST ── */
@@ -239,6 +276,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeModal();
     closeMeeting();
+    closeAuthModal();
     document.getElementById('confirm-overlay').classList.add('hidden');
   }
   if (document.getElementById('meeting-overlay').classList.contains('active')) {
@@ -247,7 +285,7 @@ document.addEventListener('keydown', e => {
   }
 });
 
-/* ── SIDEBAR DATE — shows day + date ── */
+/* ── SIDEBAR DATE ── */
 function ordinal(n) {
   const s = ['th','st','nd','rd'], v = n % 100;
   return n + (s[(v-20)%10] || s[v] || s[0]);
@@ -267,21 +305,19 @@ function updateSidebarDate() {
 }
 
 /* ── INIT ── */
-loadData();
-updateSidebarDate();
-updateNavBadges();
-const _lastPage = (() => { try { return localStorage.getItem('phoeniks_last_page'); } catch(e) { return null; } })();
-showPage(NAV_ORDER.includes(_lastPage) ? _lastPage : 'dashboard');
-// Init period filters after showPage has rendered the buttons
-if (typeof initDashPeriodFilter  === 'function') initDashPeriodFilter();
-if (typeof initBottleneckFilter  === 'function') initBottleneckFilter();
-// Re-open meeting if it was open before refresh
-try { if (localStorage.getItem('phoeniks_meeting_open') === '1') { setTimeout(openMeeting, 100); } } catch(e) {}
+(async () => {
+  await initAuth();     // set _currentSession, wire onAuthStateChange
+  await loadData();     // fetch from Supabase
+  updateAuthUI();
+  updateSidebarDate();
+  updateNavBadges();
 
-/* Reset localStorage to load demo data if needed */
-function resetToDemo() {
-  localStorage.removeItem('phoeniks_tracker_v2');
-  localStorage.removeItem('phoeniks_parts_v1');
-  localStorage.removeItem('phoeniks_reports_v1');
-  location.reload();
-}
+  const _lastPage = (() => { try { return localStorage.getItem('phoeniks_last_page'); } catch(e) { return null; } })();
+  showPage(NAV_ORDER.includes(_lastPage) ? _lastPage : 'dashboard');
+
+  if (typeof initDashPeriodFilter  === 'function') initDashPeriodFilter();
+  if (typeof initBottleneckFilter  === 'function') initBottleneckFilter();
+
+  // Re-open meeting if it was open before refresh
+  try { if (localStorage.getItem('phoeniks_meeting_open') === '1') { setTimeout(openMeeting, 100); } } catch(e) {}
+})();
