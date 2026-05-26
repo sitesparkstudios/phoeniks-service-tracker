@@ -1653,6 +1653,40 @@ function buildPrintReport() {
       </div>
     </div>
 
+    <!-- ══ OPS HEALTH SUMMARY ══ -->
+    ${(() => {
+      const _ohOpen = jobs.filter(isOpenService);
+      const _ohTotals = {};
+      ACTIVE_STAGES.forEach(s => { _ohTotals[s] = { sum:0, c:0 }; });
+      _ohOpen.forEach(j => {
+        const dw = getDwellTimes(j);
+        if (Object.keys(dw).length > 1) {
+          ACTIVE_STAGES.forEach(s => { if (dw[s]!==undefined) { _ohTotals[s].sum+=dw[s]; _ohTotals[s].c++; } });
+        } else if (ACTIVE_STAGES.includes(j.status)) {
+          _ohTotals[j.status].sum += daysBetween(j.poDate,null);
+          _ohTotals[j.status].c++;
+        }
+      });
+      const _ohAvgs = ACTIVE_STAGES.map(s => _ohTotals[s].c ? Math.round(_ohTotals[s].sum/_ohTotals[s].c) : 0);
+      const ohIssues = [];
+      if (_ohAvgs[0] > 7)  ohIssues.push({ label: `Incoming Job averaging ${_ohAvgs[0]}d`, color: _ohAvgs[0]>14?'#dc2626':'#d97706' });
+      if (_ohAvgs[1] > 10) ohIssues.push({ label: `Job Booked averaging ${_ohAvgs[1]}d before work starts`, color: _ohAvgs[1]>21?'#dc2626':'#d97706' });
+      if (_ohAvgs[2] > 14) ohIssues.push({ label: `${_ohTotals['Waiting for Parts']?.c||0} jobs stuck waiting on parts (avg ${_ohAvgs[2]}d)`, color: _ohAvgs[2]>21?'#dc2626':'#d97706' });
+      if (_ohAvgs[3] > 7)  ohIssues.push({ label: `${_ohTotals['Revisiting']?.c||0} revisiting jobs (avg ${_ohAvgs[3]}d)`, color: _ohAvgs[3]>14?'#dc2626':'#d97706' });
+      if (!ohIssues.length) return `
+        <div style="margin-top:10px;padding:7px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px">✅</span>
+          <span style="font-size:8px;font-weight:700;color:#16a34a">Ops Health: All stages within normal thresholds — no bottlenecks detected</span>
+        </div>`;
+      return `
+        <div style="margin-top:10px;padding:7px 12px;background:#fff8f8;border:1px solid #fecaca;border-radius:6px">
+          <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#dc2626;margin-bottom:5px">⚠ Ops Health Check</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">
+            ${ohIssues.map(i => `<span style="font-size:8px;padding:2px 7px;background:#fff;border:1px solid ${i.color}40;border-radius:10px;color:${i.color};font-weight:600">${i.label}</span>`).join('')}
+          </div>
+        </div>`;
+    })()}
+
     <!-- ══ RECURRING SITES ALERT ══ -->
     ${(() => {
       const thisYear = new Date().getFullYear().toString();
