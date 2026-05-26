@@ -38,7 +38,7 @@ async function initAuth() {
 async function sendMagicLink(email) {
   const { error } = await _sb.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.origin + window.location.pathname }
+    options: { emailRedirectTo: window.location.origin + window.location.pathname, shouldCreateUser: false }
   });
   return error;
 }
@@ -293,7 +293,7 @@ function showLoginWall() {
     <div style="background:white;border-radius:14px;padding:32px;width:340px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.15);text-align:center">
       <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:800;color:#1e2024;margin-bottom:6px">Service Tracker</div>
       <div style="font-size:13px;color:#6b7280;margin-bottom:24px">Sign in to view service data</div>
-      <input id="wall-email" type="email" placeholder="your@email.com" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:11px 14px;font-size:14px;margin-bottom:12px;font-family:'Plus Jakarta Sans',sans-serif">
+      <input id="wall-email" type="email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')wallSignIn()" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:11px 14px;font-size:14px;margin-bottom:12px;font-family:'Plus Jakarta Sans',sans-serif" autofocus>
       <button id="wall-btn" onclick="wallSignIn()" style="width:100%;background:#3d4043;color:white;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">Send magic link</button>
       <div id="wall-msg" style="margin-top:12px;font-size:12px;color:#6b7280;min-height:16px"></div>
     </div>
