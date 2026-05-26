@@ -36,9 +36,11 @@ async function initAuth() {
 }
 
 async function sendMagicLink(email) {
+  // Note: shouldCreateUser:false can silently fail on some Supabase versions
+  // Instead we send the OTP and let Supabase handle unknown emails with its own message
   const { error } = await _sb.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.origin + window.location.pathname, shouldCreateUser: false }
+    options: { emailRedirectTo: window.location.origin + window.location.pathname }
   });
   return error;
 }
@@ -304,37 +306,58 @@ function showLoginWall() {
   `;
   document.body.appendChild(wall);
 
-  // Enter key on email field
-  document.getElementById('wall-email').addEventListener('keydown', e => {
-    if (e.key === 'Enter') wallSignIn();
-  });
+  // Enter key on email field — belt AND suspenders
+  setTimeout(() => {
+    const emailEl = document.getElementById('wall-email');
+    if (emailEl) {
+      emailEl.focus();
+      emailEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); wallSignIn(); }
+      });
+    }
+  }, 50);
 }
 
 async function wallSignIn() {
-  const email = document.getElementById('wall-email').value.trim();
-  const btn   = document.getElementById('wall-btn');
-  const msg   = document.getElementById('wall-msg');
-  if (!email) { msg.style.color = '#dc2626'; msg.textContent = 'Please enter your email address.'; return; }
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
-  msg.style.color = '#6b7280';
-  msg.textContent = '';
-  const error = await sendMagicLink(email);
+  const emailInput = document.getElementById('wall-email');
+  const btn        = document.getElementById('wall-btn');
+  const msg        = document.getElementById('wall-msg');
+  const email      = emailInput ? emailInput.value.trim() : '';
+
+  if (!email) {
+    if (msg) { msg.style.color = '#dc2626'; msg.textContent = 'Please enter your email address.'; }
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  if (msg) { msg.style.color = '#6b7280'; msg.textContent = ''; }
+
+  let error = null;
+  try {
+    error = await sendMagicLink(email);
+  } catch (e) {
+    error = e;
+  }
+
   if (error) {
-    btn.disabled = false;
-    btn.textContent = 'Send magic link';
-    msg.style.color = '#dc2626';
-    if (error.status === 429 || (error.message && error.message.toLowerCase().includes('rate'))) {
-      msg.textContent = 'Too many requests — email rate limit reached. Please wait 30–60 minutes and try again.';
-    } else if (error.message && error.message.toLowerCase().includes('not found')) {
-      msg.textContent = "That email isn't registered. Contact your admin to be invited.";
-    } else {
-      msg.textContent = 'Error: ' + error.message;
+    if (btn) { btn.disabled = false; btn.textContent = 'Send magic link'; }
+    if (msg) {
+      msg.style.color = '#dc2626';
+      const errMsg = (error.message || '').toLowerCase();
+      const errStatus = error.status || error.statusCode || 0;
+      if (errStatus === 429 || errMsg.includes('rate') || errMsg.includes('too many')) {
+        msg.textContent = '⏳ Too many requests — rate limit reached. Please wait 60 minutes and try again.';
+      } else if (errMsg.includes('not found') || errMsg.includes('invalid') || errMsg.includes('not registered')) {
+        msg.textContent = "That email isn't authorised. Contact Sean to be added.";
+      } else if (errMsg.includes('network') || errMsg.includes('fetch')) {
+        msg.textContent = 'Network error — check your connection and try again.';
+      } else {
+        msg.textContent = 'Error: ' + (error.message || 'Something went wrong. Try again.');
+      }
     }
   } else {
-    msg.style.color = '#16a34a';
-    msg.textContent = '✓ Magic link sent — check your email and click the link to sign in.';
-    btn.textContent = 'Link sent!';
+    if (msg) { msg.style.color = '#16a34a'; msg.textContent = '✓ Magic link sent! Check your email and click the link to sign in.'; }
+    if (btn) { btn.disabled = true; btn.textContent = '✓ Link sent!'; }
   }
 }
 

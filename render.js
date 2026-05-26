@@ -215,6 +215,22 @@ function renderDashboard() {
       </tr>`).join('')}</tbody></table>`;
 
   renderSpendChart();
+
+  // Ops health banner — computed from all open jobs (not period-filtered)
+  const _allOpen = jobs.filter(isOpenService);
+  const _totals = {};
+  ACTIVE_STAGES.forEach(s => { _totals[s] = { sum:0, c:0 }; });
+  _allOpen.forEach(j => {
+    const dw = getDwellTimes(j);
+    if (Object.keys(dw).length > 1) {
+      ACTIVE_STAGES.forEach(s => { if (dw[s] !== undefined) { _totals[s].sum += dw[s]; _totals[s].c++; } });
+    } else if (ACTIVE_STAGES.includes(j.status)) {
+      _totals[j.status].sum += daysBetween(j.poDate, null);
+      _totals[j.status].c++;
+    }
+  });
+  const _avgs = ACTIVE_STAGES.map(s => _totals[s].c ? Math.round(_totals[s].sum / _totals[s].c) : 0);
+  renderDashHealthBanner(_avgs, _totals);
 }
 
 /* ── SPEND CHART ── */
