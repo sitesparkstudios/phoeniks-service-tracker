@@ -403,7 +403,10 @@ async function renderAdmin() {
                 ${esc(u.email || '—')}
                 ${isSelf ? '<span style="background:#fef9c3;color:#854d0e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px">You</span>' : ''}
               </div>
-              <div style="font-size:11px;color:var(--text3);margin-top:2px">Added ${date}</div>
+              <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
+                <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;background:${(u.role||'editor')=='editor'?'#fef9c3':'var(--surface3)'};color:${(u.role||'editor')=='editor'?'#854d0e':'var(--text3)'}">${(u.role||'editor')=='editor'?'Full edit':'View only'}</span>
+                <span style="font-size:11px;color:var(--text3)">Added ${date}</span>
+              </div>
             </div>
           </div>
           ${!isSelf ? `<button onclick="adminRemoveUser('${esc(u.email)}')" style="font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--red);cursor:pointer;flex-shrink:0">Remove</button>` : ''}
@@ -420,9 +423,11 @@ async function renderAdmin() {
 
 async function adminInviteFromInput() {
   const input  = document.getElementById('admin-invite-email');
+  const roleEl = document.getElementById('admin-invite-role');
   const result = document.getElementById('admin-invite-result');
   const btn    = document.querySelector('#page-admin .btn-primary');
   const email  = input ? input.value.trim() : '';
+  const role   = roleEl ? roleEl.value : 'viewer';
 
   if (!email || !email.includes('@')) {
     if (result) { result.style.color = 'var(--red)'; result.textContent = 'Please enter a valid email address.'; }
@@ -445,7 +450,7 @@ async function adminInviteFromInput() {
     if (otpErr) throw otpErr;
 
     // 2. Record in invited_users table so we can list/remove them
-    await _sb.from('invited_users').upsert({ email, invited_at: new Date().toISOString() }, { onConflict: 'email' });
+    await _sb.from('invited_users').upsert({ email, role, invited_at: new Date().toISOString() }, { onConflict: 'email' });
 
     if (result) { result.style.color = 'var(--green)'; result.textContent = `✓ Invite sent to ${email} — they'll receive a magic link shortly.`; }
     if (input)  input.value = '';

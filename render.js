@@ -116,11 +116,11 @@ function renderDashboard() {
       <div class="metric-sub">PO sent → done</div>
     </div>
     <div class="metric-card accent-yellow">
-      <div class="metric-label">Year Spend</div>
+      <div class="metric-label">Total Spend</div>
       <div class="metric-value" style="font-size:${yearSpend > 99999 ? '20px' : '26px'}">
         ${yearSpend > 0 ? '$' + Math.round(yearSpend).toLocaleString() : '—'}
       </div>
-      <div class="metric-sub">All POs this year</div>
+      <div class="metric-sub">${dashPeriodDays ? 'Last ' + dashPeriodDays + 'd' : 'All time'} · ${periodJobs.length} POs</div>
     </div>
     <div class="metric-card">
       <div class="metric-label">Total Jobs</div>
@@ -979,7 +979,10 @@ function renderPerformance() {
 
   // ── SCORECARD METRICS ──
   const totalDone    = donePeriod.length;
-  const revisited    = donePeriod.filter(j => j.history?.some(h => h.status === 'Revisiting')).length;
+  // A job counts as revisited if: history shows Revisiting status, OR notes/ref mention revisit
+  // For Odoo imports without full history, we can only detect via history entries
+  const isRevisited = j => j.history?.some(h => h.status === 'Revisiting') || j.status === 'Revisiting';
+  const revisited    = donePeriod.filter(isRevisited).length;
   const fixRate      = totalDone > 0 ? Math.round((1 - revisited / totalDone) * 100) : null;
   const _durJobs = donePeriod.filter(j => getTotalDays(j) !== null);
   const avgDuration  = _durJobs.length > 0
@@ -994,7 +997,7 @@ function renderPerformance() {
     const last = j.history?.[j.history.length - 1];
     return last && last.date >= prevCutoffStr && last.date < cutoffStr;
   }) : [];
-  const prevFixRate   = prevDone.length > 0 ? Math.round((1 - prevDone.filter(j => j.history?.some(h => h.status === 'Revisiting')).length / prevDone.length) * 100) : null;
+  const prevFixRate   = prevDone.length > 0 ? Math.round((1 - prevDone.filter(isRevisited).length / prevDone.length) * 100) : null;
   const _prevDurJobs = prevDone.filter(j => getTotalDays(j) !== null);
   const prevAvgDur    = _prevDurJobs.length > 0 ? Math.round(_prevDurJobs.reduce((a, j) => a + getTotalDays(j), 0) / _prevDurJobs.length) : null;
 
@@ -1072,7 +1075,7 @@ function renderPerformance() {
     const slot = buckets.find(b => b.key === key);
     if (!slot) return;
     slot.completed++;
-    if (j.history?.some(h => h.status === 'Revisiting')) slot.revisited++;
+    if (isRevisited(j)) slot.revisited++;
     const dur = getTotalDays(j);
     if (dur !== null) { slot.totalDays += dur; slot.durCount++; }
   });
@@ -1202,7 +1205,7 @@ function renderPerformance() {
   // ── SUPPLIER TBODY ──
   const tbody = document.getElementById('perf-supplier-tbody');
   const perfSortEl = document.getElementById('perf-supplier-sort');
-  const perfSort = perfSortEl ? perfSortEl.value : 'avg';
+  const perfSort = perfSortEl ? perfSortEl.value : 'jobs';
   let sortedSupData = [...supData];
   if (perfSort === 'jobs') sortedSupData.sort((a,b) => b.count - a.count);
   else if (perfSort === 'fix') sortedSupData.sort((a,b) => (b.fix||0) - (a.fix||0));

@@ -622,12 +622,17 @@ function getTotalDays(job) {
   if (!job.poDate) return null;
   if (job.status === 'Job Done') {
     const hist = job.history || [];
+    // Multi-entry history: use first → last date
     if (hist.length > 1) {
       const lastDate = hist[hist.length - 1]?.date;
       if (lastDate && lastDate !== job.poDate) {
         return daysBetween(job.poDate, lastDate);
       }
+      // History entries exist but same date — job done same day, count as 1
+      if (lastDate === job.poDate) return 1;
     }
+    // Single history entry (Odoo import with no chatter): we don't know completion date
+    // Return null so it's excluded from duration averages rather than skewing them to 0
     return null;
   }
   return daysBetween(job.poDate, null);
