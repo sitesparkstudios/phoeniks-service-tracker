@@ -348,6 +348,10 @@ async function renderAdmin() {
   const emailEl = document.getElementById('admin-your-email');
   if (emailEl) emailEl.textContent = _currentSession?.user?.email || '—';
 
+  // Show job count from in-memory jobs array (already loaded)
+  const jobCountEl = document.getElementById('admin-job-count');
+  if (jobCountEl) jobCountEl.textContent = jobs.length || '0';
+
   // Load users via Supabase admin API
   const listEl  = document.getElementById('admin-users-list');
   const countEl = document.getElementById('admin-user-count');
