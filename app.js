@@ -348,7 +348,13 @@ async function renderAdmin() {
   const metaEl     = document.getElementById('admin-users-meta');
 
   if (emailEl)    emailEl.textContent    = _currentSession?.user?.email || '—';
-  if (jobCountEl) jobCountEl.textContent = jobs.length;
+  // Get live job count from Supabase
+  if (jobCountEl) {
+    jobCountEl.textContent = jobs.length || '…';
+    _sb.from('jobs').select('id', { count: 'exact', head: true }).then(({ count }) => {
+      if (jobCountEl) jobCountEl.textContent = count ?? jobs.length;
+    });
+  }
   if (listEl)     listEl.innerHTML = '<div class="empty-state"><p>Loading…</p></div>';
   if (metaEl)     metaEl.textContent = 'Loading…';
 
