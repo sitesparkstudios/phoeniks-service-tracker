@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phoeniks — Migrate to Supabase</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 60px auto; padding: 0 20px; background: #f9fafb; }
+  h1   { font-size: 20px; margin-bottom: 4px; }
+  p    { color: #6b7280; font-size: 14px; margin: 0 0 24px; }
+  .card { background: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 24px; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #374151; }
+  input { width: 100%; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 10px; font-size: 14px; margin-bottom: 12px; }
+  button { background: #1d4ed8; color: white; border: none; border-radius: 6px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:hover { background: #1e40af; }
+  button:disabled { background: #93c5fd; cursor: default; }
+  #log  { font-family: monospace; font-size: 12px; white-space: pre-wrap; background: #111827; color: #d1fae5; border-radius: 8px; padding: 16px; max-height: 400px; overflow-y: auto; display: none; }
+  .ok   { color: #34d399; }
+  .err  { color: #f87171; }
+  .warn { color: #fbbf24; }
+  .info { color: #93c5fd; }
+  .step { color: #e5e7eb; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>🔁 Phoeniks → Supabase Migration</h1>
+<p>Run this page <strong>in the same browser</strong> that has your live data (so localStorage is accessible). Run it once — it's idempotent.</p>
+
+<div class="card">
+  <label>Supabase Project URL</label>
+  <input id="url" type="url" placeholder="https://xxxxxxxxxxxx.supabase.co" />
+
+  <label>Supabase Anon Key</label>
+  <input id="key" type="text" placeholder="eyJhbGci..." />
+
+  <label>Admin Email (for magic-link login before migrating)</label>
+  <input id="email" type="email" placeholder="you@example.com" />
+
+  <button id="btn" onclick="runMigration()">Start Migration</button>
+</div>
+
+<pre id="log"></pre>
+
+<script>
+// ── localStorage keys (must match data.js)
+const SK       = 'phoeniks_tracker_v3';
+const SK_PARTS = 'phoeniks_parts_v2';
+const SK_RPTS  = 'phoeniks_reports_v2';
+
+const log = document.getElementById('log');
+function line(msg, cls = '') {
+  log.style.display = 'block';
+  const span = document.createElement('span');
+  span.className = cls;
+  span.textContent = msg + '\n';
+  log.appendChild(span);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function runMigration() {
+  const url   = document.getElementById('url').value.trim();
+  const key   = document.getElementById('key').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const btn   = document.getElementById('btn');
+
+  if (!url || !key || !email) {
+    alert('Please fill in all three fields.'); return;
+  }
+
+  btn.disabled = true;
+  log.textContent = '';
+  log.style.display = 'block';
+
+  // ── 1. Init Supabase client
+  const { createClient } = supabase;
+  const sb = createClient(url, key);
+
+  line('── Step 1: Sign in via magic link ──', 'step');
+  line(`Sending magic link to ${email}…`, 'info');
+
+  const { error: authErr } = await sb.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: false }
+  });
+
+  if (authErr) {
+    line(`Auth error: ${authErr.message}`, 'err');
+    line('Make sure this email already exists as a Supabase user (see SETUP.md).', 'warn');
+    btn.disabled = false;
+    return;
+  }
+
+  line('✓ Magic link sent — check your email, click the link, then come back here and click "Continue Migration".', 'ok');
+
+  // Replace button with continue button
+  btn.textContent = 'Continue Migration (after clicking email link)';
+  btn.disabled = false;
+  btn.onclick = () => continueMigration(sb, btn);
+}
+
+async function continueMigration(sb, btn) {
+  btn.disabled = true;
+
+  // Re-check auth state
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    line('Not signed in yet — click the link in your email first.', 'err');
+    btn.disabled = false;
+    return;
+  }
+  line(`✓ Authenticated as ${session.user.email}`, 'ok');
+
+  // ── 2. Read localStorage
+  line('\n── Step 2: Reading localStorage ──', 'step');
+
+  let jobs = [], partsData = {}, reportsData = [];
+
+  try {
+    const raw = localStorage.getItem(SK);
+    jobs = raw ? JSON.parse(raw) : [];
+    // Strip any demo jobs
+    jobs = jobs.filter(j => !String(j.id || '').startsWith('demo-'));
+    line(`✓ Jobs found: ${jobs.length}`, 'ok');
+  } catch(e) { line(`✗ Could not read jobs: ${e}`, 'err'); }
+
+  try {
+    const rp = localStorage.getItem(SK_PARTS);
+    partsData = rp ? JSON.parse(rp) : {};
+    line(`✓ Parts entries found: ${Object.keys(partsData).length}`, 'ok');
+  } catch(e) { line(`✗ Could not read parts: ${e}`, 'err'); }
+
+  try {
+    const rr = localStorage.getItem(SK_RPTS);
+    reportsData = rr ? JSON.parse(rr) : [];
+    line(`✓ Reports found: ${reportsData.length}`, 'ok');
+  } catch(e) { line(`✗ Could not read reports: ${e}`, 'err'); }
+
+  if (jobs.length === 0 && Object.keys(partsData).length === 0) {
+    line('\nNothing to migrate. Is this the right browser/profile?', 'warn');
+    btn.disabled = false;
+    return;
+  }
+
+  // ── 3. Upsert jobs
+  line('\n── Step 3: Uploading jobs ──', 'step');
+
+  const jobRows = jobs.map(j => ({
+    id:               j.id,
+    po:               j.po               || '',
+    supplier:         j.supplier         || '',
+    ref:              j.ref              || '',
+    equipment:        j.equipment        || '',
+    po_date:          j.poDate           || null,
+    status:           j.status           || 'Incoming Job',
+    value:            j.value            || '',
+    value_untaxed:    j.valueUntaxed     || '',
+    buyer:            j.buyer            || '',
+    deadline:         j.deadline         || '',
+    priority:         j.priority         || '',
+    receipt_status:   j.receiptStatus    || '',
+    billing_status:   j.billingStatus    || '',
+    amount_to_invoice: j.amountToInvoice || '',
+    source_doc:       j.sourceDoc        || '',
+    notes:            j.notes            || '',
+    added_date:       j.addedDate        || null,
+    history:          j.history          || [],
+  }));
+
+  // Batch in chunks of 200
+  const CHUNK = 200;
+  let jobsOk = 0, jobsFail = 0;
+  for (let i = 0; i < jobRows.length; i += CHUNK) {
+    const chunk = jobRows.slice(i, i + CHUNK);
+    const { error } = await sb.from('jobs').upsert(chunk, { onConflict: 'id' });
+    if (error) {
+      line(`  ✗ Jobs batch ${i}–${i+chunk.length}: ${error.message}`, 'err');
+      jobsFail += chunk.length;
+    } else {
+      jobsOk += chunk.length;
+      line(`  ✓ Jobs ${i+1}–${i+chunk.length} uploaded`, 'ok');
+    }
+  }
+  line(`Jobs: ${jobsOk} ok, ${jobsFail} failed`, jobsFail ? 'err' : 'ok');
+
+  // ── 4. Upsert parts
+  line('\n── Step 4: Uploading parts ──', 'step');
+
+  const partsRows = Object.entries(partsData)
+    .filter(([jobId]) => jobRows.some(j => j.id === jobId))  // only insert if job exists
+    .map(([jobId, v]) => ({
+      job_id: jobId,
+      eta:    v.eta   || '',
+      notes:  v.notes || '',
+    }));
+
+  if (partsRows.length) {
+    const { error } = await sb.from('parts').upsert(partsRows, { onConflict: 'job_id' });
+    if (error) line(`  ✗ Parts: ${error.message}`, 'err');
+    else line(`  ✓ ${partsRows.length} parts entries uploaded`, 'ok');
+  } else {
+    line('  (no parts data to upload)', 'info');
+  }
+
+  // ── 5. Upsert reports
+  line('\n── Step 5: Uploading reports ──', 'step');
+
+  if (reportsData.length) {
+    const reportRows = reportsData.map(r => ({
+      id:          r.id,
+      report_date: r.date,
+      open_jobs:   r.openJobs    || 0,
+      done_jobs:   r.doneJobs    || 0,
+      stuck:       r.stuck       || 0,
+      avg_days:    r.avgDays     || null,
+      open_value:  r.openValue   || 0,
+      total_jobs:  r.totalJobs   || 0,
+      by_status:   r.byStatus    || {},
+      attention:   r.attention   || [],
+    }));
+    const { error } = await sb.from('reports').upsert(reportRows, { onConflict: 'id' });
+    if (error) line(`  ✗ Reports: ${error.message}`, 'err');
+    else line(`  ✓ ${reportRows.length} reports uploaded`, 'ok');
+  } else {
+    line('  (no reports to upload)', 'info');
+  }
+
+  // ── Done
+  line('\n✅ Migration complete!', 'ok');
+  line('You can now deploy the updated app. localStorage is still intact as a backup.', 'info');
+  btn.textContent = 'Done';
+  btn.disabled = true;
+}
+</script>
+</body>
+</html>
