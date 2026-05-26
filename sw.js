@@ -1,4 +1,5 @@
 // Service Worker — forces fresh fetch of all app files
+// CHANGED: Supabase API calls are excluded from cache (like googleapis)
 const VERSION = '20260526';
 const CACHE = 'phoeniks-' + VERSION;
 
@@ -14,7 +15,17 @@ self.addEventListener('activate', e => {
 
 // Network first — always try to get fresh, fall back to cache
 self.addEventListener('fetch', e => {
-  if (e.request.url.includes('googleapis') || e.request.url.includes('cdnjs')) return;
+  const url = e.request.url;
+
+  // Never cache: Supabase API, auth endpoints, external CDN
+  if (
+    url.includes('supabase.co') ||
+    url.includes('googleapis') ||
+    url.includes('cdnjs') ||
+    url.includes('/auth/v1/') ||
+    url.includes('/rest/v1/')
+  ) return;
+
   e.respondWith(
     fetch(e.request, { cache: 'no-store' })
       .then(r => {
