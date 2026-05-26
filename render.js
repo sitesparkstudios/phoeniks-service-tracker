@@ -15,6 +15,21 @@ function renderAll() {
   renderReports();
   renderActivity();
   if (typeof updateNavBadges === 'function') updateNavBadges();
+  // Ops health banner — quick bottleneck snapshot
+  const _allOpen = jobs.filter(isOpenService);
+  const _totals = {};
+  ACTIVE_STAGES.forEach(s => { _totals[s] = { sum:0, c:0 }; });
+  _allOpen.forEach(j => {
+    const dw = getDwellTimes(j);
+    if (Object.keys(dw).length > 1) {
+      ACTIVE_STAGES.forEach(s => { if (dw[s]!==undefined) { _totals[s].sum+=dw[s]; _totals[s].c++; } });
+    } else if (ACTIVE_STAGES.includes(j.status)) {
+      _totals[j.status].sum += daysBetween(j.poDate,null);
+      _totals[j.status].c++;
+    }
+  });
+  const _avgs = ACTIVE_STAGES.map(s => _totals[s].c ? Math.round(_totals[s].sum/_totals[s].c) : 0);
+  renderDashHealthBanner(_avgs, _totals);
 }
 
 /* ── DASHBOARD ── */
@@ -444,7 +459,8 @@ function renderBottleneck() {
   }).join('');
 
   // ── ACTIONABLE STEPS ──
-  renderBottleneckActions(avgs, totals, stageAvgs => stageAvgs);
+  renderBottleneckActions(avgs, totals);
+  renderDashHealthBanner(avgs, totals);
 }
 
 function renderBottleneckActions(avgs, totals) {
@@ -1169,18 +1185,24 @@ function renderPerformance() {
 
   // ── SUPPLIER TBODY ──
   const tbody = document.getElementById('perf-supplier-tbody');
+  const perfSortEl = document.getElementById('perf-supplier-sort');
+  const perfSort = perfSortEl ? perfSortEl.value : 'avg';
+  let sortedSupData = [...supData];
+  if (perfSort === 'jobs') sortedSupData.sort((a,b) => b.count - a.count);
+  else if (perfSort === 'fix') sortedSupData.sort((a,b) => (b.fix||0) - (a.fix||0));
+  else sortedSupData.sort((a,b) => (a.avg||999) - (b.avg||999));
   if (tbody) {
-    tbody.innerHTML = !supData.length
+    tbody.innerHTML = !sortedSupData.length
       ? '<tr><td colspan="7"><div class="empty-state"><p>No completed jobs in this period.</p></div></td></tr>'
-      : supData.map(d => {
+      : sortedSupData.map(d => {
           const fixCls = d.fix === null ? '' : d.fix >= 80 ? 'color:var(--green)' : d.fix < 70 ? 'color:var(--red)' : 'color:var(--amber)';
-          const avgCls = d.avg === null ? '' : d.avg <= 14 ? 'color:var(--green)' : d.avg > 21 ? 'color:var(--red)' : '';
+          const avgCls = d.avg === null ? 'color:var(--text3)' : d.avg <= 14 ? 'color:var(--green)' : d.avg > 21 ? 'color:var(--red)' : '';
           return `<tr onclick="openSupplierModal('${esc(d.s)}','all')" style="cursor:pointer">
             <td style="font-weight:600">${esc(d.s)}</td>
             <td style="text-align:center">${d.count}</td>
             <td style="text-align:center">${d.revisits > 0 ? `<span style="color:var(--amber);font-weight:600">${d.revisits}</span>` : '<span style="color:var(--green)">0</span>'}</td>
             <td style="text-align:center;font-weight:700;${fixCls}">${d.fix !== null ? d.fix + '%' : '—'}</td>
-            <td style="text-align:center;font-weight:700;${avgCls}">${d.avg !== null ? d.avg + 'd' : '—'}</td>
+            <td style="text-align:center;font-weight:700;${avgCls}">${d.avg !== null ? d.avg + 'd' : '<span style="font-size:11px;color:var(--text3)" title="No tracked completion dates for this company in period">—</span>'}</td>
             <td style="text-align:center;color:var(--green)">${d.fastest !== null ? d.fastest + 'd' : '—'}</td>
             <td style="text-align:center;color:var(--red)">${d.slowest !== null ? d.slowest + 'd' : '—'}</td>
           </tr>`;
@@ -1617,6 +1639,32 @@ function buildPrintReport() {
       </div>
     </div>
 
+    <!-- ══ RECURRING SITES ALERT ══ -->
+    ${(() => {
+      const thisYear = new Date().getFullYear().toString();
+      const siteMap = {};
+      jobs.filter(isServiceJob).forEach(j => {
+        const site = parseSiteName(j.ref);
+        if (!site) return;
+        const key = site.toLowerCase().replace(/\s+/g,' ');
+        if (!siteMap[key]) siteMap[key] = { name:site, total:0, thisYear:0, open:0 };
+        siteMap[key].total++;
+        if ((j.poDate||'').startsWith(thisYear)) siteMap[key].thisYear++;
+        if (j.status !== 'Job Done') siteMap[key].open++;
+      });
+      const hotSites = Object.values(siteMap).filter(s => s.thisYear >= 2).sort((a,b) => b.thisYear - a.thisYear);
+      if (!hotSites.length) return '';
+      return `<div style="margin-top:10px;padding:7px 12px;background:#fff8f0;border:1px solid #fed7aa;border-radius:6px">
+        <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#c2410c;margin-bottom:5px">⚑ Recurring Sites — ${hotSites.length} site${hotSites.length!==1?'s':''} with repeat callouts this year</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          ${hotSites.slice(0,8).map(s => `<span style="font-size:8px;padding:2px 7px;background:#fff;border:1px solid #fed7aa;border-radius:10px;color:#9a3412">
+            <strong>${esc(s.name)}</strong> — ${s.thisYear}x this year${s.open>0?' · <strong style="color:#c2410c">'+s.open+' open</strong>':''}
+          </span>`).join('')}
+          ${hotSites.length > 8 ? `<span style="font-size:7.5px;color:#9ba3af;align-self:center">+${hotSites.length-8} more</span>` : ''}
+        </div>
+      </div>`;
+    })()}
+
     <!-- ══ FOOTER ══ -->
     <div style="margin-top:11px;padding-top:6px;border-top:1.5px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
       <div style="display:flex;align-items:center;gap:6px">
@@ -1640,6 +1688,58 @@ function buildPrintReport() {
   </div>`;
 
   document.getElementById('print-report').innerHTML = html;
+}
+
+
+/* ── DASHBOARD HEALTH BANNER ── */
+function renderDashHealthBanner(avgs, totals) {
+  const el = document.getElementById('ops-health-banner');
+  if (!el) return;
+
+  const STAGE_NAMES = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting'];
+  const issues = [];
+  if (avgs[0] > 7)  issues.push({ label: `Incoming Job averaging ${avgs[0]}d`, color: avgs[0]>14?'var(--red)':'var(--amber)', page: 'bottleneck' });
+  if (avgs[1] > 10) issues.push({ label: `Job Booked averaging ${avgs[1]}d before work starts`, color: avgs[1]>21?'var(--red)':'var(--amber)', page: 'bottleneck' });
+  if (avgs[2] > 14) issues.push({ label: `${totals['Waiting for Parts']?.c||0} jobs stuck waiting on parts (avg ${avgs[2]}d)`, color: avgs[2]>21?'var(--red)':'var(--amber)', page: 'bottleneck' });
+  if (avgs[3] > 7)  issues.push({ label: `${totals['Revisiting']?.c||0} revisiting jobs (avg ${avgs[3]}d)`, color: avgs[3]>14?'var(--red)':'var(--amber)', page: 'bottleneck' });
+
+  // Recurring sites this year
+  const thisYear = new Date().getFullYear().toString();
+  const siteMap = {};
+  jobs.filter(isServiceJob).forEach(j => {
+    const site = parseSiteName(j.ref);
+    if (!site) return;
+    const key = site.toLowerCase().replace(/\s+/g,' ');
+    if (!siteMap[key]) siteMap[key] = { name:site, count:0 };
+    if ((j.poDate||'').startsWith(thisYear)) siteMap[key].count++;
+  });
+  const hotSites = Object.values(siteMap).filter(s => s.count >= 3).sort((a,b) => b.count - a.count);
+  if (hotSites.length) {
+    issues.push({ label: `${hotSites[0].name} has had ${hotSites[0].count} callouts this year`, color: 'var(--red)', page: 'sites' });
+    if (hotSites.length > 1) issues.push({ label: `${hotSites.length} sites with 3+ callouts this year`, color: 'var(--amber)', page: 'sites' });
+  }
+
+  if (!issues.length) {
+    el.style.display = 'flex';
+    el.innerHTML = `<span style="font-size:14px">✅</span><span style="font-size:12px;font-weight:600;color:var(--green)">Operations healthy — no bottlenecks or recurring issues detected</span>`;
+    el.style.background = 'rgba(22,163,74,0.06)';
+    el.style.borderColor = 'rgba(22,163,74,0.2)';
+    el.style.color = 'var(--green)';
+    return;
+  }
+
+  el.style.display = 'flex';
+  el.style.background = 'rgba(220,38,38,0.05)';
+  el.style.borderColor = 'rgba(220,38,38,0.15)';
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:5px;width:100%">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text3);margin-bottom:2px">Ops Health Check</div>
+      ${issues.map(i => `<div style="display:flex;align-items:center;gap:8px;font-size:12px">
+        <span style="width:6px;height:6px;border-radius:50%;background:${i.color};flex-shrink:0;display:inline-block"></span>
+        <span style="color:var(--text2);flex:1">${i.label}</span>
+        <span onclick="showPage('${i.page}')" style="font-size:11px;color:var(--blue);cursor:pointer;flex-shrink:0">View →</span>
+      </div>`).join('')}
+    </div>`;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1700,31 +1800,49 @@ function renderSupplierTags() {
   const tags = loadSupplierTags();
   const supplierNames = [...new Set(jobs.map(j => j.supplier).filter(Boolean))].sort();
   const STATES = ['VIC','NSW','QLD','SA','WA','TAS','ACT','NT','NAT','?'];
+  const STATE_COLORS = { VIC:'#3b82f6', NSW:'#16a34a', QLD:'#d97706', SA:'#dc2626', WA:'#7c3aed', TAS:'#0891b2', ACT:'#be185d', NT:'#c2410c', NAT:'#374151', '?':'#9ba3af' };
+
+  const untagged = supplierNames.filter(s => !getSupplierState(s, tags));
+  const tagged   = supplierNames.filter(s =>  getSupplierState(s, tags));
+
+  const makeRow = (s) => {
+    const autoState = getSupplierState(s, {});
+    const userState = tags[s] || '';
+    const effectiveState = userState || autoState;
+    const isAuto = !userState && !!autoState;
+    const isUserSet = !!userState;
+    const sc = STATE_COLORS[effectiveState] || 'var(--text3)';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s)}</div>
+        ${effectiveState ? `<div style="font-size:11px;color:var(--text3);margin-top:1px">${isAuto ? 'Auto-detected' : 'Manually tagged'}</div>` : '<div style="font-size:11px;color:var(--text3);margin-top:1px">Not tagged yet</div>'}
+      </div>
+      ${effectiveState ? `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;background:${sc}20;color:${sc};border:1px solid ${sc}40;flex-shrink:0">${effectiveState}</span>` : ''}
+      <select onchange="setSupplierTag('${esc(s)}',this.value)"
+        style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font);flex-shrink:0">
+        <option value="">${effectiveState ? '✎ change' : '— tag state'}</option>
+        ${STATES.map(st => `<option value="${st}" ${(userState||autoState)===st?'selected':''}>${st}</option>`).join('')}
+      </select>
+    </div>`;
+  };
 
   el.innerHTML = `
-    <div class="card" style="padding:20px 24px;margin-bottom:20px">
-      <div style="font-size:13px;font-weight:700;margin-bottom:4px">Service Company — State Tags</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:16px">
-        Known companies are pre-tagged from your spreadsheet. Tag any unknowns below — saved automatically.
+    ${untagged.length ? `
+    <div class="card" style="margin-bottom:16px;overflow:hidden">
+      <div style="padding:14px 20px;background:rgba(220,38,38,0.04);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--text)">Needs tagging <span style="font-size:12px;font-weight:400;color:var(--text3)">(${untagged.length} companies)</span></div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">These companies appear in your jobs but don't have a state assigned yet</div>
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">
-        ${supplierNames.map(s => {
-          const autoState = getSupplierState(s, {});
-          const userState = tags[s] || '';
-          const effectiveState = userState || autoState;
-          const isAuto = !userState && !!autoState;
-          const stateColor = effectiveState === 'NAT' ? 'var(--blue)' : effectiveState ? 'var(--green)' : 'var(--text3)';
-          return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm)">
-            <div style="flex:1;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s)}">${esc(s)}</div>
-            ${isAuto ? `<span style="font-size:10px;color:var(--text3);font-style:italic">auto</span>` : ''}
-            <select onchange="setSupplierTag('${esc(s)}',this.value)"
-              style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:${stateColor};font-weight:700;font-family:var(--font);min-width:70px">
-              <option value="">— tag</option>
-              ${STATES.map(st => `<option value="${st}" ${effectiveState===st?'selected':''}>${st}</option>`).join('')}
-            </select>
-          </div>`;
-        }).join('')}
+      ${untagged.map(makeRow).join('')}
+    </div>` : ''}
+    <div class="card" style="overflow:hidden">
+      <div style="padding:14px 20px;border-bottom:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:700;color:var(--text)">All tagged companies <span style="font-size:12px;font-weight:400;color:var(--text3)">(${tagged.length})</span></div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">Pre-loaded from your spreadsheet + any manual tags. Click ✎ change to override.</div>
       </div>
+      ${tagged.length ? tagged.map(makeRow).join('') : '<div style="padding:20px;color:var(--text3);font-size:13px">No tagged companies yet.</div>'}
     </div>`;
 }
 
