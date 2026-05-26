@@ -503,3 +503,4 @@ select {
 .colour-legend { font-size: 12px; }
 .colour-legend .badge { cursor: default; }
 
+.hidden { display: none !important; }
