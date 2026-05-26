@@ -103,7 +103,7 @@ function renderDashboard() {
     <div class="metric-card accent-blue">
       <div class="metric-label">Open Jobs</div>
       <div class="metric-value">${open.length}</div>
-      <div class="metric-sub">${done.length} completed total</div>
+      <div class="metric-sub">${done.length} completed in period</div>
     </div>
     <div class="metric-card ${stuck.length > 0 ? 'warn' : 'accent-green'}">
       <div class="metric-label">Needs Attention</div>
@@ -935,7 +935,7 @@ let perfThroughputInst, perfFixRateInst, perfDurationInst, perfSupplierInst;
 
 function renderPerformance() {
   const periodEl = document.getElementById('perf-period');
-  const months   = periodEl ? parseInt(periodEl.value) || 999 : 6;
+  const months   = periodEl ? parseInt(periodEl.value) || 999 : 999;
   const now      = new Date();
 
   // Date cutoff
