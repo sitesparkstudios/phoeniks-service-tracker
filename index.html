@@ -1,969 +1,437 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Phoeniks — Service Tracker</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f5c842'/%3E%3Ccircle cx='10' cy='10' r='4' fill='%233d4043'/%3E%3Ccircle cx='22' cy='10' r='4' fill='%233d4043'/%3E%3Ccircle cx='10' cy='22' r='4' fill='%233d4043'/%3E%3Ccircle cx='22' cy='22' r='4' fill='none' stroke='%233d4043' stroke-width='2.5'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=20260534">
+/* ============================================================
+   app.js — UI routing, CRUD, form handling, toast, confirm
+   CHANGED FROM ORIGINAL:
+   - saveJob() / deleteJob() are now async (await Supabase)
+   - Removed resetToDemo() (Supabase doesn't use demo data)
+   - init sequence awaits loadData()
+   - last_page still uses localStorage (tiny UI pref, not data)
+   - Auth modal wired up
+   ============================================================ */
 
-  <script>
-    // Unregister any old service workers that may be causing caching issues
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(regs => {
-        regs.forEach(r => r.unregister());
-      });
-      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+/* ── PAGE ROUTING ── */
+const PAGE_TITLES = {
+  dashboard:  'Dashboard',
+  activity:   'Weekly Activity',
+  urgent:     'Urgent — Jobs Needing Attention',
+  bottleneck: 'Bottleneck Report',
+  performance: 'Performance',
+  jobs:       'All Jobs',
+  parts:      'Parts Tracker',
+  suppliers:  'Service Companies',
+  reports:    'Meeting Reports',
+  sites:      'Recurring Sites',
+  'supplier-tags': 'Tag Service Companies',
+  import:     'Odoo Import',
+  add:        'Add / Edit Job',
+};
+
+const NAV_ORDER = ['dashboard','urgent','activity','bottleneck','performance','jobs','parts','suppliers','sites','reports','import','add','admin'];
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach((n, i) => {
+    n.classList.toggle('active', NAV_ORDER[i] === name);
+  });
+  const pg = document.getElementById('page-' + name);
+  if (pg) pg.classList.add('active');
+  const pageTitle = PAGE_TITLES[name] || name;
+  document.getElementById('topbar-title').textContent = pageTitle;
+  document.body.setAttribute('data-print-page', pageTitle);
+  try { localStorage.setItem('phoeniks_last_page', name); } catch(e) {}
+
+  if (name === 'dashboard')  { if (typeof initDashPeriodFilter === 'function') initDashPeriodFilter(); renderDashboard(); }
+  if (name === 'activity')   renderActivity();
+  if (name === 'urgent')     renderUrgent();
+  if (name === 'bottleneck') { if (typeof initBottleneckFilter === 'function') initBottleneckFilter(); renderBottleneck(); }
+  if (name === 'performance') renderPerformance();
+  if (name === 'jobs')       { renderJobs(); populateSupplierDatalist(); }
+  if (name === 'parts')      renderParts();
+  if (name === 'suppliers')  renderSuppliers();
+  if (name === 'sites')      renderSites();
+  if (name === 'supplier-tags') { renderSupplierTags(); }
+  if (name === 'reports')    renderReports();
+  if (name === 'add')        populateSupplierDatalist();
+  if (name === 'admin')      renderAdmin();
+}
+
+/* ── NAV BADGES ── */
+function updateNavBadges() {
+  const openJobs  = jobs.filter(isOpenService).length;
+  const waiting   = jobs.filter(j => j.status === 'Waiting for Parts').length;
+
+  const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); weekStart.setHours(0,0,0,0);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+  const doneThisWeek = jobs.filter(j => {
+    if (j.status !== 'Job Done') return false;
+    const last = j.history?.[j.history.length - 1];
+    return last && last.date >= weekStartStr;
+  }).length;
+
+  const urgentCount = jobs.filter(j => isOpenService(j) && daysBetween(j.poDate, null) >= 21).length;
+
+  const jobsBadge   = document.getElementById('nav-badge-jobs');
+  const partsBadge  = document.getElementById('nav-badge-parts');
+  const urgentBadge = document.getElementById('nav-badge-urgent');
+
+  if (jobsBadge)   { jobsBadge.textContent   = openJobs || '';    jobsBadge.style.display   = openJobs   > 0 ? 'inline-block' : 'none'; }
+  if (partsBadge)  { partsBadge.textContent  = waiting  || '';    partsBadge.style.display  = waiting    > 0 ? 'inline-block' : 'none'; }
+  if (urgentBadge) { urgentBadge.textContent = urgentCount || ''; urgentBadge.style.display = urgentCount > 0 ? 'inline-block' : 'none'; }
+
+  const pulseOpen  = document.getElementById('pulse-open');
+  const pulseParts = document.getElementById('pulse-parts');
+  const pulseDone  = document.getElementById('pulse-done');
+  const maintCount = jobs.filter(j => j.status === 'Maintenance').length;
+  if (pulseOpen)  pulseOpen.textContent  = openJobs;
+  if (pulseParts) pulseParts.textContent = waiting;
+  if (pulseDone)  pulseDone.textContent  = doneThisWeek;
+  const pulseMaint = document.getElementById('pulse-maint');
+  if (pulseMaint) {
+    pulseMaint.parentElement.style.display = maintCount > 0 ? 'flex' : 'none';
+    pulseMaint.textContent = maintCount;
+  }
+}
+
+function populateSupplierDatalist() {
+  const dl = document.getElementById('supplier-datalist');
+  if (!dl) return;
+  const suppliers = [...new Set(jobs.map(j => j.supplier))].sort();
+  dl.innerHTML = suppliers.map(s => `<option value="${esc(s)}">`).join('');
+}
+
+/* ── CRUD ── */
+async function saveJob() {
+  if (!isAuthed()) { showToast('Sign in to add or edit jobs'); openAuthModal(); return; }
+
+  const po      = document.getElementById('f-po').value.trim();
+  const supplier= document.getElementById('f-supplier').value.trim();
+  const poDate  = document.getElementById('f-po-date').value;
+  const status  = document.getElementById('f-status').value;
+  const notes   = document.getElementById('f-notes').value.trim();
+  const ref     = document.getElementById('f-ref').value.trim();
+  const equip   = document.getElementById('f-equipment').value.trim();
+  const value   = document.getElementById('f-value').value.trim();
+  const buyer   = document.getElementById('f-buyer').value.trim();
+  const chatter = document.getElementById('f-chatter').value;
+
+  const msgEl = document.getElementById('form-validation-msg');
+  if (!po || !supplier || !poDate) {
+    msgEl.textContent   = 'PO number, service co. and PO date are required.';
+    msgEl.style.display = 'block';
+    return;
+  }
+  msgEl.style.display = 'none';
+
+  const { transitions, notes: cn } = parseChatter(chatter);
+  const allNotes = [notes, ...cn.map(n => n.text)].filter(Boolean).join('\n');
+
+  let savedJob;
+
+  if (editingId) {
+    const j = jobs.find(x => x.id === editingId);
+    if (j) {
+      j.po = po; j.supplier = supplier; j.ref = ref; j.equipment = equip;
+      j.poDate = poDate; j.notes = allNotes; j.value = value; j.buyer = buyer;
+      if (transitions.length) {
+        j.history = buildHistoryFromTransitions(poDate, transitions);
+        j.status  = j.history[j.history.length-1].status;
+      } else if (j.status !== status) {
+        if (!j.history || !j.history.length) j.history = [{ status: j.status, date: j.poDate }];
+        j.history.push({ status, date: today() });
+        j.status = status;
+      } else {
+        j.status = status;
+      }
+      savedJob = j;
     }
-  </script>
-</head>
-<body>
-<div class="app">
+    editingId = null;
+  } else {
+    savedJob = {
+      id:        'j' + Date.now(),
+      po, supplier, ref, equipment: equip, poDate,
+      notes: allNotes, value, buyer,
+      addedDate: today(),
+      status:    transitions.length ? transitions[transitions.length-1].to : status,
+      history:   transitions.length ? buildHistoryFromTransitions(poDate, transitions) : [{ status, date: poDate }],
+    };
+    jobs.push(savedJob);
+  }
 
-  <!-- ── SIDEBAR ── -->
-  <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="sidebar-logo-inner">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;flex-shrink:0">
-            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
-            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
-            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
-            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
-            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
-            <div style="width:8px;height:8px;border-radius:50%;border:2px solid #3d4043"></div>
-          </div>
-          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:21px;color:#3d4043;letter-spacing:1px;line-height:1">PHOENIKS</div>
-        </div>
-        <div style="font-size:10px;color:rgba(61,64,67,0.55);letter-spacing:0.06em;text-transform:uppercase;margin-top:6px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600">Electric Kitchen Specialists</div>
-      </div>
-    </div>
+  await saveOneJob(savedJob);   // fast single-row upsert
+  clearForm();
+  showToast('Job saved');
+  showPage('jobs');
+}
 
-    <div class="nav-section-label">Main</div>
-    <div class="sidebar-nav">
-      <div class="nav-item active" onclick="showPage('dashboard')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-        Dashboard
-      </div>
-      <div class="nav-item" onclick="showPage('urgent')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        Urgent
-        <span id="nav-badge-urgent" class="nav-badge" style="display:none;background:rgba(220,38,38,0.2);color:#dc2626"></span>
-      </div>
-      <div class="nav-item" onclick="showPage('activity')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        Weekly Activity
-      </div>
-      <div class="nav-item" onclick="showPage('bottleneck')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        Bottleneck Report
-      </div>
-      <div class="nav-item" onclick="showPage('performance')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-        Performance
-      </div>
-      <div class="nav-item" onclick="showPage('jobs')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
-        All Jobs
-        <span id="nav-badge-jobs" class="nav-badge" style="display:none"></span>
-      </div>
-      <div class="nav-item" onclick="showPage('parts')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/><path d="M14.83 9.17a4 4 0 010 5.66M9.17 9.17a4 4 0 000 5.66"/></svg>
-        Parts Tracker
-        <span id="nav-badge-parts" class="nav-badge nav-badge-amber" style="display:none"></span>
-      </div>
-      <div class="nav-item" onclick="showPage('suppliers')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-        Service Cos.
-      </div>
-      <div class="nav-item" onclick="showPage('sites')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-        Recurring Sites
-      </div>
-      <div class="nav-item" onclick="showPage('reports')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13,2 13,9 20,9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
-        Reports
-      </div>
-      <div class="nav-section-label" style="padding-left:0">Data</div>
-      <div class="nav-item" onclick="showPage('import')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Odoo Import
-      </div>
-      <div class="nav-item" onclick="showPage('add')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-        Add / Edit Job
-      </div>
-      <div class="nav-item" id="nav-admin" onclick="showPage('admin')" style="display:none">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M17 14l1.5 1.5L21 13"/></svg>
-        Admin
-      </div>
-    </div>
+function editJob(id) {
+  const j = jobs.find(x => x.id === id);
+  if (!j) return;
+  editingId = id;
+  closeModal();
+  showPage('add');
+  document.getElementById('form-page-title').textContent  = 'Edit Job — ' + j.po;
+  document.getElementById('save-btn-label').textContent   = 'Save changes';
+  document.getElementById('f-po').value        = j.po;
+  document.getElementById('f-supplier').value  = j.supplier;
+  document.getElementById('f-ref').value       = j.ref       || '';
+  document.getElementById('f-equipment').value = j.equipment || '';
+  document.getElementById('f-po-date').value   = j.poDate    || '';
+  document.getElementById('f-status').value    = j.status;
+  document.getElementById('f-notes').value     = j.notes     || '';
+  document.getElementById('f-value').value     = j.value     || '';
+  document.getElementById('f-buyer').value     = j.buyer     || '';
+  document.getElementById('f-chatter').value   = '';
+  document.getElementById('chatter-preview-box').innerHTML = '';
+  document.getElementById('chatter-parse-status').textContent = '';
+}
 
-    <div id="sidebar-pulse" style="padding:10px 20px 0;flex-shrink:0">
-      <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;display:flex;flex-direction:column;gap:5px">
-        <div style="display:flex;justify-content:space-between;font-size:11px">
-          <span style="color:rgba(255,255,255,0.35)">Open jobs</span>
-          <span id="pulse-open" style="color:rgba(255,255,255,0.65);font-weight:600;font-family:'DM Mono',monospace">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:11px">
-          <span style="color:rgba(255,255,255,0.35)">Waiting on parts</span>
-          <span id="pulse-parts" style="color:#fcd34d;font-weight:600;font-family:'DM Mono',monospace">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:11px">
-          <span style="color:rgba(255,255,255,0.35)">Completed this week</span>
-          <span id="pulse-done" style="color:#86efac;font-weight:600;font-family:'DM Mono',monospace">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:11px">
-          <span style="color:rgba(255,255,255,0.35)">Maintenance (PPM)</span>
-          <span id="pulse-maint" style="color:rgba(255,255,255,0.45);font-weight:600;font-family:'DM Mono',monospace">—</span>
-        </div>
-      </div>
-    </div>
-    <div class="sidebar-bottom">
-      <div id="sidebar-date-display"></div>
-      <div class="mono" style="margin-top:6px;color:rgba(255,255,255,0.25)">v4.0 · Supabase</div>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08)">
-        <div id="auth-status-bar-signed-in" style="display:none">
-          <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-bottom:4px">Signed in as</div>
-          <div id="auth-email" style="font-size:11px;color:rgba(255,255,255,0.7);word-break:break-all;margin-bottom:6px"></div>
-          <button onclick="handleSignOut()" style="background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.55);font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer">Sign out</button>
-        </div>
-        <div id="auth-status-bar-signed-out">
-          <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-bottom:6px">👁 Read-only mode</div>
-          <button onclick="openAuthModal()" style="background:rgba(245,200,66,0.15);border:1px solid rgba(245,200,66,0.3);color:#f5c842;font-size:11px;padding:5px 12px;border-radius:5px;cursor:pointer;font-weight:600">Sign in to edit</button>
-        </div>
-      </div>
-      <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08)">
-        Created by <strong style="color:rgba(255,255,255,0.55)">Sean</strong><br>
-        Technical Service Manager
-      </div>
-    </div>
-  </aside>
+function clearForm() {
+  editingId = null;
+  document.getElementById('form-page-title').textContent = 'Add New Job';
+  document.getElementById('save-btn-label').textContent  = 'Save job';
+  document.getElementById('form-validation-msg').style.display = 'none';
+  ['f-po','f-supplier','f-ref','f-equipment','f-notes','f-chatter','f-value','f-buyer']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-po-date').value = '';
+  document.getElementById('f-status').value  = 'Incoming Job';
+  document.getElementById('chatter-preview-box').innerHTML = '';
+  document.getElementById('chatter-parse-status').textContent = '';
+}
 
-  <!-- ── MAIN ── -->
-  <div class="main">
-    <div class="topbar">
-      <div class="topbar-title" id="topbar-title">Dashboard</div>
-      <div class="topbar-actions">
-        <button class="btn btn-meeting" onclick="openMeeting()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-          Monday Meeting
-        </button>
-        <button class="btn btn-secondary btn-sm" onclick="exportCSV()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Export
-        </button>
-        <button class="btn btn-ghost btn-sm" onclick="buildPrintReport(); setTimeout(window.print, 120)">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          Print
-        </button>
-      </div>
-    </div>
+async function deleteJob(id) {
+  if (!isAuthed()) { showToast('Sign in to delete jobs'); return; }
+  const confirmed = await showConfirm('Delete this job?', 'This action cannot be undone.');
+  if (!confirmed) return;
+  jobs = jobs.filter(j => j.id !== id);
+  delete partsData[id];
+  await deleteJobFromDB(id);    // Supabase delete (parts cascade)
+  closeModal();
+  renderJobs();
+  renderDashboard();
+  showToast('Job deleted');
+}
 
-    <!-- DASHBOARD -->
-    <div id="page-dashboard" class="page active">
-      <div class="section-header mb-24">
-        <div>
-          <div class="section-title">Overview</div>
-          <div class="section-sub" id="dash-date"></div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <div style="display:flex;gap:4px">
-            <button class="btn btn-sm btn-secondary dash-period active" data-days="30">30d</button>
-            <button class="btn btn-sm btn-secondary dash-period" data-days="180">6mo</button>
-            <button class="btn btn-sm btn-secondary dash-period" data-days="365">1yr</button>
-            <button class="btn btn-sm btn-secondary dash-period" data-days="all">All</button>
-          </div>
-          <button class="btn btn-primary" onclick="showPage('add')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-            Add job
-          </button>
-        </div>
-      </div>
+/* ── AUTH MODAL ── */
+function openAuthModal() {
+  const el = document.getElementById('auth-modal-overlay');
+  if (el) el.classList.remove('hidden');
+}
 
-      <!-- COLOUR LEGEND -->
-      <div class="colour-legend card" style="padding:14px 20px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:20px;align-items:center">
-        <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em">Status</span>
-        <span class="badge b-incoming"><span class="badge-dot"></span>Incoming Job</span>
-        <span class="badge b-booked"><span class="badge-dot"></span>Job Booked</span>
-        <span class="badge b-waiting"><span class="badge-dot"></span>Waiting for Parts</span>
-        <span class="badge b-revisiting"><span class="badge-dot"></span>Revisiting</span>
-        <span class="badge b-done"><span class="badge-dot"></span>Job Done</span>
-        <div style="width:1px;height:20px;background:var(--border)"></div>
-        <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em">Days open</span>
-        <span class="day-chip" style="background:var(--surface2)">0–14d <span style="font-size:9px;color:var(--text3)">on track</span></span>
-        <span class="day-chip warn">15–21d <span style="font-size:9px">watch</span></span>
-        <span class="day-chip danger">&gt;21d <span style="font-size:9px">overdue</span></span>
-        <span class="day-chip ok">Xd <span style="font-size:9px">completed</span></span>
-      </div>
-      <div id="invoicing-health" style="display:none;background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:12px;font-size:12px;color:var(--red);gap:10px;align-items:center"></div>
-      <div id="ops-health-banner" style="display:none;background:rgba(220,38,38,0.05);border:1px solid rgba(220,38,38,0.15);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:12px;font-size:12px;gap:10px;align-items:flex-start"></div>
-      <div id="kpi-grid" class="metric-grid"></div>
+function closeAuthModal() {
+  const el = document.getElementById('auth-modal-overlay');
+  if (el) el.classList.add('hidden');
+  document.getElementById('auth-magic-sent')?.classList.add('hidden');
+  document.getElementById('auth-modal-form')?.classList.remove('hidden');
+}
 
-      <!-- Stage dwell — prominent at top -->
-      <div class="card mb-24" style="padding:24px">
-        <div class="chart-title">Stage dwell breakdown — where jobs are sitting right now</div>
-        <div id="stage-dwell-prominent"></div>
-      </div>
+async function submitMagicLink() {
+  const emailEl = document.getElementById('auth-modal-email');
+  const email = emailEl?.value.trim();
+  if (!email) { showToast('Enter your email'); return; }
 
-      <div class="grid-2 mb-24">
-        <div class="card chart-card">
-          <div class="chart-title">Jobs by status</div>
-          <div class="chart-wrap" style="height:200px"><canvas id="statusChart"></canvas></div>
-        </div>
-        <div class="card" style="padding:20px">
-          <div class="chart-title">Current stage — avg days open</div>
-          <div id="stage-bars-dash"></div>
-        </div>
-      </div>
-      <div class="card chart-card mb-24">
-        <div class="chart-title">Monthly spend — last 12 months</div>
-        <div class="chart-wrap" style="height:180px"><canvas id="spendChart"></canvas></div>
-      </div>
-      <div class="card">
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            Needs attention
-          </div>
-          <span class="text-sm text-muted">Open &gt; 14 days</span>
-        </div>
-        <div id="attention-table" class="table-wrap"></div>
-      </div>
-    </div>
+  const btn = document.getElementById('auth-modal-submit');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
 
-    <!-- WEEKLY ACTIVITY -->
-    <div id="page-activity" class="page">
-      <div class="section-header mb-24">
-        <div>
-          <div class="section-title">Weekly Activity</div>
-          <div class="section-sub">What's changed this week — new jobs, status moves, completions</div>
-        </div>
-        <div style="display:flex;gap:8px">
-          <select id="activity-range" onchange="renderActivity()" style="width:auto">
-            <option value="7">Last 7 days</option>
-            <option value="14">Last 14 days</option>
-            <option value="30">Last 30 days</option>
-          </select>
-        </div>
-      </div>
-      <div class="grid-2 mb-24">
-        <div class="metric-card accent-blue">
-          <div class="metric-label">New jobs</div>
-          <div class="metric-value" id="act-new">—</div>
-          <div class="metric-sub">Added this period</div>
-        </div>
-        <div class="metric-card accent-green">
-          <div class="metric-label">Completed</div>
-          <div class="metric-value" id="act-done">—</div>
-          <div class="metric-sub">Marked job done</div>
-        </div>
-      </div>
-      <div class="card">
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
-          <div style="font-size:13px;font-weight:700">Activity feed</div>
-        </div>
-        <div style="padding:20px" id="activity-feed"></div>
-      </div>
-    </div>
+  const error = await sendMagicLink(email);
 
-    <!-- BOTTLENECK -->
+  if (btn) { btn.disabled = false; btn.textContent = 'Send magic link'; }
 
-    <!-- PERFORMANCE PAGE -->
-    <div id="page-performance" class="page">
-      <div class="section-header mb-24">
-        <div>
-          <div class="section-title">Performance</div>
-          <div class="section-sub" id="perf-period-label">Tracking service job trends and quality metrics</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <select id="perf-period" onchange="renderPerformance()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
-            <option value="1">This month</option>
-            <option value="3">Last 3 months</option>
-            <option value="6" selected>Last 6 months</option>
-            <option value="12">Last 12 months</option>
-            <option value="all">All time</option>
-          </select>
-        </div>
-      </div>
+  if (error) {
+    showToast('Error: ' + error.message);
+  } else {
+    document.getElementById('auth-modal-form')?.classList.add('hidden');
+    document.getElementById('auth-magic-sent')?.classList.remove('hidden');
+  }
+}
 
-      <!-- DATA NOTE -->
-      <div id="perf-data-note" style="background:var(--blue-dim);border:1px solid rgba(37,99,235,0.2);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:16px;font-size:12px;color:var(--blue);display:flex;gap:10px;align-items:flex-start">
-        <span style="font-size:16px;flex-shrink:0">ℹ</span>
-        <span><strong>Duration metrics improve over time.</strong> Jobs imported from Odoo start with only their PO date — duration data becomes accurate as you track status changes in the app. Revisit rate and job counts are accurate from day one.</span>
-      </div>
-      <!-- KPI SCORECARD -->
-      <div id="perf-scorecard" class="kpi-grid" style="margin-bottom:24px"></div>
+async function handleSignOut() {
+  await signOut();
+  showToast('Signed out');
+}
 
-      <!-- CHARTS ROW 1 -->
-      <div class="grid-2 mb-20">
-        <div class="card chart-card">
-          <div class="chart-title">Monthly jobs completed</div>
-          <div class="chart-sub" style="font-size:11px;color:var(--text3);margin-bottom:12px">Throughput trend over time</div>
-          <div class="chart-wrap" style="height:220px"><canvas id="perfThroughputChart"></canvas></div>
-        </div>
-        <div class="card chart-card">
-          <div class="chart-title">First-time fix rate</div>
-          <div class="chart-sub" style="font-size:11px;color:var(--text3);margin-bottom:12px">% of jobs completed without revisiting — industry benchmark ~75%</div>
-          <div class="chart-wrap" style="height:220px"><canvas id="perfFixRateChart"></canvas></div>
-        </div>
-      </div>
+/* ── TOAST ── */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
 
-      <!-- CHARTS ROW 2 -->
-      <div class="grid-2 mb-20">
-        <div class="card chart-card">
-          <div class="chart-title">Avg job duration trend</div>
-          <div class="chart-sub" style="font-size:11px;color:var(--text3);margin-bottom:12px">Average days PO raised → completed, per month</div>
-          <div class="chart-wrap" style="height:220px"><canvas id="perfDurationChart"></canvas></div>
-        </div>
-        <div class="card chart-card">
-          <div class="chart-title">Service co. league table</div>
-          <div class="chart-sub" style="font-size:11px;color:var(--text3);margin-bottom:12px">Ranked by avg completion time — completed jobs only</div>
-          <div class="chart-wrap" style="height:220px"><canvas id="perfSupplierChart"></canvas></div>
-        </div>
-      </div>
+/* ── CONFIRM DIALOG ── */
+function showConfirm(title, msg, okLabel = 'Delete') {
+  return new Promise(resolve => {
+    document.getElementById('confirm-title').textContent  = title;
+    document.getElementById('confirm-msg').textContent    = msg;
+    document.getElementById('confirm-ok-btn').textContent = okLabel;
+    document.getElementById('confirm-overlay').classList.remove('hidden');
+    confirmCallback = resolve;
+  });
+}
 
-      <!-- LEAGUE TABLE -->
-      <div class="card mb-20">
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:13px;font-weight:700">Service co. detailed breakdown</div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:11px;color:var(--text3)">Completed jobs only · Sort:</span>
-            <select id="perf-supplier-sort" onchange="renderPerformance()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
-              <option value="avg">Avg duration</option>
-              <option value="jobs">Jobs done</option>
-              <option value="fix">Fix rate</option>
-            </select>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>Service Co.</th>
-              <th style="width:80px;text-align:center">Jobs done</th>
-              <th style="width:90px;text-align:center">Revisits</th>
-              <th style="width:100px;text-align:center">Fix rate</th>
-              <th style="width:90px;text-align:center">Avg days</th>
-              <th style="width:90px;text-align:center">Fastest</th>
-              <th style="width:90px;text-align:center">Slowest</th>
-            </tr></thead>
-            <tbody id="perf-supplier-tbody"></tbody>
-          </table>
-        </div>
-      </div>
+function confirmResolve(val) {
+  document.getElementById('confirm-overlay').classList.add('hidden');
+  if (confirmCallback) { confirmCallback(val); confirmCallback = null; }
+}
 
-      <!-- REVISIT LOG -->
-      <div class="card">
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
-          <div style="font-size:13px;font-weight:700">Revisited jobs</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">Jobs that required a second visit — these directly impact your fix rate</div>
-        </div>
-        <div id="perf-revisit-list" class="table-wrap">
-        </div>
-      </div>
-    </div>
+/* ── KEYBOARD SHORTCUTS ── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeModal();
+    closeMeeting();
+    closeAuthModal();
+    document.getElementById('confirm-overlay').classList.add('hidden');
+  }
+  if (document.getElementById('meeting-overlay').classList.contains('active')) {
+    if (e.key === 'ArrowRight') meetingNext();
+    if (e.key === 'ArrowLeft')  meetingPrev();
+  }
+});
 
+/* ── SIDEBAR DATE ── */
+function ordinal(n) {
+  const s = ['th','st','nd','rd'], v = n % 100;
+  return n + (s[(v-20)%10] || s[v] || s[0]);
+}
 
-    <!-- URGENT PAGE -->
-    <div id="page-urgent" class="page">
-      <div class="section-header mb-16">
-        <div>
-          <div class="section-title" style="color:var(--red)">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            Urgent — Jobs Needing Attention
-          </div>
-          <div class="section-sub" id="urgent-sub">Jobs overrunning or stalled — review and take action</div>
-        </div>
-        <select id="urgent-threshold" onchange="renderUrgent()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
-          <option value="14">Overdue: 14+ days</option>
-          <option value="21" selected>Overdue: 21+ days</option>
-          <option value="30">Overdue: 30+ days</option>
-          <option value="7">Overdue: 7+ days</option>
-        </select>
-      </div>
+function updateSidebarDate() {
+  const el = document.getElementById('sidebar-date-display');
+  if (!el) return;
+  const now   = new Date();
+  const day   = now.toLocaleDateString('en-AU', { weekday: 'long' });
+  const month = now.toLocaleDateString('en-AU', { month: 'long' });
+  const date  = ordinal(now.getDate());
+  el.innerHTML = `
+    <div style="color:rgba(255,255,255,0.45);font-size:10px;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:2px">${day}</div>
+    <div style="color:rgba(255,255,255,0.7);font-size:13px;font-weight:500">${date} ${month}</div>
+  `;
+}
 
-      <!-- URGENT KPIs -->
-      <div id="urgent-kpis" class="metric-grid" style="margin-bottom:20px"></div>
+/* ── INIT ── */
+(async () => {
+  await initAuth();     // set _currentSession, wire onAuthStateChange
+  await loadData();     // fetch from Supabase
+  updateAuthUI();
+  // Show admin nav only when signed in
+  const navAdmin = document.getElementById('nav-admin');
+  if (navAdmin) navAdmin.style.display = isAuthed() ? 'flex' : 'none';
+  updateSidebarDate();
+  updateNavBadges();
 
-      <!-- BY SERVICE CO. -->
-      <div class="card mb-20">
-        <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:13px;font-weight:700">Overdue by service co.</div>
-          <div style="font-size:11px;color:var(--text3)">Click a row to see their jobs</div>
-        </div>
-        <div id="urgent-by-supplier" class="table-wrap"></div>
-      </div>
+  const _lastPage = (() => { try { return localStorage.getItem('phoeniks_last_page'); } catch(e) { return null; } })();
+  showPage(NAV_ORDER.includes(_lastPage) ? _lastPage : 'dashboard');
 
-      <!-- FULL URGENT LIST -->
-      <div class="card">
-        <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:13px;font-weight:700">All overdue jobs</div>
-          <div style="font-size:11px;color:var(--text3)">Sorted by days open — longest first</div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th style="width:110px">PO</th>
-              <th>Reference / Site</th>
-              <th style="width:150px">Service Co.</th>
-              <th style="width:120px">Status</th>
-              <th style="width:75px">Days open</th>
-              <th style="width:90px">Value</th>
-              <th style="width:110px">Notes</th>
-            </tr></thead>
-            <tbody id="urgent-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+  if (typeof initDashPeriodFilter  === 'function') initDashPeriodFilter();
+  if (typeof initBottleneckFilter  === 'function') initBottleneckFilter();
 
-    <div id="page-bottleneck" class="page">
-      <div class="section-header mb-24">
-        <div>
-          <div class="section-title">Bottleneck Report</div>
-          <div class="section-sub" id="bottleneck-period-sub">Average time in each stage — find where jobs stall</div>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn btn-sm btn-secondary bottleneck-period active" data-days="7">7d</button>
-          <button class="btn btn-sm btn-secondary bottleneck-period" data-days="30">30d</button>
-          <button class="btn btn-sm btn-secondary bottleneck-period" data-days="90">90d</button>
-          <button class="btn btn-sm btn-secondary bottleneck-period" data-days="365">1yr</button>
-          <button class="btn btn-sm btn-secondary bottleneck-period" data-days="all">All</button>
-        </div>
-      </div>
-      <div id="bottleneck-actions" style="margin-bottom:16px"></div>
-      <div class="card" style="padding:24px;margin-bottom:20px">
-        <div class="chart-title">Where time is being lost</div>
-        <div id="bottleneck-bars"></div>
-      </div>
-      <div class="grid-2 mb-20">
-        <div class="card chart-card">
-          <div class="chart-title">Avg dwell per stage</div>
-          <div class="chart-wrap" style="height:220px"><canvas id="dwellChart"></canvas></div>
-        </div>
-        <div class="card chart-card">
-          <div class="chart-title">Avg total duration by service co.</div>
-          <div class="chart-wrap" style="height:220px"><canvas id="supplierChart"></canvas></div>
-        </div>
-      </div>
-      <div class="card">
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
-          <div style="font-size:13px;font-weight:700">Stage dwell breakdown — all jobs</div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th style="width:90px">PO</th><th style="width:140px">Service Co.</th><th>Reference</th>
-              <th style="width:75px">Incoming</th><th style="width:68px">Booked</th>
-              <th style="width:75px">Waiting</th><th style="width:75px">Revisit</th>
-              <th style="width:68px">Status</th><th style="width:65px">Total</th>
-            </tr></thead>
-            <tbody id="dwell-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+  // Re-open meeting if it was open before refresh
+  try { if (localStorage.getItem('phoeniks_meeting_open') === '1') { setTimeout(openMeeting, 100); } } catch(e) {}
+})();
 
-    <!-- ALL JOBS -->
-    <div id="page-jobs" class="page">
-      <div class="section-header mb-16">
-        <div>
-          <div class="section-title">All Jobs</div>
-          <div class="section-sub" id="jobs-count"></div>
-        </div>
-        <button class="btn btn-primary" onclick="showPage('add')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-          Add job
-        </button>
-      </div>
-      <div class="filter-row">
-        <select id="filter-status" onchange="renderJobs()">
-          <option value="">All statuses</option>
-          <option>Incoming Job</option><option>Job Booked</option>
-          <option>Waiting for Parts</option><option>Revisiting</option>
-          <option>Job Done</option><option>Maintenance</option>
-        </select>
-        <select id="filter-supplier" onchange="renderJobs()"><option value="">All service cos.</option></select>
-        <input type="text" id="filter-search" placeholder="Search PO, reference, equipment..." oninput="renderJobs()" style="max-width:300px">
-      </div>
-      <div class="card">
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th style="width:90px">PO</th><th>Reference</th><th style="width:150px">Service Co.</th>
-              <th style="width:130px">Status</th><th style="width:70px">Open</th>
-              <th style="width:75px">In status</th><th style="width:100px">Value</th><th style="width:90px"></th>
-            </tr></thead>
-            <tbody id="jobs-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+/* ── ADMIN PAGE ── */
+const SUPABASE_ADMIN_URL = 'https://hoeiwbotdkjqzrygmdhs.supabase.co';
+const SUPABASE_ADMIN_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvZWl3Ym90ZGtqcXpyeWdtZGhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzM5NDQsImV4cCI6MjA5NTMwOTk0NH0.u9yyk578jkoPv1QQJqZGmRL8A9RoS2prJtW4KnefxZk';
 
-    <!-- PARTS TRACKER -->
-    <div id="page-parts" class="page">
-      <div class="section-header mb-16">
-        <div>
-          <div class="section-title">Parts Tracker</div>
-          <div class="section-sub">Jobs waiting on parts — add ETA and notes manually</div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th style="width:90px">PO</th>
-              <th>Reference</th>
-              <th style="width:140px">Service Co.</th>
-              <th style="width:80px">Waiting</th>
-              <th style="width:150px">Part / Notes</th>
-              <th style="width:140px">ETA</th>
-              <th style="width:80px">Status</th>
-            </tr></thead>
-            <tbody id="parts-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+async function renderAdmin() {
+  if (!isAuthed()) { showPage('dashboard'); showToast('Sign in to access admin'); return; }
 
-    <!-- SUPPLIERS -->
-    <div id="page-suppliers" class="page">
-      <div class="section-header mb-24">
-        <div>
-          <div class="section-title">Service Co. Scorecards</div>
-          <div class="section-sub">Performance breakdown by repairer</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <select id="supplier-sort" onchange="renderSuppliers()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
-            <option value="name">Sort: A–Z</option>
-            <option value="overdue">Sort: Most Overdue</option>
-            <option value="open">Sort: Most Open</option>
-            <option value="avg">Sort: Avg Duration</option>
-          </select>
-          <select id="supplier-state" onchange="renderSuppliers()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
-            <option value="">All States</option>
-            <option value="VIC">VIC</option>
-            <option value="NSW">NSW</option>
-            <option value="QLD">QLD</option>
-            <option value="SA">SA</option>
-            <option value="WA">WA</option>
-            <option value="TAS">TAS</option>
-            <option value="ACT">ACT</option>
-            <option value="NT">NT</option>
-            <option value="NAT">National</option>
-          </select>
-          <button class="btn btn-ghost btn-sm" onclick="showPage('supplier-tags')" style="font-size:11px">Tag states ✎</button>
-        </div>
-      </div>
-      <div id="supplier-grid" class="supplier-grid"></div>
-    </div>
+  // Show admin nav item
+  const navAdmin = document.getElementById('nav-admin');
+  if (navAdmin) navAdmin.style.display = 'flex';
 
-    <!-- RECURRING SITES -->
-    <div id="page-sites" class="page">
-      <div class="section-header mb-24">
-        <div>
-          <div class="section-title">Recurring Sites</div>
-          <div class="section-sub">Sites and locations with multiple service jobs — spot repeat issues</div>
-        </div>
-      </div>
-      <div id="sites-content"></div>
-    </div>
+  // Show your email
+  const emailEl = document.getElementById('admin-your-email');
+  if (emailEl) emailEl.textContent = _currentSession?.user?.email || '—';
 
-    <!-- SUPPLIER TAG MANAGER -->
-    <div id="page-supplier-tags" class="page">
-      <div class="section-header mb-24">
-        <div>
-          <div class="section-title">Tag Service Companies by State</div>
-          <div class="section-sub">Known companies are pre-tagged. Manually tag any others to enable state filtering on scorecards.</div>
-        </div>
-        <button class="btn btn-ghost btn-sm" onclick="showPage('suppliers')">← Back to Scorecards</button>
-      </div>
-      <div id="supplier-tag-manager"></div>
-    </div>
+  // Load users via Supabase admin API
+  const listEl  = document.getElementById('admin-users-list');
+  const countEl = document.getElementById('admin-user-count');
+  const metaEl  = document.getElementById('admin-users-meta');
 
-    <!-- REPORTS -->
-    <div id="page-reports" class="page">
-      <div class="section-header mb-24">
-        <div>
-          <div class="section-title">Meeting Reports</div>
-          <div class="section-sub">Saved snapshots from each Monday meeting — track progress week to week</div>
-        </div>
-        <button class="btn btn-primary" onclick="saveReport()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
-          Save this week's snapshot
-        </button>
-      </div>
-      <div id="reports-list"></div>
-    </div>
+  if (listEl) listEl.innerHTML = '<div class="empty-state"><p>Loading users…</p></div>';
 
-    <!-- ODOO IMPORT -->
-    <div id="page-import" class="page">
-      <div class="section-header mb-20">
-        <div>
-          <div class="section-title">Odoo CSV Import</div>
-          <div class="section-sub">Upload your weekly Odoo export — app auto-maps fields and updates existing jobs</div>
-        </div>
-      </div>
-      <div class="import-panel mb-24">
-        <div class="import-panel-header">
-          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700">Odoo Export Fields</div>
-          <button class="btn btn-xs btn-secondary" onclick="copyOdooTemplate()">Copy field names</button>
-        </div>
-        <div class="import-panel-body">
-          <div style="font-size:12px;color:var(--text3);margin-bottom:14px">
-            In Odoo go to <strong style="color:var(--text2)">Purchases → Orders</strong>, select all rows, click <strong style="color:var(--text2)">Action → Export</strong> and add these columns. Click <em>Copy field names</em> to copy them ready to paste.
-          </div>
-          <div class="odoo-fields" style="margin-bottom:14px">
-            <span class="odoo-field odoo-field-required" title="PO number — used as unique job ID">Order Reference</span>
-            <span class="odoo-field odoo-field-required" title="Service company name">Vendor</span>
-            <span class="odoo-field odoo-field-required" title="Your job/site reference">Vendor Reference</span>
-            <span class="odoo-field odoo-field-required" title="Date PO was raised">Confirmation Date</span>
-            <span class="odoo-field odoo-field-required" title="Your custom job status field">Job Status</span>
-            <span class="odoo-field odoo-field-required" title="PO value">Total</span>
-            <span class="odoo-field odoo-field-required" title="Who raised the PO">Buyer</span>
-            <span class="odoo-field" title="Tax-exclusive PO value">Untaxed Amount</span>
-            <span class="odoo-field" title="Nothing to Bill / Waiting Bills / Fully Billed">Billing Status</span>
-            <span class="odoo-field" title="Amount still outstanding to be invoiced">Amount to Invoice</span>
-            <span class="odoo-field" title="Whether goods/services have been received">Receipt Status</span>
-            <span class="odoo-field" title="Target completion date">Order Deadline</span>
-            <span class="odoo-field" title="Original job/sales order reference">Source Document</span>
-            <span class="odoo-field" title="Internal PO notes">Terms and Conditions</span>
-          </div>
-          <div style="font-size:11px;color:var(--text3)">
-            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:4px;vertical-align:middle"></span>Highlighted fields are essential — the rest add useful detail but won't break the import if missing.
-          </div>
-        </div>
-      </div>
-      <div class="card" style="padding:24px;margin-bottom:20px">
-        <div class="chart-title" style="margin-bottom:16px">Upload CSV</div>
-        <div class="drop-zone" id="drop-zone"
-          ondragover="handleDragOver(event)" ondragleave="handleDragLeave()" ondrop="handleDrop(event)"
-          onclick="document.getElementById('csv-file').click()">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <div style="font-weight:600;margin-bottom:4px;margin-top:10px">Drop CSV here or click to browse</div>
-          <div style="font-size:12px;color:var(--text3)">Exported from Odoo Purchase → Orders</div>
-        </div>
-        <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
-        <div id="import-result" style="margin-top:12px"></div>
-      </div>
+  try {
+    // Use the auth.users view via REST — requires anon key + RLS allows reading own profile
+    // We fetch from auth.users using the service role isn't available client-side,
+    // so we use a profiles approach: list sessions we know about
+    // Best we can do client-side: show current user + any profiles stored
+    const { data: { user } } = await _sb.auth.getUser();
 
-      <!-- INVOICE VALUE IMPORT -->
-      <div class="card" style="padding:24px;margin-bottom:20px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-          <div>
-            <div class="chart-title" style="margin-bottom:4px">Invoice Value Import</div>
-            <div style="font-size:12px;color:var(--text3)">Upload warranty or non-warranty invoice export from Odoo Accounting → Journal Items.<br>
-            Matches on PO number and updates the job value. Jobs without a PO# in the file are skipped.</div>
-          </div>
-        </div>
-        <div class="import-panel-body" style="margin-bottom:16px">
-          <div class="odoo-fields">
-            <span class="odoo-field odoo-field-required" title="Invoice date">Date</span>
-            <span class="odoo-field odoo-field-required" title="Bill/invoice number">Number</span>
-            <span class="odoo-field odoo-field-required" title="Invoice amount">Debit</span>
-            <span class="odoo-field odoo-field-required" title="PO number reference e.g. P03312 (site description)">PO#</span>
-            <span class="odoo-field" title="Account code">Account</span>
-            <span class="odoo-field" title="Service company">Partner</span>
-          </div>
-          <div style="font-size:11px;color:var(--text3);margin-top:8px">
-            Export from <strong style="color:var(--text2)">Odoo → Accounting → Journal Items</strong> — filter by account 57000 (warranty) or 57500 (non-warranty). Accepts XLSX or CSV.
-          </div>
-        </div>
-        <div class="drop-zone" id="invoice-drop-zone"
-          ondragover="handleDragOver(event)" ondragleave="handleDragLeave()"
-          ondrop="handleInvoiceDrop(event)"
-          onclick="document.getElementById('invoice-file').click()">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <div style="font-weight:600;margin-bottom:4px;margin-top:8px">Drop invoice XLSX or CSV here</div>
-          <div style="font-size:12px;color:var(--text3)">Warranty and non-warranty both accepted</div>
-        </div>
-        <input type="file" id="invoice-file" accept=".xlsx,.csv" style="display:none" onchange="handleInvoiceImport(event)">
-        <div id="invoice-import-result" style="margin-top:12px"></div>
-      </div>
-    </div>
+    // Try to get user list from a profiles table if it exists, otherwise show current user only
+    const { data: profiles, error } = await _sb
+      .from('user_profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-    <!-- ADD / EDIT JOB -->
-    <div id="page-add" class="page">
-      <div class="section-header mb-20">
-        <div>
-          <div class="section-title" id="form-page-title">Add New Job</div>
-          <div class="section-sub">Fill in manually or paste Odoo chatter below to auto-extract status history</div>
-        </div>
-      </div>
-      <div class="form-card">
-        <div class="form-section">
-          <div class="form-section-title">Job Details</div>
-          <div class="form-grid">
-            <div class="form-group"><label>PO Number *</label><input type="text" id="f-po" placeholder="PO00123"></div>
-            <div class="form-group">
-              <label>Service Co. *</label>
-              <input type="text" id="f-supplier" placeholder="e.g. BakerGroup, Norfolk" list="supplier-datalist">
-              <datalist id="supplier-datalist"></datalist>
+    let users = [];
+    if (!error && profiles) {
+      users = profiles;
+    } else {
+      // Fallback: just show current user
+      users = [{ email: user.email, id: user.id, created_at: user.created_at, last_sign_in_at: user.last_sign_in_at }];
+    }
+
+    if (countEl) countEl.textContent = users.length;
+    if (metaEl)  metaEl.textContent  = `${users.length} user${users.length !== 1 ? 's' : ''}`;
+
+    if (listEl) {
+      if (!users.length) {
+        listEl.innerHTML = '<div class="empty-state"><p>No users found.</p></div>';
+        return;
+      }
+      listEl.innerHTML = users.map(u => {
+        const isYou = u.email === (_currentSession?.user?.email);
+        const lastSeen = u.last_sign_in_at
+          ? new Date(u.last_sign_in_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+          : 'Never signed in';
+        const joined = u.created_at
+          ? new Date(u.created_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
+          : '—';
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:34px;height:34px;border-radius:50%;background:${isYou ? 'var(--phoenix)' : 'var(--surface3)'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:${isYou ? 'var(--phoenix-dark)' : 'var(--text2)'}">
+                ${(u.email || '?')[0].toUpperCase()}
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(u.email || '—')} ${isYou ? '<span style="background:#fef9c3;color:#854d0e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px">You</span>' : ''}</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">Joined ${joined} · Last sign in: ${lastSeen}</div>
+              </div>
             </div>
-            <div class="form-group"><label>Reference / Site</label><input type="text" id="f-ref" placeholder="e.g. KFC Ringwood — oven repair"></div>
-            <div class="form-group"><label>Equipment</label><input type="text" id="f-equipment" placeholder="e.g. Combi Oven 20GN"></div>
-            <div class="form-group"><label>PO Date *</label><input type="date" id="f-po-date"></div>
-            <div class="form-group">
-              <label>Current Job Status</label>
-              <select id="f-status">
-                <option>Incoming Job</option><option>Job Booked</option>
-                <option>Waiting for Parts</option><option>Revisiting</option>
-                <option>Job Done</option><option>Maintenance</option>
-              </select>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700">Admin</span>
+              ${!isYou ? `<button class="btn btn-danger btn-sm" onclick="adminRemoveUser('${u.id}','${esc(u.email)}')">Remove</button>` : ''}
             </div>
-            <div class="form-group"><label>Order Value ($)</label><input type="text" id="f-value" placeholder="0.00"></div>
-            <div class="form-group"><label>Buyer</label><input type="text" id="f-buyer" placeholder="Peter Houchin"></div>
-            <div class="form-group full"><label>Notes</label><textarea id="f-notes" placeholder="Serial numbers, loan machine details, technician notes..."></textarea></div>
-          </div>
-        </div>
-        <div class="form-section" style="margin-bottom:0">
-          <div class="form-section-title" style="display:flex;justify-content:space-between;align-items:center">
-            <span>Odoo Chatter Log <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">(optional — auto-extracts status history)</span></span>
-            <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('f-chatter').value='';document.getElementById('chatter-preview-box').innerHTML=''">Clear</button>
-          </div>
-          <div class="chatter-box">
-            <div class="chatter-box-header">
-              <span>Paste the chatter section from the Odoo PO page</span>
-              <span class="text-sm" style="color:var(--text3)" id="chatter-parse-status"></span>
-            </div>
-            <textarea id="f-chatter" placeholder="Paste Odoo chatter here to auto-extract status transitions..." oninput="liveParseChatter()"></textarea>
-            <div id="chatter-preview-box"></div>
-          </div>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="saveJob()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
-          <span id="save-btn-label">Save job</span>
-        </button>
-        <button class="btn btn-secondary" onclick="clearForm()">Cancel</button>
-      </div>
-      <div id="form-validation-msg" style="margin-top:10px;font-size:13px;color:var(--red);display:none"></div>
-    </div>
+          </div>`;
+      }).join('');
+    }
+  } catch(err) {
+    if (listEl) listEl.innerHTML = `<div class="empty-state"><p>Could not load users. You may need a service role key for full user management.</p></div>`;
+    if (countEl) countEl.textContent = '1';
+    console.error('Admin load error:', err);
+  }
+}
 
-  </div><!-- /main -->
-</div><!-- /app -->
+async function adminInvitePrompt() {
+  const email = prompt('Enter email address to invite:');
+  if (!email || !email.includes('@')) { showToast('Invalid email'); return; }
 
-<!-- ── MEETING MODE — BOLD YELLOW ── -->
-<div id="meeting-overlay" class="meeting-overlay">
-  <div class="meeting-header">
-    <div class="meeting-logo">
-      <div class="meeting-logo-inner">
-        <div class="meeting-logo-dots">
-          <div class="meeting-logo-dot"></div>
-          <div class="meeting-logo-dot"></div>
-          <div class="meeting-logo-dot"></div>
-          <div class="meeting-logo-dot"></div>
-          <div class="meeting-logo-dot"></div>
-          <div class="meeting-logo-dot hollow"></div>
-        </div>
-        <div>
-          <div class="meeting-logo-text-wrap">PHOENIKS</div>
-          <div class="meeting-logo-sub">Service Meeting</div>
-        </div>
-      </div>
-    </div>
-    <div class="meeting-date" id="meeting-date-display"></div>
-    <div class="meeting-close" onclick="closeMeeting()">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-    </div>
-  </div>
-  <div class="meeting-body">
-    <div class="meeting-slide active" id="slide-0">
-      <div class="slide-label">Slide 1 of 4 — Weekly Overview</div>
-      <div class="meeting-section-title"><div class="dot"></div>This Week's Numbers</div>
-      <div class="meeting-kpi-grid" id="meeting-kpis"></div>
-      <div class="grid-2">
-        <div>
-          <div class="meeting-sub-title">Status Breakdown</div>
-          <div id="meeting-stage-bars"></div>
-        </div>
-        <div>
-          <div class="meeting-sub-title">Service Co. Workload</div>
-          <div id="meeting-supplier-list"></div>
-        </div>
-      </div>
-    </div>
-    <div class="meeting-slide" id="slide-1">
-      <div class="slide-label">Slide 2 of 4 — Needs Attention</div>
-      <div class="meeting-section-title">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3d4043" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        Jobs Needing Attention
-      </div>
-      <div id="meeting-attention-content"></div>
-    </div>
-    <div class="meeting-slide" id="slide-2">
-      <div class="slide-label">Slide 3 of 4 — Active Jobs by Stage</div>
-      <div class="meeting-section-title"><div class="dot"></div>Active Jobs by Stage</div>
-      <div class="status-columns" id="meeting-stage-columns" style="grid-template-columns:repeat(4,1fr)"></div>
-    </div>
-    <div class="meeting-slide" id="slide-3">
-      <div class="slide-label">Slide 4 of 4 — Performance</div>
-      <div class="meeting-section-title"><div class="dot"></div>Where Are We Losing Time?</div>
-      <div class="meeting-bottleneck" id="meeting-bottleneck-content"></div>
-    </div>
-  </div>
-  <div class="meeting-nav">
-    <button class="btn btn-secondary btn-sm" onclick="meetingPrev()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-      Prev
-    </button>
-    <div class="meeting-nav-dots" id="meeting-dots"></div>
-    <button class="btn btn-secondary btn-sm" onclick="meetingNext()">
-      Next
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
-    </button>
-  </div>
-</div>
+  const { error } = await _sb.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: window.location.origin + window.location.pathname,
+      shouldCreateUser: true
+    }
+  });
 
+  if (error) {
+    showToast('Error: ' + error.message);
+  } else {
+    showToast(`Invite sent to ${email}`);
+    renderAdmin();
+  }
+}
 
-<!-- Supplier jobs modal -->
-<div id="supplier-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeSupplierModal()">
-  <div class="modal" style="max-width:640px">
-    <div class="modal-header">
-      <div>
-        <div id="supplier-modal-title" class="modal-title"></div>
-        <div id="supplier-modal-sub" class="modal-subtitle"></div>
-      </div>
-      <button class="modal-close-btn" onclick="closeSupplierModal()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-    <div class="modal-body" id="supplier-modal-body" style="max-height:440px;overflow-y:auto;padding:0"></div>
-  </div>
-</div>
-
-<!-- Job detail modal -->
-<div id="job-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeModal()">
-  <div class="modal">
-    <div class="modal-header">
-      <div>
-        <div class="modal-title" id="modal-po"></div>
-        <div class="modal-subtitle" id="modal-ref"></div>
-      </div>
-      <button class="btn btn-ghost btn-icon" onclick="closeModal()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="modal-body" id="modal-body"></div>
-    <div class="modal-footer">
-      <button class="btn btn-danger btn-sm" id="modal-del-btn">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal()">Close</button>
-      <button class="btn btn-primary" id="modal-edit-btn">Edit job</button>
-    </div>
-  </div>
-</div>
-
-<!-- Confirm dialog -->
-<div id="confirm-overlay" class="confirm-overlay hidden">
-  <div class="confirm-box">
-    <div class="confirm-title" id="confirm-title">Are you sure?</div>
-    <div class="confirm-msg" id="confirm-msg"></div>
-    <div class="confirm-actions">
-      <button class="btn btn-secondary" onclick="confirmResolve(false)">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmResolve(true)" id="confirm-ok-btn">Delete</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── LOADING SCREEN ── -->
-<div id="loading-screen" style="position:fixed;inset:0;background:var(--bg,#f8f9fa);display:flex;align-items:center;justify-content:center;z-index:9999">
-  <div style="text-align:center">
-    <div style="font-size:28px;margin-bottom:12px">🔥</div>
-    <div style="font-size:14px;font-weight:600;color:#374151">Loading Phoeniks…</div>
-    <div style="font-size:12px;color:#9ca3af;margin-top:4px">Connecting to Supabase</div>
-  </div>
-</div>
-
-<!-- ── AUTH MODAL ── -->
-<div id="auth-modal-overlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)closeAuthModal()">
-  <div style="background:white;border-radius:14px;padding:32px;width:360px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
-    <div style="font-size:20px;font-weight:700;margin-bottom:6px">Sign in</div>
-    <div style="font-size:13px;color:#6b7280;margin-bottom:20px">Enter your email and we'll send a magic link. No password needed.</div>
-    <div id="auth-modal-form">
-      <input id="auth-modal-email" type="email" placeholder="you@example.com" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:12px" onkeydown="if(event.key==='Enter')submitMagicLink()">
-      <button id="auth-modal-submit" onclick="submitMagicLink()" style="width:100%;background:#1d4ed8;color:white;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:600;cursor:pointer">Send magic link</button>
-    </div>
-    <div id="auth-magic-sent" class="hidden" style="text-align:center;padding:12px 0">
-      <div style="font-size:28px;margin-bottom:8px">📧</div>
-      <div style="font-weight:600;margin-bottom:4px">Check your email</div>
-      <div style="font-size:13px;color:#6b7280">Click the link in your email to sign in. You can close this.</div>
-    </div>
-    <button onclick="closeAuthModal()" style="margin-top:12px;width:100%;background:none;border:1px solid #e5e7eb;border-radius:8px;padding:9px;font-size:13px;color:#6b7280;cursor:pointer">Cancel</button>
-  </div>
-</div>
-
-<div id="toast" class="toast"></div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="data.js?v=20260600"></script>
-<script src="render.js?v=20260600"></script>
-<script src="meeting.js?v=20260600"></script>
-<script src="app.js?v=20260600"></script>
-
-  <!-- ═══════════════════════════════════════════════
-       PRINT REPORT — hidden on screen, print only
-       Rendered by buildPrintReport() before window.print()
-  ═══════════════════════════════════════════════════ -->
-  <div id="print-report" style="display:none">
-    <!-- content injected by buildPrintReport() -->
-  </div>
-
-  <!-- ── ADMIN PAGE ── -->
-  <div class="page" id="page-admin">
-    <div class="section-header">
-      <div>
-        <div class="section-title">Admin</div>
-        <div class="section-sub">Manage user access and view sign-in activity</div>
-      </div>
-      <button class="btn btn-primary" onclick="adminInvitePrompt()">+ Invite user</button>
-    </div>
-
-    <div class="grid-2" style="margin-bottom:24px">
-      <div class="card" style="padding:20px">
-        <div class="metric-label">Total Users</div>
-        <div class="metric-value" id="admin-user-count">—</div>
-        <div class="metric-sub">invited to this tracker</div>
-      </div>
-      <div class="card" style="padding:20px">
-        <div class="metric-label">Your Account</div>
-        <div class="metric-value" style="font-size:14px;padding-top:6px" id="admin-your-email">—</div>
-        <div class="metric-sub">signed in · full edit access</div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:24px">
-      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-        <div style="font-size:13px;font-weight:700;color:var(--text)">Users</div>
-        <div style="font-size:12px;color:var(--text3)" id="admin-users-meta"></div>
-      </div>
-      <div id="admin-users-list" style="padding:8px 0">
-        <div class="empty-state"><p>Loading…</p></div>
-      </div>
-    </div>
-
-    <div class="card" style="padding:20px">
-      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:12px">Access levels</div>
-      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
-        <div style="display:flex;gap:12px;align-items:center">
-          <span style="background:#fef9c3;color:#854d0e;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">Admin</span>
-          <span style="color:var(--text2)">Can add, edit and delete jobs. Must be invited.</span>
-        </div>
-        <div style="display:flex;gap:12px;align-items:center">
-          <span style="background:var(--surface3);color:var(--text2);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">View only</span>
-          <span style="color:var(--text2)">Anyone with the URL. No login required.</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-
-</body>
-</html>
+async function adminRemoveUser(id, email) {
+  const confirmed = await showConfirm(`Remove ${email}?`, 'They will no longer be able to sign in.');
+  if (!confirmed) return;
+  showToast('User removal requires Supabase dashboard — go to Authentication → Users');
+}
