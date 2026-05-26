@@ -13,11 +13,13 @@ const PAGE_TITLES = {
   parts:      'Parts Tracker',
   suppliers:  'Service Companies',
   reports:    'Meeting Reports',
+  sites:      'Recurring Sites',
+  'supplier-tags': 'Tag Service Companies',
   import:     'Odoo Import',
   add:        'Add / Edit Job',
 };
 
-const NAV_ORDER = ['dashboard','urgent','activity','bottleneck','performance','jobs','parts','suppliers','reports','import','add'];
+const NAV_ORDER = ['dashboard','urgent','activity','bottleneck','performance','jobs','parts','suppliers','sites','reports','import','add'];
 
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -39,6 +41,8 @@ function showPage(name) {
   if (name === 'jobs')       { renderJobs(); populateSupplierDatalist(); }
   if (name === 'parts')      renderParts();
   if (name === 'suppliers')  renderSuppliers();
+  if (name === 'sites')      renderSites();
+  if (name === 'supplier-tags') { renderSupplierTags(); }
   if (name === 'reports')    renderReports();
   if (name === 'add')        populateSupplierDatalist();
 }

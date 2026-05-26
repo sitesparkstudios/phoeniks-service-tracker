@@ -63,13 +63,12 @@ function renderDashboard() {
   if (healthEl) {
     if (hasBillingData && waitingBillsJobs.length > 0) {
       // Show which POs are waiting — actionable
-      const poList = waitingBillsJobs.slice(0,5).map(j=>
+      const poList = waitingBillsJobs.map(j=>
         `<span onclick="openJobModal('${j.id}')" style="cursor:pointer;text-decoration:underline;font-family:'DM Mono',monospace;font-size:11px">${esc(j.po)}</span>`
       ).join(', ');
-      const more = waitingBillsJobs.length > 5 ? ` <span style="color:var(--text3)">+${waitingBillsJobs.length-5} more</span>` : '';
       healthEl.style.display = 'flex';
       healthEl.innerHTML = `<span style="font-size:16px;flex-shrink:0">⚠️</span>
-        <span><strong>${waitingBillsJobs.length} job${waitingBillsJobs.length!==1?'s':''} waiting on bills</strong> — invoices raised in Odoo but not confirmed yet. Chase accounts to match these: ${poList}${more}</span>`;
+        <span><strong>${waitingBillsJobs.length} job${waitingBillsJobs.length!==1?'s':''} waiting on bills</strong> — invoices raised in Odoo but not confirmed yet. Chase accounts to match: ${poList}</span>`;
     } else if (!hasBillingData) {
       const inv90h   = last90h.filter(j=>parseFloat(j.value)>0).length;
       const invRateH = last90h.length ? Math.round(inv90h/last90h.length*100) : null;
@@ -402,7 +401,8 @@ function renderBottleneck() {
   const suppliers = [...new Set(periodJobs.map(j => j.supplier))].sort();
   const supAvg    = suppliers.map(s => {
     const sj = periodJobs.filter(j => j.supplier === s && j.status === 'Job Done');
-    return sj.length ? Math.round(sj.reduce((a,j) => a + (getTotalDays(j)||0), 0) / sj.length) : 0;
+    const sjd = sj.filter(j => getTotalDays(j) !== null);
+    return sjd.length ? Math.round(sjd.reduce((a,j) => a + getTotalDays(j), 0) / sjd.length) : 0;
   }).map((v, i) => ({ s: suppliers[i], v }))
     .filter(d => d.v > 0)
     .sort((a, b) => b.v - a.v);
@@ -442,6 +442,119 @@ function renderBottleneck() {
       <td><strong class="mono" style="color:var(--text)">${total !== null ? total+'d' : '—'}</strong></td>
     </tr>`;
   }).join('');
+
+  // ── ACTIONABLE STEPS ──
+  renderBottleneckActions(avgs, totals, stageAvgs => stageAvgs);
+}
+
+function renderBottleneckActions(avgs, totals) {
+  const el = document.getElementById('bottleneck-actions');
+  if (!el) return;
+
+  const stageNames = ACTIVE_STAGES;
+  const actions = [];
+
+  // Incoming Job slow
+  const incomingAvg = avgs[0];
+  if (incomingAvg > 7) {
+    actions.push({
+      stage: 'Incoming Job',
+      color: incomingAvg > 14 ? 'var(--red)' : 'var(--amber)',
+      icon: '📥',
+      title: `Incoming Job averaging ${incomingAvg}d before being booked`,
+      steps: [
+        'Review all "Incoming Job" POs — are service cos. acknowledging receipt?',
+        'Set a 48-hour acknowledgement SLA — if no response, call and escalate',
+        'Check if POs are being sent to the right contact at each service company',
+        'Consider chasing any job sitting Incoming for more than 3 days directly',
+      ]
+    });
+  }
+
+  // Job Booked slow
+  const bookedAvg = avgs[1];
+  if (bookedAvg > 10) {
+    actions.push({
+      stage: 'Job Booked',
+      color: bookedAvg > 21 ? 'var(--red)' : 'var(--amber)',
+      icon: '📅',
+      title: `Job Booked averaging ${bookedAvg}d before work starts`,
+      steps: [
+        'Ask service companies for their next available booking dates — long delays suggest capacity issues',
+        'For urgent jobs, request priority booking and follow up by phone',
+        'If a service co. is consistently slow to book, consider splitting work with an alternative in that region',
+        'Set a target: jobs should move from Booked to active within 5 working days',
+      ]
+    });
+  }
+
+  // Waiting for Parts slow
+  const partsAvg = avgs[2];
+  const partsCount = totals['Waiting for Parts']?.c || 0;
+  if (partsAvg > 14 || partsCount > 3) {
+    actions.push({
+      stage: 'Waiting for Parts',
+      color: partsAvg > 21 ? 'var(--red)' : 'var(--amber)',
+      icon: '🔩',
+      title: `${partsCount} jobs stuck waiting on parts (avg ${partsAvg}d)`,
+      steps: [
+        'Ask each service co. for an ETA on parts — log these in the Parts Tracker',
+        'For parts overdue by more than 2 weeks, contact the OEM or supplier directly',
+        'Check if a different supplier has the part in stock — sometimes faster to source elsewhere',
+        'Consider pre-stocking common consumables (elements, igniters, thermostats) to reduce wait times',
+        'Ask service cos. to confirm part orders have been placed, not just requested',
+      ]
+    });
+  }
+
+  // Revisiting slow
+  const revisitAvg = avgs[3];
+  const revisitCount = totals['Revisiting']?.c || 0;
+  if (revisitAvg > 14 || revisitCount > 2) {
+    actions.push({
+      stage: 'Revisiting',
+      color: revisitAvg > 21 ? 'var(--red)' : 'var(--amber)',
+      icon: '🔁',
+      title: `${revisitCount} jobs revisiting (avg ${revisitAvg}d) — indicates first-visit failures`,
+      steps: [
+        'Review each revisiting job — was the fault properly diagnosed on the first visit?',
+        'Request a written debrief from the service co. on why a second visit was needed',
+        'Track which service cos. have the most revisits — feed into performance reviews',
+        'For jobs revisiting more than twice, escalate to a senior technician or different company',
+        'Check if revisits are due to parts arriving and needing fitting — these may be unavoidable',
+      ]
+    });
+  }
+
+  if (!actions.length) {
+    el.innerHTML = `<div class="card" style="padding:20px 24px;margin-top:20px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">✅</span>
+        <div>
+          <div style="font-weight:700;color:var(--text)">All stages within normal thresholds</div>
+          <div style="font-size:13px;color:var(--text3);margin-top:2px">No bottlenecks detected for this period. Keep monitoring weekly.</div>
+        </div>
+      </div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = `<div style="margin-top:20px">
+    <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:12px">Actionable Steps</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+    ${actions.map(a => `
+      <div class="card" style="padding:16px 20px;border-left:3px solid ${a.color}">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:18px">${a.icon}</span>
+          <span style="font-weight:700;font-size:13px;color:var(--text)">${a.title}</span>
+        </div>
+        <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px">
+          ${a.steps.map(s => `<li style="font-size:12px;color:var(--text2);line-height:1.5">${s}</li>`).join('')}
+        </ol>
+      </div>
+    `).join('')}
+    </div>
+  </div>`;
 }
 
 /* ── ALL JOBS ── */
@@ -560,33 +673,7 @@ function updatePartsData(jobId, field, value) {
 }
 
 /* ── SUPPLIERS ── */
-function renderSuppliers() {
-  const sortEl  = document.getElementById('supplier-sort');
-  const stateEl = document.getElementById('supplier-state');
-  const sortBy  = sortEl ? sortEl.value : 'name';
-  const stateFilter = stateEl ? stateEl.value : '';
-
-  // Extract state from supplier name if it contains a state code in brackets or suffix
-  // e.g. "BakerGroup VIC" or "Norfolk (NSW)" — fallback: no filter
-  const getState = s => {
-    const m = s.match(/(VIC|NSW|QLD|SA|WA|TAS|ACT|NT)/i);
-    return m ? m[1].toUpperCase() : '';
-  };
-
-  let suppliers = [...new Set(jobs.map(j => j.supplier).filter(Boolean))];
-
-  // State filter
-  if (stateFilter) {
-    suppliers = suppliers.filter(s => getState(s) === stateFilter);
-  }
-
-  if (!suppliers.length) {
-    document.getElementById('supplier-grid').innerHTML = stateFilter
-      ? '<div class="empty-state"><p>No service companies found for ' + stateFilter + '. State is detected from the company name (e.g. "BakerGroup VIC").</p></div>'
-      : '<div class="empty-state"><p>No jobs yet.</p></div>';
-    return;
-  }
-
+function renderSuppliers() {  const sortEl  = document.getElementById('supplier-sort');  const stateEl = document.getElementById('supplier-state');  const sortBy  = sortEl ? sortEl.value : 'name';  const stateFilter = stateEl ? stateEl.value : '';  const tags = loadSupplierTags();  let suppliers = [...new Set(jobs.map(j => j.supplier).filter(Boolean))];  // State filter using pre-loaded map + user tags  if (stateFilter) {    suppliers = suppliers.filter(s => getSupplierState(s, tags) === stateFilter);  }  if (!suppliers.length) {    document.getElementById('supplier-grid').innerHTML = stateFilter      ? `<div class="empty-state"><p>No service companies tagged as <strong>${stateFilter}</strong>. <a href="#" onclick="showPage('supplier-tags');return false" style="color:var(--blue)">Tag your companies →</a></p></div>`      : '<div class="empty-state"><p>No jobs yet.</p></div>';    return;  }
   // Build stats for sorting
   const stats = suppliers.map(s => {
     const sj      = jobs.filter(j => j.supplier === s);
@@ -615,7 +702,10 @@ function renderSuppliers() {
   document.getElementById('supplier-grid').innerHTML = stats.map(({ s, sj, done, open, overdue, critical, avgTotal, pct, st }) => {
     return `<div class="card supplier-card">
       <div class="flex-between mb-12">
-        <div class="supplier-name">${esc(s)}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="supplier-name">${esc(s)}</div>
+          ${getSupplierState(s,tags) ? `<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text3)">${getSupplierState(s,tags)}</span>` : `<span style="font-size:10px;color:var(--text3);cursor:pointer" onclick="showPage('supplier-tags')" title="Tag this company's state">+ tag</span>`}
+        </div>
         ${critical > 0
           ? `<span class="badge b-waiting" style="cursor:pointer;background:var(--red);color:#fff" onclick="openSupplierModal('${s}','overdue');event.stopPropagation()" title="Click to see overdue jobs">${critical} critical ↗</span>`
           : overdue > 0
@@ -859,8 +949,9 @@ function renderPerformance() {
   const totalDone    = donePeriod.length;
   const revisited    = donePeriod.filter(j => j.history?.some(h => h.status === 'Revisiting')).length;
   const fixRate      = totalDone > 0 ? Math.round((1 - revisited / totalDone) * 100) : null;
-  const avgDuration  = totalDone > 0
-    ? Math.round(donePeriod.reduce((a, j) => a + (getTotalDays(j) || 0), 0) / totalDone)
+  const _durJobs = donePeriod.filter(j => getTotalDays(j) !== null);
+  const avgDuration  = _durJobs.length > 0
+    ? Math.round(_durJobs.reduce((a, j) => a + getTotalDays(j), 0) / _durJobs.length)
     : null;
 
   // Compare to previous period for trend arrows
@@ -872,7 +963,8 @@ function renderPerformance() {
     return last && last.date >= prevCutoffStr && last.date < cutoffStr;
   }) : [];
   const prevFixRate   = prevDone.length > 0 ? Math.round((1 - prevDone.filter(j => j.history?.some(h => h.status === 'Revisiting')).length / prevDone.length) * 100) : null;
-  const prevAvgDur    = prevDone.length > 0 ? Math.round(prevDone.reduce((a, j) => a + (getTotalDays(j) || 0), 0) / prevDone.length) : null;
+  const _prevDurJobs = prevDone.filter(j => getTotalDays(j) !== null);
+  const prevAvgDur    = _prevDurJobs.length > 0 ? Math.round(_prevDurJobs.reduce((a, j) => a + getTotalDays(j), 0) / _prevDurJobs.length) : null;
 
   // Currently open jobs > 30 days
   const longOpen = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 30).length;
@@ -1239,7 +1331,8 @@ function buildPrintReport() {
   const now90 = new Date(); now90.setDate(now90.getDate()-90);
   const cut90 = now90.toISOString().split('T')[0];
   const recent90    = done.filter(j=>(j.poDate||'')>=cut90);
-  const avgDur      = recent90.length ? Math.round(recent90.reduce((a,j)=>a+(getTotalDays(j)||0),0)/recent90.length) : null;
+  const _r90dur     = recent90.filter(j=>getTotalDays(j)!==null);
+  const avgDur      = _r90dur.length ? Math.round(_r90dur.reduce((a,j)=>a+getTotalDays(j),0)/_r90dur.length) : null;
   const revisited90 = recent90.filter(j=>j.history?.some(h=>h.status==='Revisiting')).length;
   const fixRate     = recent90.length ? Math.round((1-revisited90/recent90.length)*100) : null;
 
@@ -1557,4 +1650,206 @@ function buildPrintReport() {
   </div>`;
 
   document.getElementById('print-report').innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════════════
+   SUPPLIER STATE TAGS — persisted in localStorage
+   ══════════════════════════════════════════════════════ */
+const SK_SUPPLIER_TAGS = 'phoeniks_supplier_tags_v1';
+
+// Pre-loaded from Phoeniks spreadsheet — state → [supplier name fragments]
+const SUPPLIER_STATE_MAP = {
+  VIC: ['United Catering Repairs','Norfolk Food Services','United Equipment Services'],
+  NSW: ['Gasforce','Coreserve','Mackie Electric','Recom','Bathurst Electrical'],
+  QLD: ['Gold Coast Commercial Services','Bake Repair','Heatec','Chef Tech','MVO Services','Element FSR','Tech Express','Central Commercial Electrics'],
+  WA:  ['CPB','KCI','Ord River Electrics'],
+  SA:  ['Total Commercial Equipment','Bakequip'],
+  ACT: ['Essential Services','Total Catering Equipment','Five Star Electrical','Ritesh','Preferred Services'],
+  TAS: ['EC Fix','Tasmanian Catering Solutions','Warren Services Group'],
+  NT:  ['Dishtec','Arafura Catering Equipment'],
+  QLD_TOWNSVILLE: ['Nitelec Electrical','A1 Electrical','Voltec'],
+  QLD_CAIRNS:     ['Justlec','Tinus Electrical','J & R Refrigeration'],
+  QLD_ROCKHAMPTON:['Central Commercial Electrics'],
+  VIC_WARRNAMBOOL:['Mr Sparkz'],
+  WA_KUNUNURRA:   ['Ord River Electrics'],
+  NATIONAL:       ['Bakergroup','Baker Group'],
+};
+
+function loadSupplierTags() {
+  try {
+    const raw = localStorage.getItem(SK_SUPPLIER_TAGS);
+    return raw ? JSON.parse(raw) : {};
+  } catch(e) { return {}; }
+}
+
+function saveSupplierTags(tags) {
+  try { localStorage.setItem(SK_SUPPLIER_TAGS, JSON.stringify(tags)); } catch(e) {}
+}
+
+function getSupplierState(supplierName, tags) {
+  // 1. Check user-set tags first
+  if (tags && tags[supplierName]) return tags[supplierName];
+  // 2. Check pre-loaded map
+  for (const [state, names] of Object.entries(SUPPLIER_STATE_MAP)) {
+    if (names.some(n => supplierName.toLowerCase().includes(n.toLowerCase()) || n.toLowerCase().includes(supplierName.toLowerCase()))) {
+      // Normalise region codes to base state
+      const base = state.replace(/_.*/, '');
+      return base === 'QLD_TOWNSVILLE' || base === 'QLD_CAIRNS' || base === 'QLD_ROCKHAMPTON' ? 'QLD'
+           : base === 'VIC_WARRNAMBOOL' ? 'VIC'
+           : base === 'WA_KUNUNURRA' ? 'WA'
+           : base === 'NATIONAL' ? 'NAT'
+           : base;
+    }
+  }
+  return '';
+}
+
+function renderSupplierTags() {
+  const el = document.getElementById('supplier-tag-manager');
+  if (!el) return;
+  const tags = loadSupplierTags();
+  const supplierNames = [...new Set(jobs.map(j => j.supplier).filter(Boolean))].sort();
+  const STATES = ['VIC','NSW','QLD','SA','WA','TAS','ACT','NT','NAT','?'];
+
+  el.innerHTML = `
+    <div class="card" style="padding:20px 24px;margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">Service Company — State Tags</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:16px">
+        Known companies are pre-tagged from your spreadsheet. Tag any unknowns below — saved automatically.
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">
+        ${supplierNames.map(s => {
+          const autoState = getSupplierState(s, {});
+          const userState = tags[s] || '';
+          const effectiveState = userState || autoState;
+          const isAuto = !userState && !!autoState;
+          const stateColor = effectiveState === 'NAT' ? 'var(--blue)' : effectiveState ? 'var(--green)' : 'var(--text3)';
+          return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm)">
+            <div style="flex:1;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s)}">${esc(s)}</div>
+            ${isAuto ? `<span style="font-size:10px;color:var(--text3);font-style:italic">auto</span>` : ''}
+            <select onchange="setSupplierTag('${esc(s)}',this.value)"
+              style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:${stateColor};font-weight:700;font-family:var(--font);min-width:70px">
+              <option value="">— tag</option>
+              ${STATES.map(st => `<option value="${st}" ${effectiveState===st?'selected':''}>${st}</option>`).join('')}
+            </select>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function setSupplierTag(supplier, state) {
+  const tags = loadSupplierTags();
+  if (state) tags[supplier] = state;
+  else delete tags[supplier];
+  saveSupplierTags(tags);
+  renderSuppliers();
+}
+
+/* ══════════════════════════════════════════════════════
+   RECURRING SITES — group jobs by site name from ref field
+   Site name = text before the first ' - ' or '-' in the ref
+   ══════════════════════════════════════════════════════ */
+function parseSiteName(ref) {
+  if (!ref) return null;
+  // "GYG Midland - Temp up not turning on" → "GYG Midland"
+  const m = ref.match(/^([^\-–]+?)(?:\s*[-–]|$)/);
+  if (!m) return ref.trim();
+  const site = m[1].trim();
+  return site.length >= 3 ? site : null;
+}
+
+function renderSites() {
+  const el = document.getElementById('sites-content');
+  if (!el) return;
+
+  const serviceJobs = jobs.filter(isServiceJob);
+  const siteMap = {};
+  serviceJobs.forEach(j => {
+    const site = parseSiteName(j.ref);
+    if (!site) return;
+    // Normalise: lowercase for grouping, preserve first-seen casing for display
+    const key = site.toLowerCase().replace(/\s+/g, ' ');
+    if (!siteMap[key]) siteMap[key] = { name: site, jobs: [] };
+    siteMap[key].jobs.push(j);
+  });
+
+  // Only show sites with 2+ jobs
+  const recurring = Object.values(siteMap)
+    .filter(s => s.jobs.length >= 2)
+    .sort((a, b) => b.jobs.length - a.jobs.length);
+
+  if (!recurring.length) {
+    el.innerHTML = `<div class="empty-state"><p>No recurring sites detected yet. Sites are identified from the reference field — e.g. "GYG Midland - temp up not turning on" groups under "GYG Midland".</p></div>`;
+    return;
+  }
+
+  el.innerHTML = recurring.map(site => {
+    const open    = site.jobs.filter(j => j.status !== 'Job Done');
+    const done    = site.jobs.filter(j => j.status === 'Job Done');
+    const urgent  = open.filter(j => daysBetween(j.poDate,null) >= 21);
+    const revisits= site.jobs.filter(j => j.history?.some(h => h.status === 'Revisiting'));
+    const issues  = [...new Set(site.jobs.map(j => {
+      // Extract issue part — text after the first dash
+      const m = (j.ref||'').match(/^[^\-–]+[-–]\s*(.+)/);
+      return m ? m[1].trim() : null;
+    }).filter(Boolean))];
+
+    // Equipment types mentioned
+    const equipment = [...new Set(site.jobs.map(j => j.equipment).filter(Boolean))];
+
+    const statusColor = urgent.length > 0 ? 'var(--red)' : open.length > 0 ? 'var(--amber)' : 'var(--green)';
+    const statusLabel = urgent.length > 0 ? `${urgent.length} urgent` : open.length > 0 ? `${open.length} open` : 'all done';
+
+    return `<div class="card" style="padding:0;margin-bottom:14px;overflow:hidden">
+      <div style="padding:14px 18px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">${esc(site.name)}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+            <span style="font-size:12px;color:var(--text3)">${site.jobs.length} jobs total</span>
+            <span style="color:var(--text3)">·</span>
+            <span style="font-size:12px;font-weight:600;color:${statusColor}">${statusLabel}</span>
+            ${revisits.length > 0 ? `<span style="color:var(--text3)">·</span><span style="font-size:12px;color:var(--amber);font-weight:600">⟳ ${revisits.length} revisit${revisits.length>1?'s':''}</span>` : ''}
+            ${equipment.length ? `<span style="color:var(--text3)">·</span><span style="font-size:11px;color:var(--text3)">${equipment.slice(0,3).map(e=>esc(e)).join(', ')}</span>` : ''}
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:11px;color:var(--text3)">Service cos. used</div>
+          <div style="font-size:12px;font-weight:600;color:var(--text2)">${[...new Set(site.jobs.map(j=>j.supplier))].slice(0,3).map(s=>esc(s)).join(', ')}</div>
+        </div>
+      </div>
+      ${issues.length ? `
+      <div style="padding:10px 18px;background:var(--surface2);border-bottom:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:6px">Issues reported</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          ${issues.slice(0,8).map(i => `<span style="font-size:11px;padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text2)">${esc(i)}</span>`).join('')}
+          ${issues.length > 8 ? `<span style="font-size:11px;color:var(--text3);align-self:center">+${issues.length-8} more</span>` : ''}
+        </div>
+      </div>` : ''}
+      <div style="padding:10px 18px">
+        <table style="width:100%;font-size:12px">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="padding:4px 6px;text-align:left;font-weight:700;color:var(--text3);font-size:11px">PO</th>
+            <th style="padding:4px 6px;text-align:left;font-weight:700;color:var(--text3);font-size:11px">Reference</th>
+            <th style="padding:4px 6px;text-align:left;font-weight:700;color:var(--text3);font-size:11px">Service Co.</th>
+            <th style="padding:4px 6px;text-align:left;font-weight:700;color:var(--text3);font-size:11px">Status</th>
+            <th style="padding:4px 6px;text-align:right;font-weight:700;color:var(--text3);font-size:11px">Age</th>
+          </tr></thead>
+          <tbody>
+            ${site.jobs.sort((a,b)=>(b.poDate||'').localeCompare(a.poDate||'')).map(j => {
+              const d = getTotalDays(j) ?? daysBetween(j.poDate,null);
+              const isDone = j.status === 'Job Done';
+              return `<tr style="border-bottom:1px solid var(--surface2);cursor:pointer" onclick="openJobModal('${j.id}')">
+                <td style="padding:4px 6px"><span class="po-link">${esc(j.po)}</span></td>
+                <td style="padding:4px 6px;color:var(--text2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.ref||'—')}</td>
+                <td style="padding:4px 6px;color:var(--text3)">${esc(j.supplier)}</td>
+                <td style="padding:4px 6px">${badge(j.status)}</td>
+                <td style="padding:4px 6px;text-align:right">${dayChip(d,isDone)}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
 }

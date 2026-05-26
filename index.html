@@ -82,6 +82,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
         Service Cos.
       </div>
+      <div class="nav-item" onclick="showPage('sites')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Recurring Sites
+      </div>
       <div class="nav-item" onclick="showPage('reports')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13,2 13,9 20,9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
         Reports
@@ -441,6 +445,8 @@
         </div>
       </div>
     </div>
+    <div id="bottleneck-actions"></div>
+    </div>
 
     <!-- ALL JOBS -->
     <div id="page-jobs" class="page">
@@ -528,10 +534,35 @@
             <option value="TAS">TAS</option>
             <option value="ACT">ACT</option>
             <option value="NT">NT</option>
+            <option value="NAT">National</option>
           </select>
+          <button class="btn btn-ghost btn-sm" onclick="showPage('supplier-tags')" style="font-size:11px">Tag states ✎</button>
         </div>
       </div>
       <div id="supplier-grid" class="supplier-grid"></div>
+    </div>
+
+    <!-- RECURRING SITES -->
+    <div id="page-sites" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Recurring Sites</div>
+          <div class="section-sub">Sites and locations with multiple service jobs — spot repeat issues</div>
+        </div>
+      </div>
+      <div id="sites-content"></div>
+    </div>
+
+    <!-- SUPPLIER TAG MANAGER -->
+    <div id="page-supplier-tags" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Tag Service Companies by State</div>
+          <div class="section-sub">Known companies are pre-tagged. Manually tag any others to enable state filtering on scorecards.</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="showPage('suppliers')">← Back to Scorecards</button>
+      </div>
+      <div id="supplier-tag-manager"></div>
     </div>
 
     <!-- REPORTS -->
