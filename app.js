@@ -28,6 +28,20 @@ const PAGE_TITLES = {
 
 const NAV_ORDER = ['dashboard','urgent','activity','bottleneck','performance','jobs','parts','suppliers','sites','reports','import','add','admin'];
 
+function toggleSidebar() {
+  const sb = document.querySelector('.sidebar');
+  const ov = document.getElementById('sidebar-overlay');
+  if (sb) sb.classList.toggle('open');
+  if (ov) ov.classList.toggle('active');
+}
+
+function closeSidebar() {
+  const sb = document.querySelector('.sidebar');
+  const ov = document.getElementById('sidebar-overlay');
+  if (sb) sb.classList.remove('open');
+  if (ov) ov.classList.remove('active');
+}
+
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach((n, i) => {
@@ -37,6 +51,8 @@ function showPage(name) {
   if (pg) pg.classList.add('active');
   // Always scroll to top when switching pages
   window.scrollTo(0, 0);
+  // Close sidebar on mobile after navigation
+  closeSidebar();
   const pageTitle = PAGE_TITLES[name] || name;
   document.getElementById('topbar-title').textContent = pageTitle;
   document.body.setAttribute('data-print-page', pageTitle);
