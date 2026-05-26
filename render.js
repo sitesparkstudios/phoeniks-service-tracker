@@ -1493,17 +1493,17 @@ function buildPrintReport() {
     <!-- ══ HEADER ══ -->
     <div style="display:flex;justify-content:space-between;align-items:stretch;margin-bottom:11px;gap:0">
 
-      <!-- Brand block -->
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#1e2024;border-radius:8px;flex-shrink:0">
+      <!-- Brand block — Phoeniks Yellow colour logo -->
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#FFD100;border-radius:8px;flex-shrink:0">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
-          <div style="width:8px;height:8px;border-radius:50%;background:#fff"></div>
-          <div style="width:8px;height:8px;border-radius:50%;background:#fff"></div>
-          <div style="width:8px;height:8px;border-radius:50%;background:#fff"></div>
-          <div style="width:8px;height:8px;border-radius:50%;background:transparent;border:2px solid rgba(255,255,255,0.4);box-sizing:border-box"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:transparent;border:2px solid rgba(61,64,67,0.4);box-sizing:border-box"></div>
         </div>
         <div>
-          <div style="font-size:18px;font-weight:800;letter-spacing:1.5px;color:#fff;line-height:1">PHOENIKS</div>
-          <div style="font-size:7px;font-weight:600;letter-spacing:0.18em;color:rgba(255,255,255,0.5);margin-top:2px">ELECTRIC KITCHEN SPECIALISTS</div>
+          <div style="font-size:18px;font-weight:800;letter-spacing:1.5px;color:#3d4043;line-height:1">PHOENIKS</div>
+          <div style="font-size:7px;font-weight:600;letter-spacing:0.18em;color:rgba(61,64,67,0.6);margin-top:2px">ELECTRIC KITCHEN SPECIALISTS</div>
         </div>
       </div>
 
