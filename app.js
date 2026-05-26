@@ -25,7 +25,7 @@ const PAGE_TITLES = {
   add:        'Add / Edit Job',
 };
 
-const NAV_ORDER = ['dashboard','urgent','activity','bottleneck','performance','jobs','parts','suppliers','sites','reports','import','add'];
+const NAV_ORDER = ['dashboard','urgent','activity','bottleneck','performance','jobs','parts','suppliers','sites','reports','import','add','admin'];
 
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -51,6 +51,7 @@ function showPage(name) {
   if (name === 'supplier-tags') { renderSupplierTags(); }
   if (name === 'reports')    renderReports();
   if (name === 'add')        populateSupplierDatalist();
+  if (name === 'admin')      renderAdmin();
 }
 
 /* ── NAV BADGES ── */
@@ -309,6 +310,9 @@ function updateSidebarDate() {
   await initAuth();     // set _currentSession, wire onAuthStateChange
   await loadData();     // fetch from Supabase
   updateAuthUI();
+  // Show admin nav only when signed in
+  const navAdmin = document.getElementById('nav-admin');
+  if (navAdmin) navAdmin.style.display = isAuthed() ? 'flex' : 'none';
   updateSidebarDate();
   updateNavBadges();
 
@@ -321,3 +325,113 @@ function updateSidebarDate() {
   // Re-open meeting if it was open before refresh
   try { if (localStorage.getItem('phoeniks_meeting_open') === '1') { setTimeout(openMeeting, 100); } } catch(e) {}
 })();
+
+/* ── ADMIN PAGE ── */
+const SUPABASE_ADMIN_URL = 'https://hoeiwbotdkjqzrygmdhs.supabase.co';
+const SUPABASE_ADMIN_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvZWl3Ym90ZGtqcXpyeWdtZGhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzM5NDQsImV4cCI6MjA5NTMwOTk0NH0.u9yyk578jkoPv1QQJqZGmRL8A9RoS2prJtW4KnefxZk';
+
+async function renderAdmin() {
+  if (!isAuthed()) { showPage('dashboard'); showToast('Sign in to access admin'); return; }
+
+  // Show admin nav item
+  const navAdmin = document.getElementById('nav-admin');
+  if (navAdmin) navAdmin.style.display = 'flex';
+
+  // Show your email
+  const emailEl = document.getElementById('admin-your-email');
+  if (emailEl) emailEl.textContent = _currentSession?.user?.email || '—';
+
+  // Load users via Supabase admin API
+  const listEl  = document.getElementById('admin-users-list');
+  const countEl = document.getElementById('admin-user-count');
+  const metaEl  = document.getElementById('admin-users-meta');
+
+  if (listEl) listEl.innerHTML = '<div class="empty-state"><p>Loading users…</p></div>';
+
+  try {
+    // Use the auth.users view via REST — requires anon key + RLS allows reading own profile
+    // We fetch from auth.users using the service role isn't available client-side,
+    // so we use a profiles approach: list sessions we know about
+    // Best we can do client-side: show current user + any profiles stored
+    const { data: { user } } = await _sb.auth.getUser();
+
+    // Try to get user list from a profiles table if it exists, otherwise show current user only
+    const { data: profiles, error } = await _sb
+      .from('user_profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    let users = [];
+    if (!error && profiles) {
+      users = profiles;
+    } else {
+      // Fallback: just show current user
+      users = [{ email: user.email, id: user.id, created_at: user.created_at, last_sign_in_at: user.last_sign_in_at }];
+    }
+
+    if (countEl) countEl.textContent = users.length;
+    if (metaEl)  metaEl.textContent  = `${users.length} user${users.length !== 1 ? 's' : ''}`;
+
+    if (listEl) {
+      if (!users.length) {
+        listEl.innerHTML = '<div class="empty-state"><p>No users found.</p></div>';
+        return;
+      }
+      listEl.innerHTML = users.map(u => {
+        const isYou = u.email === (_currentSession?.user?.email);
+        const lastSeen = u.last_sign_in_at
+          ? new Date(u.last_sign_in_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+          : 'Never signed in';
+        const joined = u.created_at
+          ? new Date(u.created_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
+          : '—';
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:34px;height:34px;border-radius:50%;background:${isYou ? 'var(--phoenix)' : 'var(--surface3)'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:${isYou ? 'var(--phoenix-dark)' : 'var(--text2)'}">
+                ${(u.email || '?')[0].toUpperCase()}
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:var(--text)">${esc(u.email || '—')} ${isYou ? '<span style="background:#fef9c3;color:#854d0e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px">You</span>' : ''}</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">Joined ${joined} · Last sign in: ${lastSeen}</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700">Admin</span>
+              ${!isYou ? `<button class="btn btn-danger btn-sm" onclick="adminRemoveUser('${u.id}','${esc(u.email)}')">Remove</button>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+    }
+  } catch(err) {
+    if (listEl) listEl.innerHTML = `<div class="empty-state"><p>Could not load users. You may need a service role key for full user management.</p></div>`;
+    if (countEl) countEl.textContent = '1';
+    console.error('Admin load error:', err);
+  }
+}
+
+async function adminInvitePrompt() {
+  const email = prompt('Enter email address to invite:');
+  if (!email || !email.includes('@')) { showToast('Invalid email'); return; }
+
+  const { error } = await _sb.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: window.location.origin + window.location.pathname,
+      shouldCreateUser: true
+    }
+  });
+
+  if (error) {
+    showToast('Error: ' + error.message);
+  } else {
+    showToast(`Invite sent to ${email}`);
+    renderAdmin();
+  }
+}
+
+async function adminRemoveUser(id, email) {
+  const confirmed = await showConfirm(`Remove ${email}?`, 'They will no longer be able to sign in.');
+  if (!confirmed) return;
+  showToast('User removal requires Supabase dashboard — go to Authentication → Users');
+}
