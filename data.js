@@ -1,20 +1,77 @@
 /* ============================================================
-   data.js — Storage, constants, helpers, CSV import/export,
-              Odoo chatter parser, parts ETAs, reports
+   data.js — Supabase-backed storage, constants, helpers,
+              CSV import/export, Odoo chatter parser,
+              parts ETAs, reports
+   ============================================================
+   CHANGED FROM ORIGINAL:
+   - loadData() / saveData() / savePartsData() / saveReports()
+     all replaced with Supabase async equivalents
+   - Auth: magic-link email login, signOut
+   - Read-only mode: write functions no-op when !isAuthed()
+   - phoeniks_last_page + phoeniks_meeting_open remain in
+     localStorage (tiny, non-sensitive UI prefs)
    ============================================================ */
 
-const SK        = 'phoeniks_tracker_v3';
-const SK_PARTS  = 'phoeniks_parts_v2';
-const SK_REPORTS= 'phoeniks_reports_v2';
-const SK_OLD    = ['phoeniks_tracker_v2','phoeniks_tracker_v1','phoeniks_parts_v1','phoeniks_reports_v1'];
+// ── SUPABASE CONFIG ─────────────────────────────────────────
+// Replace these two values with your project's URL and anon key.
+// Dashboard → Settings → API
+const SUPABASE_URL = 'https://hoeiwbotdkjqzrygmdhs.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvZWl3Ym90ZGtqcXpyeWdtZGhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzM5NDQsImV4cCI6MjA5NTMwOTk0NH0.u9yyk578jkoPv1QQJqZGmRL8A9RoS2prJtW4KnefxZk';
+
+const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── AUTH HELPERS ────────────────────────────────────────────
+let _currentSession = null;
+
+function isAuthed() { return !!_currentSession; }
+
+async function initAuth() {
+  const { data } = await _sb.auth.getSession();
+  _currentSession = data.session;
+
+  _sb.auth.onAuthStateChange((_event, session) => {
+    _currentSession = session;
+    updateAuthUI();
+  });
+}
+
+async function sendMagicLink(email) {
+  const { error } = await _sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin + window.location.pathname }
+  });
+  return error;
+}
+
+async function signOut() {
+  await _sb.auth.signOut();
+  _currentSession = null;
+  updateAuthUI();
+}
+
+function updateAuthUI() {
+  const signedIn  = document.getElementById('auth-status-bar-signed-in');
+  const signedOut = document.getElementById('auth-status-bar-signed-out');
+  const authEmail = document.getElementById('auth-email');
+
+  if (signedIn)  signedIn.style.display  = isAuthed() ? 'block' : 'none';
+  if (signedOut) signedOut.style.display = isAuthed() ? 'none'  : 'block';
+  if (authEmail) authEmail.textContent   = _currentSession?.user?.email || '';
+}
+
+// ── LEGACY KEYS (kept only for last_page / meeting UI prefs) ─
+const SK_OLD = ['phoeniks_tracker_v3','phoeniks_tracker_v2','phoeniks_tracker_v1',
+                'phoeniks_parts_v2','phoeniks_parts_v1',
+                'phoeniks_reports_v2','phoeniks_reports_v1'];
 
 let jobs          = [];
 let partsData     = {};   // { jobId: { eta, notes } }
-let reportsData   = [];   // [ { date, snapshot } ]
+let reportsData   = [];   // [ { id, date, …snapshot } ]
 let editingId     = null;
 let confirmCallback = null;
+let _dataLoaded   = false;
 
-/* ── STATUS CONSTANTS ── */
+/* ── STATUS CONSTANTS ─────────────────────────────────────── */
 const STATUSES = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting','Job Done','Maintenance'];
 
 const STATUS_BADGE = {
@@ -29,8 +86,7 @@ const STATUS_BADGE = {
 const STAGE_COLORS  = ['#3b82f6','#a855f7','#f59e0b','#ff5f1f','#22c55e','#6b7280'];
 const ACTIVE_STAGES = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting'];
 
-// Maintenance jobs are PPM/scheduled — excluded from KPIs and urgency tracking
-const isServiceJob = j => j.status !== 'Maintenance';
+const isServiceJob  = j => j.status !== 'Maintenance';
 const isOpenService = j => j.status !== 'Job Done' && j.status !== 'Maintenance';
 
 const ODOO_MAP = {
@@ -56,55 +112,212 @@ const ODOO_MAP = {
   'product':            'equipment',
 };
 
-/* ── DEMO DATA ── */
-const DEMO_JOBS = [];
+/* ── ROW MAPPING (DB ↔ JS) ──────────────────────────────────
+   DB uses snake_case; JS uses camelCase. These two functions
+   convert between them so the rest of the app is unchanged.
+   ─────────────────────────────────────────────────────────── */
+function dbRowToJob(row) {
+  return {
+    id:               row.id,
+    po:               row.po,
+    supplier:         row.supplier,
+    ref:              row.ref,
+    equipment:        row.equipment,
+    poDate:           row.po_date,
+    status:           row.status,
+    value:            row.value,
+    valueUntaxed:     row.value_untaxed,
+    buyer:            row.buyer,
+    deadline:         row.deadline,
+    priority:         row.priority,
+    receiptStatus:    row.receipt_status,
+    billingStatus:    row.billing_status,
+    amountToInvoice:  row.amount_to_invoice,
+    sourceDoc:        row.source_doc,
+    notes:            row.notes,
+    addedDate:        row.added_date,
+    history:          row.history || [],
+  };
+}
 
-const DEMO_PARTS = {};
+function jobToDbRow(j) {
+  return {
+    id:               j.id,
+    po:               j.po               || '',
+    supplier:         j.supplier         || '',
+    ref:              j.ref              || '',
+    equipment:        j.equipment        || '',
+    po_date:          j.poDate           || null,
+    status:           j.status           || 'Incoming Job',
+    value:            j.value            || '',
+    value_untaxed:    j.valueUntaxed     || '',
+    buyer:            j.buyer            || '',
+    deadline:         j.deadline         || '',
+    priority:         j.priority         || '',
+    receipt_status:   j.receiptStatus    || '',
+    billing_status:   j.billingStatus    || '',
+    amount_to_invoice: j.amountToInvoice || '',
+    source_doc:       j.sourceDoc        || '',
+    notes:            j.notes            || '',
+    added_date:       j.addedDate        || null,
+    history:          j.history          || [],
+  };
+}
 
-/* ── PERSISTENCE ── */
-function loadData() {
-  // Wipe all old versioned keys
+function dbRowToParts(row) {
+  return { eta: row.eta || '', notes: row.notes || '' };
+}
+
+function dbRowToReport(row) {
+  return {
+    id:        row.id,
+    date:      row.report_date,
+    openJobs:  row.open_jobs,
+    doneJobs:  row.done_jobs,
+    stuck:     row.stuck,
+    avgDays:   row.avg_days,
+    openValue: Number(row.open_value),
+    totalJobs: row.total_jobs,
+    byStatus:  row.by_status,
+    attention: row.attention,
+  };
+}
+
+/* ── LOAD ───────────────────────────────────────────────────
+   Fetches all data from Supabase. Called once on init.
+   Shows a loading screen while in flight.
+   ─────────────────────────────────────────────────────────── */
+async function loadData() {
+  showLoadingScreen(true);
+
+  // Wipe old localStorage data keys (keep UI prefs)
   try { SK_OLD.forEach(k => localStorage.removeItem(k)); } catch(e) {}
 
   try {
-    const raw = localStorage.getItem(SK);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      // If stored data contains demo jobs (id starts with 'demo-'), wipe it
-      const hasDemo = Array.isArray(parsed) && parsed.some(j => (j.id || '').startsWith('demo-'));
-      if (hasDemo) {
-        localStorage.removeItem(SK);
-        localStorage.removeItem(SK_PARTS);
-        localStorage.removeItem(SK_REPORTS);
-        jobs = [];
-        saveData();
-      } else {
-        jobs = parsed;
-      }
-    } else {
-      jobs = [];
-      saveData();
-    }
-  } catch(e) { jobs = []; }
+    // Jobs — order by po_date desc, then updated_at desc
+    const { data: jobRows, error: jobErr } = await _sb
+      .from('jobs')
+      .select('*')
+      .order('updated_at', { ascending: false });
 
-  try {
-    const rp = localStorage.getItem(SK_PARTS);
-    partsData = rp ? JSON.parse(rp) : {};
-    if (!rp) savePartsData();
-  } catch(e) { partsData = {}; }
+    if (jobErr) throw jobErr;
+    jobs = (jobRows || []).map(dbRowToJob);
 
-  try {
-    const rr = localStorage.getItem(SK_REPORTS);
-    reportsData = rr ? JSON.parse(rr) : [];
-  } catch(e) { reportsData = []; }
+    // Parts
+    const { data: partsRows, error: partsErr } = await _sb
+      .from('parts')
+      .select('*');
+
+    if (partsErr) throw partsErr;
+    partsData = {};
+    (partsRows || []).forEach(r => { partsData[r.job_id] = dbRowToParts(r); });
+
+    // Reports — newest first
+    const { data: reportRows, error: rptErr } = await _sb
+      .from('reports')
+      .select('*')
+      .order('report_date', { ascending: false });
+
+    if (rptErr) throw rptErr;
+    reportsData = (reportRows || []).map(dbRowToReport);
+
+    _dataLoaded = true;
+  } catch(err) {
+    console.error('Supabase loadData error:', err);
+    showToast('Failed to load data — check Supabase config');
+  }
+
+  showLoadingScreen(false);
 }
 
-function saveData()      { localStorage.setItem(SK, JSON.stringify(jobs)); }
-function savePartsData() { localStorage.setItem(SK_PARTS, JSON.stringify(partsData)); }
-function saveReports()   { localStorage.setItem(SK_REPORTS, JSON.stringify(reportsData)); }
+function showLoadingScreen(visible) {
+  const el = document.getElementById('loading-screen');
+  if (el) el.classList.toggle('hidden', !visible);
+}
 
-/* ── REPORT SNAPSHOTS ── */
-function saveReport() {
+/* ── SAVE SINGLE JOB ────────────────────────────────────────
+   Upserts one job. Used by saveJob() in app.js.
+   No-op when not authenticated (read-only visitors).
+   ─────────────────────────────────────────────────────────── */
+async function saveData() {
+  if (!isAuthed()) { showToast('Sign in to save changes'); return; }
+
+  // saveData() is called after the in-memory `jobs` array has already
+  // been mutated (by saveJob / deleteJob / importCSV). We upsert the
+  // full array so bulk imports (CSV) are covered in one call.
+  const rows = jobs.map(jobToDbRow);
+  const CHUNK = 200;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const { error } = await _sb.from('jobs').upsert(rows.slice(i, i + CHUNK), { onConflict: 'id' });
+    if (error) { console.error('saveData error:', error); showToast('Save failed — see console'); return; }
+  }
+}
+
+/* ── SAVE ONE JOB (fast path) ───────────────────────────────
+   Called by saveJob() for add/edit to avoid re-upserting
+   the whole array. Falls back to saveData() for bulk imports.
+   ─────────────────────────────────────────────────────────── */
+async function saveOneJob(job) {
+  if (!isAuthed()) { showToast('Sign in to save changes'); return; }
+  const { error } = await _sb.from('jobs').upsert(jobToDbRow(job), { onConflict: 'id' });
+  if (error) { console.error('saveOneJob error:', error); showToast('Save failed — see console'); }
+}
+
+/* ── DELETE JOB ─────────────────────────────────────────────
+   Removes from Supabase. Parts cascade on delete via FK.
+   ─────────────────────────────────────────────────────────── */
+async function deleteJobFromDB(id) {
+  if (!isAuthed()) return;
+  const { error } = await _sb.from('jobs').delete().eq('id', id);
+  if (error) { console.error('deleteJob error:', error); showToast('Delete failed — see console'); }
+}
+
+/* ── PARTS ──────────────────────────────────────────────────
+   partsData is kept in memory. This flushes the whole map.
+   For a single-user tracker the extra roundtrip is negligible.
+   ─────────────────────────────────────────────────────────── */
+async function savePartsData() {
+  if (!isAuthed()) return;
+  // Build upsert rows for all entries
+  const rows = Object.entries(partsData).map(([jobId, v]) => ({
+    job_id: jobId,
+    eta:    v.eta   || '',
+    notes:  v.notes || '',
+  }));
+  if (!rows.length) return;
+  const { error } = await _sb.from('parts').upsert(rows, { onConflict: 'job_id' });
+  if (error) { console.error('savePartsData error:', error); showToast('Parts save failed'); }
+}
+
+/* ── REPORTS ────────────────────────────────────────────────
+   saveReports() is called from saveReport() in this file.
+   ─────────────────────────────────────────────────────────── */
+async function saveReports() {
+  if (!isAuthed()) return;
+  if (!reportsData.length) return;
+  // Only upsert the newest (index 0) — already prepended by saveReport()
+  const r = reportsData[0];
+  const row = {
+    id:          r.id,
+    report_date: r.date,
+    open_jobs:   r.openJobs   || 0,
+    done_jobs:   r.doneJobs   || 0,
+    stuck:       r.stuck      || 0,
+    avg_days:    r.avgDays    || null,
+    open_value:  r.openValue  || 0,
+    total_jobs:  r.totalJobs  || 0,
+    by_status:   r.byStatus   || {},
+    attention:   r.attention  || [],
+  };
+  const { error } = await _sb.from('reports').upsert(row, { onConflict: 'id' });
+  if (error) { console.error('saveReports error:', error); showToast('Report save failed'); }
+}
+
+/* ── REPORT SNAPSHOTS ───────────────────────────────────────
+   Unchanged logic; async only because saveReports() is async
+   ─────────────────────────────────────────────────────────── */
+async function saveReport() {
+  if (!isAuthed()) { showToast('Sign in to save reports'); return; }
   const open   = jobs.filter(j => j.status !== 'Job Done');
   const done   = jobs.filter(j => j.status === 'Job Done');
   const stuck  = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 14);
@@ -126,12 +339,14 @@ function saveReport() {
   STATUSES.forEach(s => { snapshot.byStatus[s] = jobs.filter(j => j.status === s).length; });
 
   reportsData.unshift(snapshot);
-  saveReports();
+  await saveReports();
   showToast('Report saved');
   renderReports();
 }
 
-/* ── MONTHLY SPEND ── */
+/* ── MONTHLY SPEND ──────────────────────────────────────────
+   Unchanged — pure computation from in-memory jobs array
+   ─────────────────────────────────────────────────────────── */
 function getMonthlySpend() {
   const now = new Date();
   const jobDates = jobs.filter(j => j.poDate).map(j => j.poDate).sort();
@@ -160,7 +375,9 @@ function getMonthlySpend() {
   return months;
 }
 
-/* ── DATE / CALC HELPERS ── */
+/* ── DATE / CALC HELPERS ────────────────────────────────────
+   All unchanged — pure functions, no storage
+   ─────────────────────────────────────────────────────────── */
 function today() { return new Date().toISOString().split('T')[0]; }
 
 function daysBetween(a, b) {
@@ -170,7 +387,6 @@ function daysBetween(a, b) {
   return Math.max(0, Math.round((end - start) / 86400000));
 }
 
-// Like daysBetween but returns negative if end is before start (used for ETA countdown)
 function daysUntil(target) {
   if (!target) return null;
   const now = new Date();
@@ -194,9 +410,6 @@ function getDwellTimes(job) {
 function getTotalDays(job) {
   if (!job.poDate) return null;
   if (job.status === 'Job Done') {
-    // Only count duration when we have a real tracked completion (history length > 1)
-    // Jobs imported without chatter have only one entry = import date, which is unreliable.
-    // Counting to today for a done job inflates averages massively (the 450d BakerGroup bug).
     const hist = job.history || [];
     if (hist.length > 1) {
       const lastDate = hist[hist.length - 1]?.date;
@@ -204,12 +417,14 @@ function getTotalDays(job) {
         return daysBetween(job.poDate, lastDate);
       }
     }
-    return null; // exclude from duration averages — no reliable completion date
+    return null;
   }
-  return daysBetween(job.poDate, null); // open jobs: days since PO raised
+  return daysBetween(job.poDate, null);
 }
 
-/* ── RENDER HELPERS ── */
+/* ── RENDER HELPERS ─────────────────────────────────────────
+   Unchanged
+   ─────────────────────────────────────────────────────────── */
 function badge(status) {
   const cls = STATUS_BADGE[status] || 'b-incoming';
   return `<span class="badge ${cls}"><span class="badge-dot"></span>${status}</span>`;
@@ -234,7 +449,9 @@ function esc(str) {
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-/* ── ODOO CSV IMPORT ── */
+/* ── ODOO CSV IMPORT ────────────────────────────────────────
+   Identical logic; saveData() is now async so we await it
+   ─────────────────────────────────────────────────────────── */
 function handleDragOver(e)  { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag-over'); }
 function handleDragLeave()  { document.getElementById('drop-zone').classList.remove('drag-over'); }
 function handleDrop(e) {
@@ -290,8 +507,9 @@ function mapOdooStatus(v) {
 }
 
 function processCSVFile(file) {
+  if (!isAuthed()) { showToast('Sign in to import'); return; }
   const reader = new FileReader();
-  reader.onload = ev => {
+  reader.onload = async ev => {
     const lines   = ev.target.result.split('\n').map(l => l.trim()).filter(l => l);
     if (lines.length < 2) { showImportResult('warn','File appears empty.'); return; }
     const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/^"|"$/g,''));
@@ -299,20 +517,18 @@ function processCSVFile(file) {
     headers.forEach((h,i) => { const mapped = ODOO_MAP[h]; if (mapped) colIdx[mapped] = i; });
     if (colIdx.po === undefined) { showImportResult('warn',`Could not find "Order Reference" column.`); return; }
     let added = 0, updated = 0, skipped = 0, noStatus = 0;
-    const seenPOs = new Set(); // track POs already processed in this CSV
+    const seenPOs = new Set();
     lines.slice(1).forEach(line => {
       const cols = parseCSVLine(line);
       const get  = key => colIdx[key] !== undefined ? (cols[colIdx[key]]||'').trim() : '';
       const po   = get('po').replace(/^"|"$/g,'').trim().toUpperCase();
       if (!po) { skipped++; return; }
-      if (seenPOs.has(po)) { skipped++; return; } // skip duplicate rows in same CSV
+      if (seenPOs.has(po)) { skipped++; return; }
       seenPOs.add(po);
       const rawStatus = get('status');
       const newStatus = mapOdooStatus(rawStatus);
-      // Skip POs with no Job Status — these are procurement/equipment POs, not service jobs
       if (!newStatus) { skipped++; noStatus++; return; }
       const poDate    = normalizeOdooDate(get('poDate')) || today();
-      // Match existing job case-insensitively
       const existing  = jobs.find(j => j.po.trim().toUpperCase() === po);
       if (existing) {
         if (get('supplier'))      existing.supplier      = get('supplier');
@@ -322,13 +538,12 @@ function processCSVFile(file) {
         const dl = normalizeOdooDate(get('deadline')); if (dl && dl !== existing.poDate) existing.deadline = dl;
         if (get('priority'))      existing.priority      = get('priority');
         if (get('receiptStatus')) existing.receiptStatus = get('receiptStatus');
-        if (get('sourceDoc'))        existing.sourceDoc      = get('sourceDoc');
+        if (get('sourceDoc'))     existing.sourceDoc     = get('sourceDoc');
         if (get('odooNotes') && !existing.notes) existing.notes = get('odooNotes');
         if (get('billingStatus'))    existing.billingStatus  = get('billingStatus');
         if (get('amountToInvoice'))  existing.amountToInvoice= get('amountToInvoice');
         if (get('valueUntaxed'))     existing.valueUntaxed   = get('valueUntaxed');
         if (get('receiptStatus'))    existing.receiptStatus  = get('receiptStatus');
-        // Use value from Total; if 0 and untaxed has value, use that
         if (!parseFloat(existing.value) && parseFloat(get('valueUntaxed'))) existing.value = get('valueUntaxed');
         if (existing.status !== newStatus && existing.status !== 'Job Done') {
           if (!existing.history) existing.history = [{ status: existing.status, date: existing.poDate || today() }];
@@ -354,7 +569,7 @@ function processCSVFile(file) {
         added++;
       }
     });
-    saveData();
+    await saveData();   // bulk upsert via Supabase
     renderAll();
     const skipNote = noStatus > 0 ? ` · ${noStatus} skipped (no Job Status — procurement POs)` : skipped > 0 ? ` · ${skipped} skipped` : '';
     showImportResult('success', `Import complete — ${added} new job${added!==1?'s':''} added, ${updated} updated${skipNote}.`);
@@ -372,7 +587,9 @@ function copyOdooTemplate() {
   navigator.clipboard.writeText(fields).then(() => showToast('Field names copied — paste into Odoo export column selector'));
 }
 
-/* ── CSV EXPORT ── */
+/* ── CSV EXPORT ─────────────────────────────────────────────
+   Unchanged — reads in-memory jobs array
+   ─────────────────────────────────────────────────────────── */
 function exportCSV() {
   const header = 'PO,Supplier,Reference,Equipment,PO Date,Status,Value,Buyer,Notes,Total Days';
   const rows   = jobs.map(j =>
@@ -389,7 +606,9 @@ function exportCSV() {
   showToast('CSV exported');
 }
 
-/* ── ODOO CHATTER PARSER ── */
+/* ── ODOO CHATTER PARSER ────────────────────────────────────
+   All unchanged — pure parsing, no storage
+   ─────────────────────────────────────────────────────────── */
 const MONTH_MAP = {
   jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
   january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11
@@ -463,11 +682,9 @@ function liveParseChatter() {
   pe.innerHTML = h;
 }
 
-/* ══════════════════════════════════════════════
-   INVOICE VALUE IMPORT
-   Reads XLSX or CSV from Odoo vendor bills,
-   extracts PO# → value, updates matching jobs
-   ══════════════════════════════════════════════ */
+/* ── INVOICE VALUE IMPORT ───────────────────────────────────
+   saveData() call is now async — awaited
+   ─────────────────────────────────────────────────────────── */
 function handleInvoiceDrop(e) {
   e.preventDefault();
   document.getElementById('invoice-drop-zone').classList.remove('drag-over');
@@ -482,17 +699,15 @@ function handleInvoiceImport(e) {
 }
 
 function processInvoiceFile(file) {
+  if (!isAuthed()) { showToast('Sign in to import'); return; }
   const resEl = document.getElementById('invoice-import-result');
   resEl.innerHTML = '<div class="alert alert-info">Reading file…</div>';
-
   const ext = file.name.split('.').pop().toLowerCase();
-
   if (ext === 'csv') {
     const reader = new FileReader();
     reader.onload = e => parseInvoiceCSV(e.target.result);
     reader.readAsText(file);
   } else if (ext === 'xlsx') {
-    // Read XLSX using FileReader as ArrayBuffer, parse with a lightweight approach
     const reader = new FileReader();
     reader.onload = e => parseInvoiceXLSX(e.target.result);
     reader.readAsArrayBuffer(file);
@@ -502,10 +717,8 @@ function processInvoiceFile(file) {
 }
 
 function parseInvoiceXLSX(buffer) {
-  // Use SheetJS (already available in the browser via CDN if loaded, else fallback to CSV message)
   try {
     if (typeof XLSX === 'undefined') {
-      // SheetJS not loaded — convert hint
       document.getElementById('invoice-import-result').innerHTML =
         '<div class="alert alert-warn">Please save the file as CSV from Excel and re-upload.</div>';
       return;
@@ -537,26 +750,18 @@ function parseInvoiceCSV(text) {
   applyInvoiceRows(rows);
 }
 
-function applyInvoiceRows(rows) {
+async function applyInvoiceRows(rows) {
   let matched = 0, updated = 0, skipped = 0, noMatch = 0;
-
-  // Find column names flexibly
   const firstRow = rows[0] || {};
   const keys = Object.keys(firstRow);
   const findCol = (...names) => keys.find(k => names.some(n => k.toLowerCase().trim() === n.toLowerCase())) || null;
-
-  const colPO     = findCol('po#', 'po', 'purchase order', 'order reference');
-  const colDebit  = findCol('debit', 'amount', 'total', 'untaxed amount');
-  const colDate   = findCol('date', 'invoice date');
-  const colType   = findCol('account', 'type');
-
+  const colPO    = findCol('po#', 'po', 'purchase order', 'order reference');
+  const colDebit = findCol('debit', 'amount', 'total', 'untaxed amount');
   if (!colPO || !colDebit) {
     document.getElementById('invoice-import-result').innerHTML =
       `<div class="alert alert-warn">Could not find required columns. Need "PO#" and "Debit" columns. Found: ${keys.join(', ')}</div>`;
     return;
   }
-
-  // Group by PO — sum all invoice lines for the same PO
   const poTotals = {};
   rows.forEach(row => {
     const rawPO = (row[colPO] || '').toString().trim();
@@ -568,28 +773,18 @@ function applyInvoiceRows(rows) {
     poTotals[po] += val;
     matched++;
   });
-
-  // Apply to jobs
   const updatedPOs = [];
   Object.entries(poTotals).forEach(([po, total]) => {
     const job = jobs.find(j => j.po.trim().toUpperCase() === po);
     if (!job) { noMatch++; return; }
-    if (total > 0) {
-      job.value = total.toFixed(2);
-      updatedPOs.push(po);
-      updated++;
-    }
+    if (total > 0) { job.value = total.toFixed(2); updatedPOs.push(po); updated++; }
   });
-
   if (updated > 0) {
-    saveData();
+    await saveData();
     renderAll();
   }
-
   const msg = `Invoice import complete — <strong>${updated} jobs updated</strong> with invoice values · ${skipped} rows had no PO# · ${noMatch} POs not found in tracker.
     ${updatedPOs.length ? `<div style="margin-top:6px;font-size:11px;color:var(--text3)">Updated: ${updatedPOs.slice(0,10).join(', ')}${updatedPOs.length>10?' …and '+(updatedPOs.length-10)+' more':''}</div>` : ''}`;
   document.getElementById('invoice-import-result').innerHTML =
     `<div class="alert alert-${updated > 0 ? 'success' : 'warn'}">${msg}</div>`;
 }
-
-
