@@ -1604,8 +1604,6 @@ function buildPrintReport() {
           <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Fix rate trend</span><strong style="color:${fixRateTrend===null?'#374151':fixRateTrend>=0?'#16a34a':'#dc2626'}">${fixRateTrend!==null?(fixRateTrend>=0?'▲ +':'▼ ')+Math.abs(fixRateTrend)+'% vs prev':'—'}</strong></div>
           <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Avg duration (90d)</span><strong>${fmtD(avgDur)}</strong></div>
           <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Completed this week</span><strong style="color:${completedThisWeek.length>0?'#16a34a':'#374151'}">${completedThisWeek.length}</strong></div>
-          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Fully billed</span><strong>${fullyBilled}</strong></div>
-          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Waiting bills</span><strong style="color:${waitingBills.length>0?'#d97706':'#374151'}">${waitingBills.length}</strong></div>
           <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#6b7280">This month</span><strong>${mBuckets[mBuckets.length-1]?.count||0} jobs</strong></div>
           ${longestJob?`
           <div style="margin-top:6px;padding-top:6px;border-top:1px solid #e5e7eb">
@@ -1615,15 +1613,7 @@ function buildPrintReport() {
           </div>`:''}
         </div>
 
-        ${waitingBills.length > 0 ? `
-        ${sHead('Waiting on Bills','#d97706',waitingBills.length+' jobs')}
-        <div style="background:#fffcf0;border:1px solid #fde68a;border-radius:6px;padding:6px 8px">
-          ${waitingBills.map(j=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid #fef3c7;font-size:8px">
-            <span style="font-family:'DM Mono',monospace;font-size:7.5px;color:#92400e">${esc(j.po)}</span>
-            <span style="color:#78350f;font-size:7.5px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.supplier)}</span>
-          </div>`).join('')}
-          <div style="font-size:7px;color:#9ba3af;margin-top:3px;font-style:italic">Chase accounts to confirm all ${waitingBills.length}</div>
-        </div>` : ''}
+
       </div>
     </div>
 
@@ -1752,9 +1742,13 @@ function setSupplierTag(supplier, state) {
    ══════════════════════════════════════════════════════ */
 function parseSiteName(ref) {
   if (!ref) return null;
-  // "GYG Midland - Temp up not turning on" → "GYG Midland"
-  const m = ref.match(/^([^\-–]+?)(?:\s*[-–]|$)/);
-  if (!m) return ref.trim();
+  // Strip leading invoice/PO prefixes: "INV-48172 Shaw Estate - ..." → "Shaw Estate - ..."
+  // Patterns: INV-12345, PO-123, P00123, PO 123 at start
+  let cleaned = ref.replace(/^(INV|PO|P0+)[-\s]?\d+\s*/i, '').trim();
+  if (!cleaned) return null;
+  // "Shaw Estate - Temp up not turning on" → "Shaw Estate"
+  const m = cleaned.match(/^([^\-–]+?)(?:\s*[-–]|$)/);
+  if (!m) return cleaned.trim();
   const site = m[1].trim();
   return site.length >= 3 ? site : null;
 }
@@ -1789,6 +1783,10 @@ function renderSites() {
     const done    = site.jobs.filter(j => j.status === 'Job Done');
     const urgent  = open.filter(j => daysBetween(j.poDate,null) >= 21);
     const revisits= site.jobs.filter(j => j.history?.some(h => h.status === 'Revisiting'));
+    const thisYear = new Date().getFullYear().toString();
+    const jobsThisYear = site.jobs.filter(j => (j.poDate||'').startsWith(thisYear)).length;
+    const lastYear = (new Date().getFullYear() - 1).toString();
+    const jobsLastYear = site.jobs.filter(j => (j.poDate||'').startsWith(lastYear)).length;
     const issues  = [...new Set(site.jobs.map(j => {
       // Extract issue part — text after the first dash
       const m = (j.ref||'').match(/^[^\-–]+[-–]\s*(.+)/);
@@ -1809,6 +1807,7 @@ function renderSites() {
             <span style="font-size:12px;color:var(--text3)">${site.jobs.length} jobs total</span>
             <span style="color:var(--text3)">·</span>
             <span style="font-size:12px;font-weight:600;color:${statusColor}">${statusLabel}</span>
+            ${jobsThisYear > 0 ? `<span style="color:var(--text3)">·</span><span style="font-size:12px;font-weight:700;color:${jobsThisYear>=3?'var(--red)':jobsThisYear>=2?'var(--amber)':'var(--text2)'}">⚑ ${jobsThisYear} visit${jobsThisYear!==1?'s':''} this year${jobsLastYear>0?' ('+jobsLastYear+' last year)':''}</span>` : ''}
             ${revisits.length > 0 ? `<span style="color:var(--text3)">·</span><span style="font-size:12px;color:var(--amber);font-weight:600">⟳ ${revisits.length} revisit${revisits.length>1?'s':''}</span>` : ''}
             ${equipment.length ? `<span style="color:var(--text3)">·</span><span style="font-size:11px;color:var(--text3)">${equipment.slice(0,3).map(e=>esc(e)).join(', ')}</span>` : ''}
           </div>
