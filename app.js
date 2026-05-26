@@ -337,92 +337,128 @@ function updateSidebarDate() {
 })();
 
 /* ── ADMIN PAGE ── */
+
+// Stored invited users list (Supabase doesn't expose user list to anon key, so we track in DB)
 async function renderAdmin() {
   if (!isAuthed()) { showPage('dashboard'); showToast('Sign in to access admin'); return; }
 
   const navAdmin = document.getElementById('nav-admin');
   if (navAdmin) navAdmin.style.display = 'flex';
 
-  // Fill stat cards immediately from in-memory data
-  const emailEl   = document.getElementById('admin-your-email');
+  const emailEl    = document.getElementById('admin-your-email');
   const jobCountEl = document.getElementById('admin-job-count');
-  const countEl   = document.getElementById('admin-user-count');
-  const metaEl    = document.getElementById('admin-users-meta');
-  const listEl    = document.getElementById('admin-users-list');
+  const countEl    = document.getElementById('admin-user-count');
+  const metaEl     = document.getElementById('admin-users-meta');
+  const listEl     = document.getElementById('admin-users-list');
 
   if (emailEl)    emailEl.textContent    = _currentSession?.user?.email || '—';
   if (jobCountEl) jobCountEl.textContent = jobs.length || '0';
-  if (listEl)     listEl.innerHTML       = '<div class="empty-state"><p>Loading…</p></div>';
+  if (listEl)     listEl.innerHTML       = '<div style="padding:20px;color:var(--text3);font-size:13px">Loading…</div>';
 
+  // Load invited users from invited_users table
   try {
-    const { data: { user } } = await _sb.auth.getUser();
+    const { data: invited, error } = await _sb.from('invited_users').select('*').order('invited_at', { ascending: false });
 
-    // Show current signed-in user — user_profiles table not required
-    const users = [{ 
-      email: user.email, 
-      id: user.id, 
-      created_at: user.created_at, 
-      last_sign_in_at: user.last_sign_in_at 
-    }];
+    const currentEmail = _currentSession?.user?.email || '';
+    const allUsers = invited && !error ? invited : [];
 
-    if (countEl) countEl.textContent = '1';
-    if (metaEl)  metaEl.textContent  = '1 user with access · Add more via Invite';
+    // Always include current user if not in list
+    const hasSelf = allUsers.some(u => u.email === currentEmail);
+    if (!hasSelf) {
+      allUsers.unshift({ email: currentEmail, invited_at: _currentSession?.user?.created_at, is_self: true });
+    }
+
+    if (countEl) countEl.textContent = allUsers.length;
+    if (metaEl)  metaEl.textContent  = `${allUsers.length} user${allUsers.length !== 1 ? 's' : ''} with access`;
 
     if (listEl) {
-      const u = users[0];
-      const lastSeen = u.last_sign_in_at
-        ? new Date(u.last_sign_in_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
-        : 'Never';
-      const joined = u.created_at
-        ? new Date(u.created_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
-        : '—';
-      listEl.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:38px;height:38px;border-radius:50%;background:var(--phoenix);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--phoenix-dark)">
+      listEl.innerHTML = allUsers.map(u => {
+        const isSelf = u.email === currentEmail || u.is_self;
+        const date = u.invited_at
+          ? new Date(u.invited_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
+          : '—';
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:12px;min-width:0">
+            <div style="width:36px;height:36px;border-radius:50%;background:${isSelf ? 'var(--phoenix)' : 'var(--surface2)'};border:${isSelf ? 'none' : '1px solid var(--border)'};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:${isSelf ? 'var(--phoenix-dark)' : 'var(--text2)'};flex-shrink:0">
               ${(u.email || '?')[0].toUpperCase()}
             </div>
-            <div>
-              <div style="font-size:13px;font-weight:700;color:var(--text)">${esc(u.email || '—')} <span style="background:#fef9c3;color:#854d0e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px">You</span></div>
-              <div style="font-size:11px;color:var(--text3);margin-top:3px">Joined ${joined} · Last sign in: ${lastSeen}</div>
+            <div style="min-width:0">
+              <div style="font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                ${esc(u.email || '—')}
+                ${isSelf ? '<span style="background:#fef9c3;color:#854d0e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px">You</span>' : ''}
+              </div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">Added ${date}</div>
             </div>
           </div>
-          <span style="background:#fef9c3;color:#854d0e;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700">Admin</span>
-        </div>
-        <div style="padding:10px 20px 14px;background:var(--surface2);border-top:1px solid var(--border);font-size:12px;color:var(--text3)">
-          To view or remove other users, go to <strong>Supabase dashboard → Authentication → Users</strong>
+          ${!isSelf ? `<button onclick="adminRemoveUser('${esc(u.email)}')" style="font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--red);cursor:pointer;flex-shrink:0">Remove</button>` : ''}
         </div>`;
+      }).join('');
     }
   } catch(err) {
-    console.error('Admin error:', err);
-    if (listEl) listEl.innerHTML = '<div class="empty-state"><p>Could not load user info.</p></div>';
+    console.error('Admin load error:', err);
+    if (listEl) listEl.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:13px">Could not load users.</div>';
     if (countEl) countEl.textContent = '1';
-    if (metaEl)  metaEl.textContent  = 'You are signed in with admin access';
+    if (metaEl)  metaEl.textContent  = 'You are signed in';
   }
 }
 
-async function adminInvitePrompt() {
-  const email = prompt('Enter email address to invite:');
-  if (!email || !email.includes('@')) { showToast('Invalid email'); return; }
+async function adminInviteFromInput() {
+  const input  = document.getElementById('admin-invite-email');
+  const result = document.getElementById('admin-invite-result');
+  const btn    = document.querySelector('#page-admin .btn-primary');
+  const email  = input ? input.value.trim() : '';
 
-  const { error } = await _sb.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: window.location.origin + window.location.pathname,
-      shouldCreateUser: true
-    }
-  });
+  if (!email || !email.includes('@')) {
+    if (result) { result.style.color = 'var(--red)'; result.textContent = 'Please enter a valid email address.'; }
+    return;
+  }
 
-  if (error) {
-    showToast('Error: ' + error.message);
-  } else {
-    showToast(`Invite sent to ${email}`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  if (result) { result.style.color = 'var(--text3)'; result.textContent = ''; }
+
+  try {
+    // 1. Send magic link (creates user + sends email)
+    const { error: otpErr } = await _sb.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.origin + window.location.pathname,
+        shouldCreateUser: true
+      }
+    });
+
+    if (otpErr) throw otpErr;
+
+    // 2. Record in invited_users table so we can list/remove them
+    await _sb.from('invited_users').upsert({ email, invited_at: new Date().toISOString() }, { onConflict: 'email' });
+
+    if (result) { result.style.color = 'var(--green)'; result.textContent = `✓ Invite sent to ${email} — they'll receive a magic link shortly.`; }
+    if (input)  input.value = '';
+    showToast('Invite sent to ' + email);
     renderAdmin();
+  } catch(err) {
+    const msg = (err.message || '').toLowerCase();
+    let friendly = err.message;
+    if (msg.includes('rate') || msg.includes('429')) friendly = 'Rate limit reached — wait 60 min and try again.';
+    if (result) { result.style.color = 'var(--red)'; result.textContent = 'Error: ' + friendly; }
+    showToast('Error: ' + friendly);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send invite'; }
   }
 }
 
-async function adminRemoveUser(id, email) {
-  const confirmed = await showConfirm(`Remove ${email}?`, 'They will no longer be able to sign in.');
-  if (!confirmed) return;
-  showToast('User removal requires Supabase dashboard — go to Authentication → Users');
+function adminInvitePrompt() {
+  // Legacy — redirect to inline invite
+  document.getElementById('admin-invite-email')?.focus();
+}
+
+async function adminRemoveUser(email) {
+  if (!confirm(`Remove ${email} from the tracker?\nThey will need to be re-invited to regain access.`)) return;
+
+  try {
+    await _sb.from('invited_users').delete().eq('email', email);
+    showToast(`${email} removed`);
+    renderAdmin();
+  } catch(err) {
+    showToast('Error removing user: ' + err.message);
+  }
 }
