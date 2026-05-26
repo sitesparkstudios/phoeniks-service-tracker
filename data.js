@@ -314,16 +314,26 @@ async function wallSignIn() {
   const email = document.getElementById('wall-email').value.trim();
   const btn   = document.getElementById('wall-btn');
   const msg   = document.getElementById('wall-msg');
-  if (!email) { msg.textContent = 'Please enter your email'; return; }
+  if (!email) { msg.style.color = '#dc2626'; msg.textContent = 'Please enter your email address.'; return; }
   btn.disabled = true;
   btn.textContent = 'Sending…';
+  msg.style.color = '#6b7280';
+  msg.textContent = '';
   const error = await sendMagicLink(email);
   if (error) {
-    msg.textContent = 'Error: ' + error.message;
     btn.disabled = false;
     btn.textContent = 'Send magic link';
+    msg.style.color = '#dc2626';
+    if (error.status === 429 || (error.message && error.message.toLowerCase().includes('rate'))) {
+      msg.textContent = 'Too many requests — email rate limit reached. Please wait 30–60 minutes and try again.';
+    } else if (error.message && error.message.toLowerCase().includes('not found')) {
+      msg.textContent = 'That email isn't registered. Contact your admin to be invited.';
+    } else {
+      msg.textContent = 'Error: ' + error.message;
+    }
   } else {
-    msg.textContent = '✓ Check your email and click the link to sign in';
+    msg.style.color = '#16a34a';
+    msg.textContent = '✓ Magic link sent — check your email and click the link to sign in.';
     btn.textContent = 'Link sent!';
   }
 }
