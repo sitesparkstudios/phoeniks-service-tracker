@@ -287,9 +287,9 @@
           <select id="perf-period" onchange="renderPerformance()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
             <option value="1">This month</option>
             <option value="3">Last 3 months</option>
-            <option value="6" selected>Last 6 months</option>
+            <option value="6">Last 6 months</option>
             <option value="12">Last 12 months</option>
-            <option value="all">All time</option>
+            <option value="all" selected>All time</option>
           </select>
         </div>
       </div>
@@ -937,47 +937,83 @@
 
   <!-- ── ADMIN PAGE ── -->
   <div class="page" id="page-admin">
-    <div class="section-header">
+    <div class="section-header mb-24">
       <div>
-        <div class="section-title">Admin</div>
-        <div class="section-sub">Manage user access and view sign-in activity</div>
+        <div class="section-title">ADMIN</div>
+        <div class="section-sub">Manage access, view sign-in activity and tracker health</div>
       </div>
-      <button class="btn btn-primary" onclick="adminInvitePrompt()">+ Invite user</button>
+      <button class="btn btn-primary" onclick="adminInvitePrompt()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        Invite user
+      </button>
     </div>
 
-    <div class="grid-2" style="margin-bottom:24px">
-      <div class="card" style="padding:20px">
+    <!-- Stats row -->
+    <div class="metric-grid" style="margin-bottom:24px">
+      <div class="card metric-card accent-yellow">
+        <div class="metric-label">Signed In As</div>
+        <div id="admin-your-email" style="font-size:13px;font-weight:700;color:var(--text);margin-top:6px;word-break:break-all">—</div>
+        <div class="metric-sub">Full edit access</div>
+      </div>
+      <div class="card metric-card accent-blue">
         <div class="metric-label">Total Users</div>
         <div class="metric-value" id="admin-user-count">—</div>
-        <div class="metric-sub">invited to this tracker</div>
+        <div class="metric-sub">with tracker access</div>
       </div>
-      <div class="card" style="padding:20px">
-        <div class="metric-label">Your Account</div>
-        <div class="metric-value" style="font-size:14px;padding-top:6px" id="admin-your-email">—</div>
-        <div class="metric-sub">signed in · full edit access</div>
+      <div class="card metric-card">
+        <div class="metric-label">Total Jobs in DB</div>
+        <div class="metric-value" id="admin-job-count">—</div>
+        <div class="metric-sub">across all statuses</div>
+      </div>
+      <div class="card metric-card accent-green">
+        <div class="metric-label">Database</div>
+        <div class="metric-value" style="font-size:16px;padding-top:4px">Supabase</div>
+        <div class="metric-sub">Sydney · ap-southeast-2</div>
       </div>
     </div>
 
+    <!-- Users table -->
     <div class="card" style="margin-bottom:24px">
       <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-        <div style="font-size:13px;font-weight:700;color:var(--text)">Users</div>
-        <div style="font-size:12px;color:var(--text3)" id="admin-users-meta"></div>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--text)">Users</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px" id="admin-users-meta">Loading…</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="renderAdmin()">↻ Refresh</button>
       </div>
-      <div id="admin-users-list" style="padding:8px 0">
-        <div class="empty-state"><p>Loading…</p></div>
+      <div id="admin-users-list">
+        <div class="empty-state"><p>Loading users…</p></div>
       </div>
     </div>
 
+    <!-- Invite panel -->
+    <div class="card" style="margin-bottom:24px;padding:24px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">Invite a new user</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:16px">They'll receive a magic link to activate their account. Once set up they can sign in anytime with a new magic link.</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input id="admin-invite-email" type="email" placeholder="colleague@phoeniks.com.au" style="flex:1;border:1px solid var(--border2);border-radius:var(--radius-sm);padding:9px 12px;font-size:13px;font-family:var(--font);background:var(--surface2);color:var(--text)" onkeydown="if(event.key==='Enter')adminInvitePrompt()">
+        <button class="btn btn-primary" onclick="adminInviteFromInput()">Send invite</button>
+      </div>
+      <div id="admin-invite-result" style="margin-top:10px;font-size:12px;min-height:16px"></div>
+    </div>
+
+    <!-- Access levels -->
     <div class="card" style="padding:20px">
-      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:12px">Access levels</div>
-      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
-        <div style="display:flex;gap:12px;align-items:center">
-          <span style="background:#fef9c3;color:#854d0e;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">Admin</span>
-          <span style="color:var(--text2)">Can add, edit and delete jobs. Must be invited.</span>
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:14px">Access levels</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:12px;background:var(--surface2);border-radius:var(--radius-sm)">
+          <span style="background:#fef9c3;color:#854d0e;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px">Admin</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">Full edit access</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px">Can add, edit and delete jobs, import CSVs, save reports. Must be invited via this page.</div>
+          </div>
         </div>
-        <div style="display:flex;gap:12px;align-items:center">
-          <span style="background:var(--surface3);color:var(--text2);padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700">View only</span>
-          <span style="color:var(--text2)">Anyone with the URL. No login required.</span>
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:12px;background:var(--surface2);border-radius:var(--radius-sm)">
+          <span style="background:var(--surface3);color:var(--text2);padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px">View only</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">Read access — login required</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px">Staff with the URL must sign in with their email to view data. No editing permissions.</div>
+          </div>
         </div>
       </div>
     </div>
