@@ -26,8 +26,17 @@ let _currentSession = null;
 function isAuthed() { return !!_currentSession; }
 
 async function initAuth() {
-  const { data } = await _sb.auth.getSession();
-  _currentSession = data.session;
+  // Try to restore + refresh the existing session (silently renews access token)
+  // Supabase JS client stores the refresh token in localStorage and handles renewal.
+  // refreshSession() explicitly forces a new access token if the refresh token is valid.
+  const { data: refreshed } = await _sb.auth.refreshSession();
+  if (refreshed && refreshed.session) {
+    _currentSession = refreshed.session;
+  } else {
+    // No valid refresh token — fall back to getSession (also handles magic link callback)
+    const { data } = await _sb.auth.getSession();
+    _currentSession = data.session;
+  }
 
   _sb.auth.onAuthStateChange((_event, session) => {
     _currentSession = session;
