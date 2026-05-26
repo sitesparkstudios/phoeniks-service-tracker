@@ -35,6 +35,8 @@ function showPage(name) {
   });
   const pg = document.getElementById('page-' + name);
   if (pg) pg.classList.add('active');
+  // Always scroll to top when switching pages
+  window.scrollTo(0, 0);
   const pageTitle = PAGE_TITLES[name] || name;
   document.getElementById('topbar-title').textContent = pageTitle;
   document.body.setAttribute('data-print-page', pageTitle);
