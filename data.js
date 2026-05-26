@@ -45,12 +45,21 @@ async function initAuth() {
 }
 
 async function sendMagicLink(email) {
-  // Note: shouldCreateUser:false can silently fail on some Supabase versions
-  // Instead we send the OTP and let Supabase handle unknown emails with its own message
   const { error } = await _sb.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.origin + window.location.pathname }
+    options: {
+      emailRedirectTo: window.location.origin + window.location.pathname,
+      shouldCreateUser: false   // only allow pre-invited users
+    }
   });
+  // Supabase returns a vague "Database error" when the email isn't in the allowed list.
+  // Return a clearer message instead.
+  if (error) {
+    const msg = (error.message || '').toLowerCase();
+    if (msg.includes('database error') || msg.includes('saving new user')) {
+      error.message = 'That email hasn\'t been invited yet. Ask Sean to add you via the Admin page.';
+    }
+  }
   return error;
 }
 
