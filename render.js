@@ -1579,107 +1579,93 @@ function buildPrintReport() {
       ${kpi(avgDur!==null?avgDur+'d':'—','Avg Duration','#1e2024','last 90 days','#f8f9fa')}
     </div>
 
-    <!-- ══ THREE-COLUMN BODY ══ -->
-    <div style="display:grid;grid-template-columns:1.15fr 1.05fr 0.8fr;gap:8px;align-items:start">
+    <!-- ══ TWO-COLUMN BODY ══ -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start">
 
-      <!-- ── COL 1: OVERDUE ── -->
+      <!-- ── COL 1: OVERDUE + REVISITING ── -->
       <div>
-        ${sHead(`Overdue Jobs <span style="font-weight:500">— 21d+ open</span>`,'#dc2626',urgent.length ? urgent.length+' jobs' : '')}
+        ${sHead(`Overdue Jobs — 21d+ open`,'#dc2626',urgent.length ? urgent.length+' jobs' : '')}
         ${urgent.length ? `
         <table style="width:100%;border-collapse:collapse">
           <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
-          <tbody>${urgent.slice(0,12).map(j=>jobRow(j)).join('')}</tbody>
+          <tbody>${urgent.slice(0,10).map(j=>jobRow(j)).join('')}</tbody>
         </table>
-        ${urgent.length>16?`<div style="font-size:7.5px;color:#9ba3af;padding:4px 0 0 5px;font-style:italic">+${urgent.length-16} more — see Urgent page</div>`:''}
-        ` : `
-        <div style="display:flex;align-items:center;gap:6px;padding:12px 8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;margin-top:4px">
-          <span style="font-size:14px">✓</span>
-          <span style="font-weight:700;color:#16a34a;font-size:9px">No overdue jobs</span>
+        ${urgent.length>10?`<div style="font-size:7px;color:#9ba3af;padding:2px 0 0 5px;font-style:italic">+${urgent.length-10} more — see Urgent page</div>`:''}
+        ` : `<div style="display:flex;align-items:center;gap:6px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;margin-top:3px">
+          <span style="font-size:12px">✓</span><span style="font-weight:700;color:#16a34a;font-size:8.5px">No overdue jobs</span>
         </div>`}
 
         ${sHead('Revisiting Jobs','#d97706',revisiting.length?`${revisiting.length} jobs · avg ${avgRevisit}d`:'')}
         ${revisiting.length ? `
         <table style="width:100%;border-collapse:collapse">
           <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
-          <tbody>${revisiting.slice(0,5).map(j=>jobRow(j)).join('')}</tbody>
+          <tbody>${revisiting.slice(0,4).map(j=>jobRow(j)).join('')}</tbody>
         </table>
-        <div style="font-size:7px;color:#9ba3af;margin-top:3px;font-style:italic;padding-left:4px">High age = not resolving on first visit</div>
-        ` : `
-        <div style="display:flex;align-items:center;gap:6px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;margin-top:4px">
-          <span style="font-size:12px">✓</span>
-          <span style="font-weight:700;color:#16a34a;font-size:9px">No revisiting jobs</span>
+        ` : `<div style="display:flex;align-items:center;gap:6px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;margin-top:3px">
+          <span style="font-size:12px">✓</span><span style="font-weight:700;color:#16a34a;font-size:8.5px">No revisiting jobs</span>
         </div>`}
       </div>
 
-      <!-- ── COL 2: PARTS + SERVICE CO. ── -->
+      <!-- ── COL 2: PARTS + SERVICE CO. + INSIGHTS ── -->
       <div>
         ${sHead('Waiting on Parts','#d97706',waiting.length?`${waiting.length} jobs · avg ${avgParts}d`:'')}
         ${waiting.length ? `
         <table style="width:100%;border-collapse:collapse">
           <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
-          <tbody>${waiting.slice(0,6).map(j=>jobRow(j)).join('')}</tbody>
+          <tbody>${waiting.slice(0,5).map(j=>jobRow(j)).join('')}</tbody>
         </table>
-        ${waiting.length>8?`<div style="font-size:7.5px;color:#9ba3af;padding:3px 0 0 5px;font-style:italic">+${waiting.length-8} more</div>`:''}
-        ` : `
-        <div style="display:flex;align-items:center;gap:6px;padding:10px 8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;margin-top:4px">
-          <span style="font-size:12px">✓</span>
-          <span style="font-weight:700;color:#16a34a;font-size:9px">No parts delays</span>
+        ${waiting.length>5?`<div style="font-size:7px;color:#9ba3af;padding:2px 0 0 5px;font-style:italic">+${waiting.length-5} more</div>`:''}
+        ` : `<div style="display:flex;align-items:center;gap:6px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;margin-top:3px">
+          <span style="font-size:12px">✓</span><span style="font-weight:700;color:#16a34a;font-size:8.5px">No parts delays</span>
         </div>`}
 
-        ${sHead('Service Co. Breakdown','#1e2024')}
-        <table style="width:100%;border-collapse:collapse">
-          <thead><tr>${th('Company')}${th('Open','center')}${th('21d+','center')}${th('30d+','center')}${th('Avg','right')}</tr></thead>
-          <tbody>${supplierStats.slice(0,8).map(x=>`<tr style="border-bottom:1px solid #f3f4f6;font-size:7.5px">
-            ${td(`<span style="font-size:8.5px;font-weight:600;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${esc(x.s)}</span>`)}
-            ${td(`<strong style="font-size:9px">${x.total}</strong>`,'text-align:center')}
-            ${td(x.urgent>0?`<span style="color:#d97706;font-weight:700;font-size:9px">${x.urgent}</span>`:`<span style="color:#d1d5db;font-size:9px">0</span>`,'text-align:center')}
-            ${td(x.critical>0?`<span style="color:#dc2626;font-weight:700;font-size:9px">${x.critical}</span>`:`<span style="color:#d1d5db;font-size:9px">0</span>`,'text-align:center')}
-            ${td(`<span style="font-size:8.5px;color:${x.avg>21?'#dc2626':x.avg>14?'#d97706':'#374151'};font-weight:600">${x.avg}d</span>`,'text-align:right')}
-          </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
+        <!-- Service Co + Stats side by side -->
+        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:6px;margin-top:0">
+          <div>
+            ${sHead('Service Co. Breakdown','#1e2024')}
+            <table style="width:100%;border-collapse:collapse">
+              <thead><tr>${th('Company')}${th('Open','center')}${th('21d+','center')}${th('Avg','right')}</tr></thead>
+              <tbody>${supplierStats.slice(0,7).map(x=>`<tr style="border-bottom:1px solid #f3f4f6">
+                ${td(`<span style="font-size:7.5px;font-weight:600;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${esc(x.s)}</span>`,'padding:2px 4px')}
+                ${td(`<strong style="font-size:8px">${x.total}</strong>`,'text-align:center;padding:2px 4px')}
+                ${td(x.urgent>0?`<span style="color:#d97706;font-weight:700;font-size:8px">${x.urgent}</span>`:`<span style="color:#d1d5db;font-size:8px">—</span>`,'text-align:center;padding:2px 4px')}
+                ${td(`<span style="font-size:8px;color:${x.avg>21?'#dc2626':x.avg>14?'#d97706':'#374151'};font-weight:600">${x.avg}d</span>`,'text-align:right;padding:2px 4px')}
+              </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div>
+            ${sHead('Stage Bottleneck',stageAvgs[0]&&stageAvgs[0].avg>14?'#dc2626':'#1e2024')}
+            ${stageAvgs.slice(0,4).map(d=>{
+              const maxA = stageAvgs[0].avg||1;
+              const barW = Math.round(d.avg/maxA*100);
+              const barC = d.avg>21?'#dc2626':d.avg>14?'#d97706':'#22c55e';
+              const shortName = d.s.replace('Waiting for ','Wait ').replace('Incoming Job','Incoming').replace('Job Booked','Booked');
+              return `<div style="margin-bottom:4px">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1px">
+                  <span style="font-size:7px;font-weight:600;color:#374151">${shortName}</span>
+                  <span style="font-size:7px;font-weight:700;color:${barC}">${d.avg}d</span>
+                </div>
+                <div style="background:#f0f0f0;border-radius:3px;height:4px;overflow:hidden">
+                  <div style="width:${barW}%;background:${barC};height:100%;border-radius:3px"></div>
+                </div>
+              </div>`;
+            }).join('')}
 
-      <!-- ── COL 3: INSIGHTS ── -->
-      <div>
-
-        ${sHead('Stage Bottleneck',stageAvgs[0]&&stageAvgs[0].avg>14?'#dc2626':'#1e2024')}
-        ${stageAvgs.length ? stageAvgs.map(d=>{
-          const maxA = stageAvgs[0].avg||1;
-          const barW = Math.round(d.avg/maxA*100);
-          const barC = d.avg>21?'#dc2626':d.avg>14?'#d97706':'#22c55e';
-          return `<div style="margin-bottom:4px">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1px">
-              <span style="font-size:7.5px;font-weight:600;color:#374151">${d.s}</span>
-              <span style="font-size:7.5px;font-weight:700;color:${barC}">${d.avg}d <span style="color:#9ba3af;font-weight:400">(${d.count})</span></span>
+            ${sHead('Key Stats','#1e2024')}
+            <div style="font-size:7.5px">
+              <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Fix rate (90d)</span><strong style="color:${fixRate!==null&&fixRate>=75?'#16a34a':'#dc2626'}">${fixRate!==null?fixRate+'%':'—'}</strong></div>
+              <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Avg duration</span><strong>${fmtD(avgDur)}</strong></div>
+              <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Done this week</span><strong style="color:${completedThisWeek.length>0?'#16a34a':'#374151'}">${completedThisWeek.length}</strong></div>
+              <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#6b7280">This month</span><strong>${mBuckets[mBuckets.length-1]?.count||0} jobs</strong></div>
+              ${longestJob?`<div style="margin-top:4px;padding-top:4px;border-top:1px solid #e5e7eb">
+                <div style="font-size:6.5px;font-weight:700;text-transform:uppercase;color:#dc2626;margin-bottom:1px">Longest open</div>
+                <div style="font-size:7.5px;font-weight:600;color:#1e2024;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(longestJob.ref||longestJob.po)}</div>
+                <div style="font-size:7px;color:#6b7280">${esc(longestJob.supplier)} · <strong style="color:#dc2626">${longestDays}d</strong></div>
+              </div>`:''}
             </div>
-            <div style="background:#f0f0f0;border-radius:3px;height:4px;overflow:hidden">
-              <div style="width:${barW}%;background:${barC};height:100%;border-radius:3px"></div>
-            </div>
-          </div>`;
-        }).join('') : '<div style="font-size:8px;color:#9ba3af;padding:6px 0">No open stage data</div>'}
-
-        ${sHead('Monthly Volume')}
-        <div style="display:flex;align-items:flex-end;gap:3px;height:34px;margin-bottom:2px">
-          ${volBars}
+          </div>
         </div>
-
-        ${sHead('Key Stats')}
-        <div style="background:#f8f9fa;border:1px solid #e5e7eb;border-radius:7px;padding:8px 9px;font-size:8px">
-          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Fix rate (90d)</span><strong style="color:${fixRate!==null&&fixRate>=75?'#16a34a':'#dc2626'}">${fixRate!==null?fixRate+'%':'—'}</strong></div>
-          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Fix rate trend</span><strong style="color:${fixRateTrend===null?'#374151':fixRateTrend>=0?'#16a34a':'#dc2626'}">${fixRateTrend!==null?(fixRateTrend>=0?'▲ +':'▼ ')+Math.abs(fixRateTrend)+'% vs prev':'—'}</strong></div>
-          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Avg duration (90d)</span><strong>${fmtD(avgDur)}</strong></div>
-          <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Completed this week</span><strong style="color:${completedThisWeek.length>0?'#16a34a':'#374151'}">${completedThisWeek.length}</strong></div>
-          <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#6b7280">This month</span><strong>${mBuckets[mBuckets.length-1]?.count||0} jobs</strong></div>
-          ${longestJob?`
-          <div style="margin-top:6px;padding-top:6px;border-top:1px solid #e5e7eb">
-            <div style="font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#dc2626;margin-bottom:2px">Longest Open Job</div>
-            <div style="font-size:8px;font-weight:600;color:#1e2024">${esc(longestJob.ref||longestJob.po)}</div>
-            <div style="font-size:7.5px;color:#6b7280">${esc(longestJob.supplier)} · <strong style="color:#dc2626">${longestDays}d</strong></div>
-          </div>`:''}
-        </div>
-
-
       </div>
     </div>
 
