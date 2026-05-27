@@ -196,6 +196,7 @@ td.ref-cell { color: var(--text); max-width: 280px; overflow: hidden; text-overf
 .b-waiting    { background: var(--amber-dim);  color: var(--amber);  } .b-waiting    .badge-dot { background: var(--amber); }
 .b-revisiting { background: var(--phoenix-dim);color: #b8960a;       } .b-revisiting .badge-dot { background: #b8960a; }
 .b-done       { background: var(--green-dim);  color: var(--green);  } .b-done       .badge-dot { background: var(--green); }
+.b-closeout   { background: rgba(99,102,241,0.1); color: #4338ca; } .b-closeout   .badge-dot { background: #4338ca; }
 .b-maintenance{ background: var(--surface3);   color: var(--text2);  } .b-maintenance .badge-dot { background: var(--text3); }
 
 /* ── DAY CHIPS ── */
@@ -466,22 +467,32 @@ select {
 
 /* ── PRINT ── */
 @media print {
-  @page { size: A4 portrait; margin: 10mm 12mm; }
+  @page { size: A4 portrait; margin: 8mm 10mm; }
 
   /* Hide everything except the print report */
   body > * { display: none !important; }
+  #sidebar-overlay { display: none !important; }
   #print-report {
     display: block !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 10px !important;
+    font-size: 9px !important;
     color: #1e2024 !important;
     background: #fff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
   }
   #print-report * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    box-sizing: border-box !important;
+  }
+  /* Force single page */
+  #print-report > div {
+    page-break-inside: avoid;
+    overflow: hidden;
   }
 }
 

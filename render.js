@@ -590,8 +590,15 @@ function renderBottleneckActions(avgs, totals) {
 }
 
 /* ── ALL JOBS ── */
+function getSelectedStatuses() {
+  const cbs = document.querySelectorAll('.fs-cb');
+  if (!cbs.length) return null; // no filter = all
+  const checked = [...cbs].filter(c => c.checked).map(c => c.value);
+  return checked;
+}
+
 function renderJobs() {
-  const fs  = document.getElementById('filter-status')?.value  || '';
+  const selectedStatuses = getSelectedStatuses();
   const fsu = document.getElementById('filter-supplier')?.value || '';
   const fq  = (document.getElementById('filter-search')?.value || '').toLowerCase();
 
@@ -599,12 +606,12 @@ function renderJobs() {
   const supSel    = document.getElementById('filter-supplier');
   if (supSel) {
     const cur = supSel.value;
-    supSel.innerHTML = '<option value="">All suppliers</option>' +
+    supSel.innerHTML = '<option value="">All service cos.</option>' +
       suppliers.map(s => `<option ${s===cur?'selected':''}>${esc(s)}</option>`).join('');
   }
 
   const filtered = jobs.filter(j => {
-    if (fs  && j.status   !== fs)  return false;
+    if (selectedStatuses && selectedStatuses.length < 8 && !selectedStatuses.includes(j.status)) return false;
     if (fsu && j.supplier !== fsu) return false;
     if (fq  && !`${j.po} ${j.ref} ${j.supplier} ${j.equipment}`.toLowerCase().includes(fq)) return false;
     return true;

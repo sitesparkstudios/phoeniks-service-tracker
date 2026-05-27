@@ -100,6 +100,7 @@ const STATUS_BADGE = {
   'Waiting for Parts': 'b-waiting',
   'Revisiting':        'b-revisiting',
   'Job Done':          'b-done',
+  'Awaiting Closeout': 'b-closeout',
   'Maintenance':       'b-maintenance',
 };
 

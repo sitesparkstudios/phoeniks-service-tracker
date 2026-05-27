@@ -28,6 +28,46 @@ const PAGE_TITLES = {
 
 const NAV_ORDER = ['dashboard','urgent','activity','bottleneck','performance','jobs','parts','suppliers','sites','reports','import','add','admin'];
 
+function toggleStatusDropdown() {
+  const dd = document.getElementById('status-filter-dropdown');
+  if (dd) dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+
+function statusFilterAll(cb) {
+  document.querySelectorAll('.fs-cb').forEach(c => c.checked = cb.checked);
+  updateStatusFilterLabel();
+  renderJobs();
+}
+
+function statusFilterChange() {
+  const cbs = document.querySelectorAll('.fs-cb');
+  const allChecked = [...cbs].every(c => c.checked);
+  const allCb = document.getElementById('fs-all');
+  if (allCb) allCb.checked = allChecked;
+  updateStatusFilterLabel();
+  renderJobs();
+}
+
+function updateStatusFilterLabel() {
+  const cbs = [...document.querySelectorAll('.fs-cb')];
+  const checked = cbs.filter(c => c.checked);
+  const label = document.getElementById('status-filter-label');
+  if (!label) return;
+  if (checked.length === 0) label.textContent = 'No statuses';
+  else if (checked.length === cbs.length) label.textContent = 'All statuses';
+  else if (checked.length === 1) label.textContent = checked[0].value;
+  else label.textContent = checked.length + ' statuses';
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('status-filter-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    const dd = document.getElementById('status-filter-dropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});
+
 function toggleSidebar() {
   const sb = document.querySelector('.sidebar');
   const ov = document.getElementById('sidebar-overlay');
