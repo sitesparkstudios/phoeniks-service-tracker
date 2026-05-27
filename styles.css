@@ -469,7 +469,6 @@ select {
 @media print {
   @page { size: A4 portrait; margin: 0; }
 
-  /* Hide everything except the print report */
   body > * { display: none !important; }
   #sidebar-overlay { display: none !important; }
 
@@ -478,8 +477,8 @@ select {
     position: fixed !important;
     top: 0; left: 0;
     width: 210mm !important;
-    min-height: 297mm !important;
-    padding: 8mm 9mm !important;
+    height: 297mm !important;
+    padding: 8mm 10mm !important;
     box-sizing: border-box !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
     font-size: 8.5px !important;
@@ -488,22 +487,31 @@ select {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     overflow: hidden !important;
-    page-break-after: avoid !important;
+  }
+  #print-report > div {
+    width: 190mm !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
   }
   #print-report * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     box-sizing: border-box !important;
-    max-width: 100% !important;
   }
   #print-report table {
-    table-layout: fixed;
+    table-layout: fixed !important;
     width: 100% !important;
   }
   #print-report td, #print-report th {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  #print-report td span, #print-report td div {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    display: block !important;
   }
 }
 
