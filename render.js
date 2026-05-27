@@ -1541,44 +1541,52 @@ function buildPrintReport() {
   }).filter(x=>x.total>0).sort((a,b)=>b.critical-a.critical||b.urgent-a.urgent||b.total-a.total);
 
   /* ── HELPERS ── */
-  const th = (txt,align='left') => `<th style="padding:3px 4px;text-align:${align};border-bottom:1.5px solid #e5e7eb;font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;background:#fafafa;overflow:hidden;white-space:nowrap">${txt}</th>`;
-  const td = (txt,style='') => `<td style="padding:2px 4px;overflow:hidden;${style}">${txt}</td>`;
+  const th = (txt,align='left',width='') => `<th style="padding:4px 6px;text-align:${align};border-bottom:2px solid #e5e7eb;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;background:#fafafa;white-space:nowrap${width?';width:'+width:''}">${txt}</th>`;
+  const td = (txt,style='') => `<td style="padding:3px 6px;${style}">${txt}</td>`;
 
   const sHead = (title,color='#1e2024',sub='') => `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0 4px;padding-bottom:3px;border-bottom:1.5px solid ${color}">
-      <span style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:${color}">${title}</span>
-      ${sub?`<span style="font-size:7.5px;color:#9ba3af;font-weight:500">${sub}</span>`:''}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 5px;padding-bottom:4px;border-bottom:2px solid ${color}">
+      <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:${color}">${title}</span>
+      ${sub?`<span style="font-size:9px;color:#9ba3af;font-weight:500">${sub}</span>`:''}
     </div>`;
 
   const kpi = (val, label, color='#1e2024', sub='', bg='#f8f9fa', border='#e5e7eb') => `
-    <div style="background:${bg};border:1px solid ${border};border-radius:6px;padding:6px 5px;text-align:center;position:relative;overflow:hidden">
-      <div style="font-size:19px;font-weight:800;color:${color};line-height:1;letter-spacing:-0.5px">${val}</div>
-      <div style="font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#6b7280;margin-top:2px;line-height:1.3">${label}</div>
-      ${sub?`<div style="font-size:6.5px;color:#9ba3af;margin-top:1px">${sub}</div>`:''}
+    <div style="background:${bg};border:1px solid ${border};border-radius:6px;padding:8px 6px;text-align:center;position:relative;overflow:hidden">
+      <div style="font-size:22px;font-weight:800;color:${color};line-height:1;letter-spacing:-0.5px">${val}</div>
+      <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#6b7280;margin-top:3px;line-height:1.3">${label}</div>
+      ${sub?`<div style="font-size:7.5px;color:#9ba3af;margin-top:1px">${sub}</div>`:''}
     </div>`;
 
-  const pill = (txt, color, bg) => `<span style="display:inline-block;padding:1px 5px;border-radius:10px;font-size:7px;font-weight:700;background:${bg};color:${color}">${txt}</span>`;
+  const pill = (txt, color, bg) => `<span style="display:inline-block;padding:2px 6px;border-radius:10px;font-size:8px;font-weight:700;background:${bg};color:${color}">${txt}</span>`;
 
   const statusDot = (days) => {
-    if (days>=30) return `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#dc2626;flex-shrink:0"></span>`;
-    if (days>=21) return `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#d97706;flex-shrink:0"></span>`;
-    return `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#3b82f6;flex-shrink:0"></span>`;
+    if (days>=30) return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#dc2626;flex-shrink:0;margin-top:1px"></span>`;
+    if (days>=21) return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#d97706;flex-shrink:0;margin-top:1px"></span>`;
+    return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;margin-top:1px"></span>`;
   };
 
-  const jobRow = (j) => {
+  const jobRow = (j, withNotes=false) => {
     const d = daysBetween(j.poDate,null);
     const rowBg = d>=30?'#fff8f8':d>=21?'#fffcf0':'';
     const dayCol = d>=30?'#dc2626':d>=21?'#d97706':'#374151';
-    // Truncate ref to 45 chars to prevent wrapping
-    const refShort = (j.ref||'—').length > 55 ? (j.ref||'—').substring(0,54)+'…' : (j.ref||'—');
-    const supShort = (j.supplier||'').length > 22 ? (j.supplier||'').substring(0,21)+'…' : (j.supplier||'');
-    return `<tr style="border-bottom:1px solid #f0f0f0;background:${rowBg}">
-      <td style="padding:2px 2px;width:8px">${statusDot(d)}</td>
-      <td style="padding:2px 2px;white-space:nowrap;width:32px"><span style="font-family:'DM Mono',monospace;font-size:6.5px;color:#6b7280">${esc(j.po)}</span></td>
-      <td style="padding:2px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="font-weight:600;font-size:7.5px">${esc(refShort)}</span></td>
-      <td style="padding:2px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:25%"><span style="color:#6b7280;font-size:7px">${esc(supShort)}</span></td>
-      <td style="padding:2px 2px;text-align:right;white-space:nowrap;width:18px"><strong style="color:${dayCol};font-size:8px">${d}d</strong></td>
+    const ref = esc(j.ref||'—');
+    const sup = esc(j.supplier||'—');
+    const mainRow = `<tr class="job-block" style="border-bottom:${withNotes?'none':'1px solid #e8e8e8'};background:${rowBg}">
+      <td style="padding:4px 4px;width:14px;vertical-align:top">${statusDot(d)}</td>
+      <td style="padding:4px 5px;white-space:nowrap;vertical-align:top"><span style="font-family:'DM Mono',monospace;font-size:8.5px;color:#6b7280">${esc(j.po)}</span></td>
+      <td style="padding:4px 5px;vertical-align:top"><span style="font-weight:600;font-size:9.5px;color:#1e2024">${ref}</span></td>
+      <td style="padding:4px 5px;vertical-align:top"><span style="color:#6b7280;font-size:9px">${sup}</span></td>
+      <td style="padding:4px 5px;text-align:right;white-space:nowrap;vertical-align:top"><strong style="color:${dayCol};font-size:10px">${d}d</strong></td>
     </tr>`;
+    if (!withNotes) return mainRow;
+    const notesRow = `<tr style="border-bottom:1px solid #e8e8e8;background:${rowBg}">
+      <td style="padding:0 4px 5px;"></td>
+      <td colspan="4" style="padding:2px 5px 6px;">
+        <span style="font-size:8px;font-weight:600;color:#9ba3af;text-transform:uppercase;letter-spacing:0.05em">Notes: </span>
+        <span style="display:inline-block;border-bottom:1px solid #d1d5db;width:calc(100% - 42px);vertical-align:bottom;">&nbsp;</span>
+      </td>
+    </tr>`;
+    return mainRow + notesRow;
   };
 
   // ── VOLUME SPARKLINE BARS ──
@@ -1596,42 +1604,42 @@ function buildPrintReport() {
   }).join('');
 
   const html = `
-  <div style="width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:8.5px;color:#1e2024;-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box">
+  <div style="width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:#1e2024;-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box">
 
     <!-- ══ HEADER ══ -->
-    <div style="display:flex;justify-content:space-between;align-items:stretch;margin-bottom:8px;gap:0">
+    <div style="display:flex;justify-content:space-between;align-items:stretch;margin-bottom:10px;gap:0">
 
-      <!-- Brand block — Phoeniks Yellow colour logo -->
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#FFD100;border-radius:8px;flex-shrink:0">
+      <!-- Brand block -->
+      <div style="display:flex;align-items:center;gap:14px;padding:12px 18px;background:#FFD100;border-radius:8px;flex-shrink:0">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
-          <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:8px;height:8px;border-radius:50%;background:transparent;border:2px solid rgba(61,64,67,0.4);box-sizing:border-box"></div>
+          <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:9px;height:9px;border-radius:50%;background:transparent;border:2px solid rgba(61,64,67,0.4);box-sizing:border-box"></div>
         </div>
         <div>
-          <div style="font-size:18px;font-weight:800;letter-spacing:1.5px;color:#3d4043;line-height:1">PHOENIKS</div>
-          <div style="font-size:7px;font-weight:600;letter-spacing:0.18em;color:rgba(61,64,67,0.6);margin-top:2px">ELECTRIC KITCHEN SPECIALISTS</div>
+          <div style="font-size:20px;font-weight:800;letter-spacing:1.5px;color:#3d4043;line-height:1">PHOENIKS</div>
+          <div style="font-size:8px;font-weight:600;letter-spacing:0.18em;color:rgba(61,64,67,0.6);margin-top:2px">ELECTRIC KITCHEN SPECIALISTS</div>
         </div>
       </div>
 
       <!-- Centre headline -->
-      <div style="flex:1;display:flex;align-items:center;padding:0 16px;background:#f8f9fa;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb">
+      <div style="flex:1;display:flex;align-items:center;padding:0 18px;background:#f8f9fa;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb">
         <div>
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#9ba3af">Monday Morning Report</div>
-          <div style="font-size:13px;font-weight:700;color:#1e2024;margin-top:1px">${dayName}, ${dateStr}</div>
-          <div style="font-size:8px;color:#6b7280;margin-top:2px">${headline}</div>
+          <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#9ba3af">Monday Morning Report</div>
+          <div style="font-size:15px;font-weight:700;color:#1e2024;margin-top:2px">${dayName}, ${dateStr}</div>
+          <div style="font-size:9.5px;color:#6b7280;margin-top:3px">${headline}</div>
         </div>
       </div>
 
       <!-- Meta block -->
-      <div style="text-align:right;padding:10px 14px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:8px;display:flex;flex-direction:column;justify-content:center;gap:2px;flex-shrink:0;min-width:130px">
-        <div style="font-size:7.5px;color:#9ba3af;line-height:1.4">Sean Pickford<br>Technical Service Manager</div>
+      <div style="text-align:right;padding:12px 16px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:8px;display:flex;flex-direction:column;justify-content:center;gap:3px;flex-shrink:0;min-width:140px">
+        <div style="font-size:9px;color:#9ba3af;line-height:1.5">Sean Pickford<br>Technical Service Manager</div>
       </div>
     </div>
 
     <!-- ══ KPI STRIP ══ -->
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:7px">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:10px">
       ${kpi(allOpen.length,'Open Jobs','#1e2024','all service jobs','#f8f9fa')}
       ${kpi(urgent.length,'Overdue 21d+',urgent.length>0?'#dc2626':'#16a34a',urgent.length>0?`${critical.length} critical`:'all on track',urgent.length>0?'#fff8f8':'#f0fdf4',urgent.length>0?'#fecaca':'#bbf7d0')}
       ${kpi(critical.length,'Critical 30d+',critical.length>0?'#dc2626':'#16a34a','needs action now',critical.length>0?'#fff8f8':'#f8f9fa',critical.length>0?'#fecaca':'#e5e7eb')}
@@ -1643,103 +1651,112 @@ function buildPrintReport() {
 
     <!-- ══ WINS STRIP ══ -->
     ${wins.length ? `
-    <div style="background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1.5px solid #86efac;border-radius:7px;padding:7px 12px;margin-bottom:8px">
-      <div style="font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#15803d;margin-bottom:4px">✅ Wins this week</div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px">
-        ${wins.map(w => `<span style="font-size:7.5px;color:#166534;padding:2px 8px;background:white;border:1px solid #86efac;border-radius:10px;font-weight:600">${w}</span>`).join('')}
+    <div style="background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1.5px solid #86efac;border-radius:7px;padding:8px 14px;margin-bottom:10px">
+      <div style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#15803d;margin-bottom:5px">✅ Wins this week</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        ${wins.map(w => `<span style="font-size:9px;color:#166534;padding:3px 10px;background:white;border:1px solid #86efac;border-radius:10px;font-weight:600">${w}</span>`).join('')}
       </div>
     </div>` : `
-    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:6px 10px;margin-bottom:7px">
-      <span style="font-size:7.5px;font-weight:700;color:#16a34a">✅ All jobs tracking normally — no critical issues this week</span>
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:7px 12px;margin-bottom:10px">
+      <span style="font-size:9px;font-weight:700;color:#16a34a">✅ All jobs tracking normally — no critical issues this week</span>
     </div>`}
 
     <!-- ══ TWO-COLUMN BODY ══ -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
 
       <!-- ── COL 1: OVERDUE + REVISITING ── -->
       <div>
         ${sHead(`Overdue Jobs — 21d+ open`,'#dc2626',urgent.length ? urgent.length+' jobs' : '')}
         ${urgent.length ? `
-        <table style="width:100%;border-collapse:collapse;table-layout:fixed">
-          <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
-          <tbody>${urgent.slice(0,10).map(j=>jobRow(j)).join('')}</tbody>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th style="width:14px;border-bottom:2px solid #e5e7eb;background:#fafafa;padding:4px 4px"></th>
+            ${th('PO','left','60px')}${th('Reference')}${th('Service Co.')}${th('Age','right','36px')}
+          </tr></thead>
+          <tbody>${urgent.slice(0,12).map(j=>jobRow(j,true)).join('')}</tbody>
         </table>
-        ${urgent.length>10?`<div style="font-size:7px;color:#9ba3af;padding:2px 0 0 5px;font-style:italic">+${urgent.length-10} more — see Urgent page</div>`:''}
-        ` : `<div style="display:flex;align-items:center;gap:6px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;margin-top:3px">
-          <span style="font-size:12px">✓</span><span style="font-weight:700;color:#16a34a;font-size:8.5px">No overdue jobs</span>
+        ${urgent.length>12?`<div style="font-size:8.5px;color:#9ba3af;padding:3px 0 0 5px;font-style:italic">+${urgent.length-12} more — see Urgent page</div>`:''}
+        ` : `<div style="display:flex;align-items:center;gap:8px;padding:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;margin-top:4px">
+          <span style="font-size:14px">✓</span><span style="font-weight:700;color:#16a34a;font-size:10px">No overdue jobs</span>
         </div>`}
 
         ${sHead('Revisiting Jobs','#d97706',revisiting.length?`${revisiting.length} jobs · avg ${avgRevisit}d`:'')}
         ${revisiting.length ? `
-        <table style="width:100%;border-collapse:collapse;table-layout:fixed">
-          <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
-          <tbody>${revisiting.slice(0,4).map(j=>jobRow(j)).join('')}</tbody>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th style="width:14px;border-bottom:2px solid #e5e7eb;background:#fafafa;padding:4px 4px"></th>
+            ${th('PO','left','60px')}${th('Reference')}${th('Service Co.')}${th('Age','right','36px')}
+          </tr></thead>
+          <tbody>${revisiting.slice(0,5).map(j=>jobRow(j,true)).join('')}</tbody>
         </table>
-        ` : `<div style="display:flex;align-items:center;gap:6px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;margin-top:3px">
-          <span style="font-size:12px">✓</span><span style="font-weight:700;color:#16a34a;font-size:8.5px">No revisiting jobs</span>
+        ` : `<div style="display:flex;align-items:center;gap:8px;padding:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;margin-top:4px">
+          <span style="font-size:14px">✓</span><span style="font-weight:700;color:#16a34a;font-size:10px">No revisiting jobs</span>
         </div>`}
       </div>
 
-      <!-- ── COL 2: PARTS + SERVICE CO. + INSIGHTS ── -->
+      <!-- ── COL 2: PARTS + SERVICE CO. + CHART + STATS ── -->
       <div>
         ${sHead('Waiting on Parts','#d97706',waiting.length?`${waiting.length} jobs · avg ${avgParts}d`:'')}
         ${waiting.length ? `
-        <table style="width:100%;border-collapse:collapse;table-layout:fixed">
-          <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
-          <tbody>${waiting.slice(0,6).map(j=>jobRow(j)).join('')}</tbody>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th style="width:14px;border-bottom:2px solid #e5e7eb;background:#fafafa;padding:4px 4px"></th>
+            ${th('PO','left','60px')}${th('Reference')}${th('Service Co.')}${th('Age','right','36px')}
+          </tr></thead>
+          <tbody>${waiting.slice(0,7).map(j=>jobRow(j,true)).join('')}</tbody>
         </table>
-        ${waiting.length>6?`<div style="font-size:7px;color:#9ba3af;padding:2px 0 0 5px;font-style:italic">+${waiting.length-6} more overleaf</div>`:''}
-        ` : `<div style="display:flex;align-items:center;gap:6px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;margin-top:3px">
-          <span style="font-size:12px">✓</span><span style="font-weight:700;color:#16a34a;font-size:8.5px">No parts delays</span>
+        ${waiting.length>7?`<div style="font-size:8.5px;color:#9ba3af;padding:3px 0 0 5px;font-style:italic">+${waiting.length-7} more — see Parts Tracker</div>`:''}
+        ` : `<div style="display:flex;align-items:center;gap:8px;padding:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;margin-top:4px">
+          <span style="font-size:14px">✓</span><span style="font-weight:700;color:#16a34a;font-size:10px">No parts delays</span>
         </div>`}
 
-        <!-- Service Co + Stats side by side -->
-        <div style="display:grid;grid-template-columns:1.2fr 0.8fr;gap:5px;margin-top:0">
+        <!-- Service Co + Chart/Stats side by side -->
+        <div style="display:grid;grid-template-columns:1.3fr 0.7fr;gap:8px;margin-top:2px">
           <div>
             ${sHead('Service Co. Breakdown','#1e2024')}
-            <table style="width:100%;border-collapse:collapse;table-layout:fixed">
-              <thead><tr>${th('Company')}${th('Open','center')}${th('21d+','center')}${th('Avg','right')}</tr></thead>
-              <tbody>${supplierStats.slice(0,7).map(x=>`<tr style="border-bottom:1px solid #f3f4f6">
-                ${td(`<span style="font-size:7.5px;font-weight:600;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${esc(x.s)}</span>`,'padding:2px 4px')}
-                ${td(`<strong style="font-size:8px">${x.total}</strong>`,'text-align:center;padding:2px 4px')}
-                ${td(x.urgent>0?`<span style="color:#d97706;font-weight:700;font-size:8px">${x.urgent}</span>`:`<span style="color:#d1d5db;font-size:8px">—</span>`,'text-align:center;padding:2px 4px')}
-                ${td(`<span style="font-size:8px;color:${x.avg>21?'#dc2626':x.avg>14?'#d97706':'#374151'};font-weight:600">${x.avg}d</span>`,'text-align:right;padding:2px 4px')}
+            <table style="width:100%;border-collapse:collapse">
+              <thead><tr>${th('Company')}${th('Open','center','32px')}${th('21d+','center','32px')}${th('Avg','right','38px')}</tr></thead>
+              <tbody>${supplierStats.slice(0,8).map(x=>`<tr style="border-bottom:1px solid #f3f4f6">
+                ${td(`<span style="font-size:9px;font-weight:600">${esc(x.s)}</span>`,'padding:3px 6px')}
+                ${td(`<strong style="font-size:9.5px">${x.total}</strong>`,'text-align:center;padding:3px 6px')}
+                ${td(x.urgent>0?`<span style="color:#d97706;font-weight:700;font-size:9.5px">${x.urgent}</span>`:`<span style="color:#d1d5db;font-size:9.5px">—</span>`,'text-align:center;padding:3px 6px')}
+                ${td(`<span style="font-size:9.5px;color:${x.avg>21?'#dc2626':x.avg>14?'#d97706':'#374151'};font-weight:600">${x.avg}d</span>`,'text-align:right;padding:3px 6px')}
               </tr>`).join('')}
               </tbody>
             </table>
           </div>
           <div>
-            ${sHead('Monthly Jobs Completed','#1e2024')}
-            <div style="display:flex;align-items:flex-end;gap:2px;height:32px;margin-bottom:3px">
+            ${sHead('Monthly Volume','#1e2024')}
+            <div style="display:flex;align-items:flex-end;gap:3px;height:44px;margin-bottom:4px">
               ${mBuckets.map(b => {
                 const maxV = Math.max(...mBuckets.map(x=>x.count),1);
                 const pct = Math.max(Math.round(b.count/maxV*100),4);
                 const isLatest = b === mBuckets[mBuckets.length-1];
                 const isPrev = b === mBuckets[mBuckets.length-2];
                 return '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex:1">'
-                  + '<div style="font-size:6px;font-weight:' + (isLatest?'800':'500') + ';color:' + (isLatest?'#1e2024':'#9ba3af') + '">' + b.count + '</div>'
-                  + '<div style="width:100%;background:#e5e7eb;border-radius:2px 2px 0 0;height:24px;display:flex;align-items:flex-end">'
+                  + '<div style="font-size:7.5px;font-weight:' + (isLatest?'800':'500') + ';color:' + (isLatest?'#1e2024':'#9ba3af') + '">' + b.count + '</div>'
+                  + '<div style="width:100%;background:#e5e7eb;border-radius:2px 2px 0 0;height:32px;display:flex;align-items:flex-end">'
                   + '<div style="width:100%;height:' + pct + '%;background:' + (isLatest?'#3d4043':isPrev?'#9ba3af':'#d1d5db') + ';border-radius:2px 2px 0 0"></div>'
                   + '</div>'
-                  + '<div style="font-size:5.5px;color:#9ba3af;text-align:center">' + b.label + '</div>'
+                  + '<div style="font-size:6.5px;color:#9ba3af;text-align:center">' + b.label + '</div>'
                   + '</div>';
               }).join('')}
             </div>
-            <div style="font-size:7px;color:${weekVsLastWeek>0?'#16a34a':weekVsLastWeek<0?'#dc2626':'#6b7280'};font-weight:600;margin-bottom:4px">
-              This week: ${completedThisWeek.length} jobs ${weekVsLastWeek>0?'▲ +'+weekVsLastWeek+' vs last week':weekVsLastWeek<0?'▼ '+Math.abs(weekVsLastWeek)+' vs last week':'· same as last week'}
+            <div style="font-size:8.5px;color:${weekVsLastWeek>0?'#16a34a':weekVsLastWeek<0?'#dc2626':'#6b7280'};font-weight:600;margin-bottom:6px">
+              This week: ${completedThisWeek.length} ${weekVsLastWeek>0?'▲ +'+weekVsLastWeek:weekVsLastWeek<0?'▼ '+Math.abs(weekVsLastWeek):'·'} vs last
             </div>
 
             ${sHead('Key Stats','#1e2024')}
-            <div style="font-size:7px">
-              <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Done this week</span><strong style="color:${completedThisWeek.length>0?'#16a34a':'#374151'}">${completedThisWeek.length} <span style="font-weight:400;color:${weekVsLastWeek>=0?'#16a34a':'#dc2626'}">(${weekVsLastWeek>=0?'+':''}${weekVsLastWeek} vs last wk)</span></strong></div>
-              <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Done this month</span><strong style="color:${doneThisMonth>=doneLastMonth?'#16a34a':'#d97706'}">${doneThisMonth} <span style="font-weight:400;color:#9ba3af">(${doneLastMonth} last mo)</span></strong></div>
-              <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Avg duration</span><strong>${fmtD(avgDur)}</strong></div>
-              ${longestJob?'<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Longest open</span><strong style="color:#dc2626">'+longestDays+'d</strong></div>':''}
-              <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#6b7280">Open jobs</span><strong>${allOpen.length}</strong></div>
+            <div style="font-size:9px">
+              <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Done this week</span><strong style="color:${completedThisWeek.length>0?'#16a34a':'#374151'}">${completedThisWeek.length} <span style="font-weight:400;color:${weekVsLastWeek>=0?'#16a34a':'#dc2626'}">(${weekVsLastWeek>=0?'+':''}${weekVsLastWeek})</span></strong></div>
+              <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Done this month</span><strong style="color:${doneThisMonth>=doneLastMonth?'#16a34a':'#d97706'}">${doneThisMonth} <span style="font-weight:400;color:#9ba3af">(${doneLastMonth} last mo)</span></strong></div>
+              <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Avg duration</span><strong>${fmtD(avgDur)}</strong></div>
+              ${longestJob?`<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Longest open</span><strong style="color:#dc2626">${longestDays}d</strong></div>`:''}
+              <div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:#6b7280">Open jobs</span><strong>${allOpen.length}</strong></div>
             </div>
 
             ${sHead('Notes','#1e2024')}
-            ${[0,1,2].map(()=>'<div style="border-bottom:1px solid #d1d5db;height:10px;margin-bottom:3px;width:100%"></div>').join('')}
+            ${[0,1,2,3].map(()=>'<div style="border-bottom:1px solid #d1d5db;height:14px;margin-bottom:4px;width:100%"></div>').join('')}
           </div>
         </div>
       </div>
@@ -1766,15 +1783,15 @@ function buildPrintReport() {
       if (_ohAvgs[2] > 14) ohIssues.push({ label: `${_ohTotals['Waiting for Parts']?.c||0} jobs stuck waiting on parts (avg ${_ohAvgs[2]}d)`, color: _ohAvgs[2]>21?'#dc2626':'#d97706' });
       if (_ohAvgs[3] > 7)  ohIssues.push({ label: `${_ohTotals['Revisiting']?.c||0} revisiting jobs (avg ${_ohAvgs[3]}d)`, color: _ohAvgs[3]>14?'#dc2626':'#d97706' });
       if (!ohIssues.length) return `
-        <div style="margin-top:7px;padding:5px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;display:flex;align-items:center;gap:8px">
-          <span style="font-size:11px">✅</span>
-          <span style="font-size:8px;font-weight:700;color:#16a34a">Ops Health: All stages within normal thresholds — no bottlenecks detected</span>
+        <div style="margin-top:9px;padding:6px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:13px">✅</span>
+          <span style="font-size:9.5px;font-weight:700;color:#16a34a">Ops Health: All stages within normal thresholds — no bottlenecks detected</span>
         </div>`;
       return `
-        <div style="margin-top:7px;padding:5px 10px;background:#fff8f8;border:1px solid #fecaca;border-radius:6px">
-          <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#dc2626;margin-bottom:5px">⚠ Ops Health Check</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px">
-            ${ohIssues.map(i => `<span style="font-size:8px;padding:2px 7px;background:#fff;border:1px solid ${i.color}40;border-radius:10px;color:${i.color};font-weight:600">${i.label}</span>`).join('')}
+        <div style="margin-top:9px;padding:6px 12px;background:#fff8f8;border:1px solid #fecaca;border-radius:6px">
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#dc2626;margin-bottom:6px">⚠ Ops Health Check</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">
+            ${ohIssues.map(i => `<span style="font-size:9.5px;padding:3px 9px;background:#fff;border:1px solid ${i.color}40;border-radius:10px;color:${i.color};font-weight:600">${i.label}</span>`).join('')}
           </div>
         </div>`;
     })()}
@@ -1794,35 +1811,35 @@ function buildPrintReport() {
       });
       const hotSites = Object.values(siteMap).filter(s => s.thisYear >= 2).sort((a,b) => b.thisYear - a.thisYear);
       if (!hotSites.length) return '';
-      return `<div style="margin-top:10px;padding:7px 12px;background:#fff8f0;border:1px solid #fed7aa;border-radius:6px">
-        <div style="font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#c2410c;margin-bottom:3px">⚑ Recurring Sites — ${hotSites.length} site${hotSites.length!==1?'s':''} with repeat callouts this year</div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px">
-          ${hotSites.slice(0,8).map(s => `<span style="font-size:8px;padding:2px 7px;background:#fff;border:1px solid #fed7aa;border-radius:10px;color:#9a3412">
+      return `<div style="margin-top:10px;padding:8px 14px;background:#fff8f0;border:1px solid #fed7aa;border-radius:6px">
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#c2410c;margin-bottom:4px">⚑ Recurring Sites — ${hotSites.length} site${hotSites.length!==1?'s':''} with repeat callouts this year</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${hotSites.slice(0,8).map(s => `<span style="font-size:9.5px;padding:3px 9px;background:#fff;border:1px solid #fed7aa;border-radius:10px;color:#9a3412">
             <strong>${esc(s.name)}</strong> — ${s.thisYear}x this year${s.open>0?' · <strong style="color:#c2410c">'+s.open+' open</strong>':''}
           </span>`).join('')}
-          ${hotSites.length > 8 ? `<span style="font-size:7.5px;color:#9ba3af;align-self:center">+${hotSites.length-8} more</span>` : ''}
+          ${hotSites.length > 8 ? `<span style="font-size:9px;color:#9ba3af;align-self:center">+${hotSites.length-8} more</span>` : ''}
         </div>
       </div>`;
     })()}
 
     <!-- ══ FOOTER ══ -->
-    <div style="margin-top:7px;padding-top:5px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
-      <div style="display:flex;align-items:center;gap:6px">
+    <div style="margin-top:9px;padding-top:6px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;align-items:center;gap:8px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">
-          <div style="width:5px;height:5px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:5px;height:5px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:5px;height:5px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:5px;height:5px;border-radius:50%;background:transparent;border:1.5px solid #3d4043;box-sizing:border-box"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:transparent;border:1.5px solid #3d4043;box-sizing:border-box"></div>
         </div>
-        <span style="font-size:7.5px;color:#9ba3af">Prepared by <strong style="color:#3d4043">Sean Pickford</strong> · Technical Service Manager · Phoeniks Electric Kitchen Specialists</span>
+        <span style="font-size:8.5px;color:#9ba3af">Prepared by <strong style="color:#3d4043">Sean Pickford</strong> · Technical Service Manager · Phoeniks Electric Kitchen Specialists</span>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <div style="display:flex;align-items:center;gap:4px;font-size:7px;color:#9ba3af">
-          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#dc2626"></span> Critical 30d+
-          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#d97706;margin-left:4px"></span> Overdue 21d+
-          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#3b82f6;margin-left:4px"></span> Active
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="display:flex;align-items:center;gap:5px;font-size:8.5px;color:#9ba3af">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#dc2626"></span> Critical 30d+
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#d97706;margin-left:5px"></span> Overdue 21d+
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6;margin-left:5px"></span> Active
         </div>
-        <span style="font-size:7.5px;color:#9ba3af">${dateStr}</span>
+        <span style="font-size:8.5px;color:#9ba3af">${dateStr}</span>
       </div>
     </div>
   </div>`;

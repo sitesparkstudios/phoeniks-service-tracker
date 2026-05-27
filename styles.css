@@ -467,7 +467,7 @@ select {
 
 /* ── PRINT ── */
 @media print {
-  @page { size: A4 portrait; margin: 8mm 10mm; }
+  @page { size: A4 portrait; margin: 10mm 12mm; }
 
   body > * { display: none !important; }
   #sidebar-overlay { display: none !important; }
@@ -476,7 +476,7 @@ select {
     display: block !important;
     width: 100% !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
-    font-size: 8.5px !important;
+    font-size: 10px !important;
     color: #1e2024 !important;
     background: #fff !important;
     -webkit-print-color-adjust: exact !important;
@@ -486,17 +486,25 @@ select {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     box-sizing: border-box !important;
-    max-width: 100% !important;
   }
   #print-report table {
-    table-layout: fixed !important;
+    table-layout: auto !important;
     width: 100% !important;
     word-break: break-word !important;
   }
   #print-report td, #print-report th {
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+  }
+  /* Allow job note rows to show fully */
+  #print-report tr.job-note-row td {
+    white-space: normal !important;
+    overflow: visible !important;
+  }
+  /* Prevent page breaks inside job rows */
+  #print-report .job-block {
+    page-break-inside: avoid;
   }
 }
 
