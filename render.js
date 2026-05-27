@@ -1486,16 +1486,16 @@ function buildPrintReport() {
   const td = (txt,style='') => `<td style="padding:3px 6px;${style}">${txt}</td>`;
 
   const sHead = (title,color='#1e2024',sub='') => `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px;padding-bottom:4px;border-bottom:2px solid ${color}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0 4px;padding-bottom:3px;border-bottom:1.5px solid ${color}">
       <span style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:${color}">${title}</span>
       ${sub?`<span style="font-size:7.5px;color:#9ba3af;font-weight:500">${sub}</span>`:''}
     </div>`;
 
   const kpi = (val, label, color='#1e2024', sub='', bg='#f8f9fa', border='#e5e7eb') => `
-    <div style="background:${bg};border:1px solid ${border};border-radius:8px;padding:9px 8px;text-align:center;position:relative;overflow:hidden">
-      <div style="font-size:22px;font-weight:800;color:${color};line-height:1;letter-spacing:-0.5px">${val}</div>
-      <div style="font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6b7280;margin-top:3px;line-height:1.3">${label}</div>
-      ${sub?`<div style="font-size:7px;color:#9ba3af;margin-top:2px">${sub}</div>`:''}
+    <div style="background:${bg};border:1px solid ${border};border-radius:6px;padding:6px 5px;text-align:center;position:relative;overflow:hidden">
+      <div style="font-size:19px;font-weight:800;color:${color};line-height:1;letter-spacing:-0.5px">${val}</div>
+      <div style="font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#6b7280;margin-top:2px;line-height:1.3">${label}</div>
+      ${sub?`<div style="font-size:6.5px;color:#9ba3af;margin-top:1px">${sub}</div>`:''}
     </div>`;
 
   const pill = (txt, color, bg) => `<span style="display:inline-block;padding:1px 5px;border-radius:10px;font-size:7px;font-weight:700;background:${bg};color:${color}">${txt}</span>`;
@@ -1510,18 +1510,12 @@ function buildPrintReport() {
     const d = daysBetween(j.poDate,null);
     const rowBg = d>=30?'#fff8f8':d>=21?'#fffcf0':'';
     const dayCol = d>=30?'#dc2626':d>=21?'#d97706':'#374151';
-    return `<tr style="border-bottom:1px solid #f3f4f6;background:${rowBg}">
-      <td style="padding:3px 5px;width:16px">${statusDot(d)}</td>
-      ${td(`<span style="font-family:'DM Mono',monospace;font-size:7.5px;color:#6b7280">${esc(j.po)}</span>`)}
-      ${td(`<span style="font-weight:600;font-size:8.5px">${esc(j.ref||'—')}</span>`,'max-width:180px;word-wrap:break-word;white-space:normal')}
-      ${td(`<span style="color:#6b7280;font-size:8px">${esc(j.supplier)}</span>`,'max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
-      ${td(`<strong style="color:${dayCol};font-size:9px">${d}d</strong>`,'text-align:right;white-space:nowrap')}
-    </tr>
-    <tr style="background:${rowBg}">
-      <td colspan="5" style="padding:2px 5px 5px 22px;border-bottom:1px solid #e5e7eb">
-        <span style="font-size:7px;color:#c0c4cc;font-style:italic">Notes: </span>
-        <span style="display:inline-block;border-bottom:1px solid #d1d5db;width:calc(100% - 42px);height:8px;vertical-align:bottom"></span>
-      </td>
+    return `<tr style="border-bottom:1px solid #f0f0f0;background:${rowBg}">
+      <td style="padding:2px 4px;width:14px">${statusDot(d)}</td>
+      ${td(`<span style="font-family:'DM Mono',monospace;font-size:7px;color:#6b7280">${esc(j.po)}</span>`,'padding:2px 4px')}
+      ${td(`<span style="font-weight:600;font-size:8px;line-height:1.3">${esc(j.ref||'—')}</span>`,'padding:2px 4px;max-width:160px;word-wrap:break-word;white-space:normal')}
+      ${td(`<span style="color:#6b7280;font-size:7.5px">${esc(j.supplier)}</span>`,'padding:2px 4px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
+      ${td(`<strong style="color:${dayCol};font-size:8.5px">${d}d</strong>`,'padding:2px 4px;text-align:right;white-space:nowrap')}
     </tr>`;
   };
 
@@ -1532,7 +1526,7 @@ function buildPrintReport() {
     const isLatest = b === mBuckets[mBuckets.length-1];
     return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
       <div style="font-size:8px;font-weight:${isLatest?'800':'600'};color:${isLatest?'#1e2024':'#6b7280'}">${b.count}</div>
-      <div style="width:100%;background:#e5e7eb;border-radius:3px 3px 0 0;height:24px;display:flex;align-items:flex-end">
+      <div style="width:100%;background:#e5e7eb;border-radius:3px 3px 0 0;height:18px;display:flex;align-items:flex-end">
         <div style="width:100%;height:${Math.max(pct,5)}%;background:${isLatest?'#3d4043':'#d1d5db'};border-radius:3px 3px 0 0;transition:height 0.2s"></div>
       </div>
       <div style="font-size:6.5px;color:#9ba3af;text-align:center">${b.label}</div>
@@ -1543,7 +1537,7 @@ function buildPrintReport() {
   <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:#1e2024;-webkit-print-color-adjust:exact;print-color-adjust:exact">
 
     <!-- ══ HEADER ══ -->
-    <div style="display:flex;justify-content:space-between;align-items:stretch;margin-bottom:11px;gap:0">
+    <div style="display:flex;justify-content:space-between;align-items:stretch;margin-bottom:8px;gap:0">
 
       <!-- Brand block — Phoeniks Yellow colour logo -->
       <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#FFD100;border-radius:8px;flex-shrink:0">
@@ -1575,7 +1569,7 @@ function buildPrintReport() {
     </div>
 
     <!-- ══ KPI STRIP ══ -->
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px">
       ${kpi(allOpen.length,'Open Jobs','#1e2024','all service jobs','#f8f9fa')}
       ${kpi(urgent.length,'Overdue 21d+',urgent.length>0?'#dc2626':'#16a34a',urgent.length>0?`${critical.length} critical`:'all on track',urgent.length>0?'#fff8f8':'#f0fdf4',urgent.length>0?'#fecaca':'#bbf7d0')}
       ${kpi(critical.length,'Critical 30d+',critical.length>0?'#dc2626':'#16a34a','needs action now',critical.length>0?'#fff8f8':'#f8f9fa',critical.length>0?'#fecaca':'#e5e7eb')}
@@ -1586,7 +1580,7 @@ function buildPrintReport() {
     </div>
 
     <!-- ══ THREE-COLUMN BODY ══ -->
-    <div style="display:grid;grid-template-columns:1.15fr 1.05fr 0.8fr;gap:10px;align-items:start">
+    <div style="display:grid;grid-template-columns:1.15fr 1.05fr 0.8fr;gap:8px;align-items:start">
 
       <!-- ── COL 1: OVERDUE ── -->
       <div>
@@ -1594,7 +1588,7 @@ function buildPrintReport() {
         ${urgent.length ? `
         <table style="width:100%;border-collapse:collapse">
           <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
-          <tbody>${urgent.slice(0,16).map(j=>jobRow(j)).join('')}</tbody>
+          <tbody>${urgent.slice(0,12).map(j=>jobRow(j)).join('')}</tbody>
         </table>
         ${urgent.length>16?`<div style="font-size:7.5px;color:#9ba3af;padding:4px 0 0 5px;font-style:italic">+${urgent.length-16} more — see Urgent page</div>`:''}
         ` : `
@@ -1607,7 +1601,7 @@ function buildPrintReport() {
         ${revisiting.length ? `
         <table style="width:100%;border-collapse:collapse">
           <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
-          <tbody>${revisiting.slice(0,6).map(j=>jobRow(j)).join('')}</tbody>
+          <tbody>${revisiting.slice(0,5).map(j=>jobRow(j)).join('')}</tbody>
         </table>
         <div style="font-size:7px;color:#9ba3af;margin-top:3px;font-style:italic;padding-left:4px">High age = not resolving on first visit</div>
         ` : `
@@ -1623,7 +1617,7 @@ function buildPrintReport() {
         ${waiting.length ? `
         <table style="width:100%;border-collapse:collapse">
           <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
-          <tbody>${waiting.slice(0,8).map(j=>jobRow(j)).join('')}</tbody>
+          <tbody>${waiting.slice(0,6).map(j=>jobRow(j)).join('')}</tbody>
         </table>
         ${waiting.length>8?`<div style="font-size:7.5px;color:#9ba3af;padding:3px 0 0 5px;font-style:italic">+${waiting.length-8} more</div>`:''}
         ` : `
@@ -1635,7 +1629,7 @@ function buildPrintReport() {
         ${sHead('Service Co. Breakdown','#1e2024')}
         <table style="width:100%;border-collapse:collapse">
           <thead><tr>${th('Company')}${th('Open','center')}${th('21d+','center')}${th('30d+','center')}${th('Avg','right')}</tr></thead>
-          <tbody>${supplierStats.slice(0,8).map(x=>`<tr style="border-bottom:1px solid #f3f4f6">
+          <tbody>${supplierStats.slice(0,8).map(x=>`<tr style="border-bottom:1px solid #f3f4f6;font-size:7.5px">
             ${td(`<span style="font-size:8.5px;font-weight:600;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${esc(x.s)}</span>`)}
             ${td(`<strong style="font-size:9px">${x.total}</strong>`,'text-align:center')}
             ${td(x.urgent>0?`<span style="color:#d97706;font-weight:700;font-size:9px">${x.urgent}</span>`:`<span style="color:#d1d5db;font-size:9px">0</span>`,'text-align:center')}
@@ -1654,19 +1648,19 @@ function buildPrintReport() {
           const maxA = stageAvgs[0].avg||1;
           const barW = Math.round(d.avg/maxA*100);
           const barC = d.avg>21?'#dc2626':d.avg>14?'#d97706':'#22c55e';
-          return `<div style="margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
+          return `<div style="margin-bottom:4px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1px">
               <span style="font-size:7.5px;font-weight:600;color:#374151">${d.s}</span>
               <span style="font-size:7.5px;font-weight:700;color:${barC}">${d.avg}d <span style="color:#9ba3af;font-weight:400">(${d.count})</span></span>
             </div>
-            <div style="background:#f0f0f0;border-radius:3px;height:5px;overflow:hidden">
+            <div style="background:#f0f0f0;border-radius:3px;height:4px;overflow:hidden">
               <div style="width:${barW}%;background:${barC};height:100%;border-radius:3px"></div>
             </div>
           </div>`;
         }).join('') : '<div style="font-size:8px;color:#9ba3af;padding:6px 0">No open stage data</div>'}
 
         ${sHead('Monthly Volume')}
-        <div style="display:flex;align-items:flex-end;gap:3px;height:42px;margin-bottom:2px">
+        <div style="display:flex;align-items:flex-end;gap:3px;height:34px;margin-bottom:2px">
           ${volBars}
         </div>
 
@@ -1710,12 +1704,12 @@ function buildPrintReport() {
       if (_ohAvgs[2] > 14) ohIssues.push({ label: `${_ohTotals['Waiting for Parts']?.c||0} jobs stuck waiting on parts (avg ${_ohAvgs[2]}d)`, color: _ohAvgs[2]>21?'#dc2626':'#d97706' });
       if (_ohAvgs[3] > 7)  ohIssues.push({ label: `${_ohTotals['Revisiting']?.c||0} revisiting jobs (avg ${_ohAvgs[3]}d)`, color: _ohAvgs[3]>14?'#dc2626':'#d97706' });
       if (!ohIssues.length) return `
-        <div style="margin-top:10px;padding:7px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;display:flex;align-items:center;gap:8px">
+        <div style="margin-top:7px;padding:5px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;display:flex;align-items:center;gap:8px">
           <span style="font-size:11px">✅</span>
           <span style="font-size:8px;font-weight:700;color:#16a34a">Ops Health: All stages within normal thresholds — no bottlenecks detected</span>
         </div>`;
       return `
-        <div style="margin-top:10px;padding:7px 12px;background:#fff8f8;border:1px solid #fecaca;border-radius:6px">
+        <div style="margin-top:7px;padding:5px 10px;background:#fff8f8;border:1px solid #fecaca;border-radius:6px">
           <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#dc2626;margin-bottom:5px">⚠ Ops Health Check</div>
           <div style="display:flex;flex-wrap:wrap;gap:4px">
             ${ohIssues.map(i => `<span style="font-size:8px;padding:2px 7px;background:#fff;border:1px solid ${i.color}40;border-radius:10px;color:${i.color};font-weight:600">${i.label}</span>`).join('')}
@@ -1739,7 +1733,7 @@ function buildPrintReport() {
       const hotSites = Object.values(siteMap).filter(s => s.thisYear >= 2).sort((a,b) => b.thisYear - a.thisYear);
       if (!hotSites.length) return '';
       return `<div style="margin-top:10px;padding:7px 12px;background:#fff8f0;border:1px solid #fed7aa;border-radius:6px">
-        <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#c2410c;margin-bottom:5px">⚑ Recurring Sites — ${hotSites.length} site${hotSites.length!==1?'s':''} with repeat callouts this year</div>
+        <div style="font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#c2410c;margin-bottom:3px">⚑ Recurring Sites — ${hotSites.length} site${hotSites.length!==1?'s':''} with repeat callouts this year</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">
           ${hotSites.slice(0,8).map(s => `<span style="font-size:8px;padding:2px 7px;background:#fff;border:1px solid #fed7aa;border-radius:10px;color:#9a3412">
             <strong>${esc(s.name)}</strong> — ${s.thisYear}x this year${s.open>0?' · <strong style="color:#c2410c">'+s.open+' open</strong>':''}
@@ -1750,7 +1744,7 @@ function buildPrintReport() {
     })()}
 
     <!-- ══ FOOTER ══ -->
-    <div style="margin-top:11px;padding-top:6px;border-top:1.5px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
+    <div style="margin-top:7px;padding-top:5px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
       <div style="display:flex;align-items:center;gap:6px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">
           <div style="width:5px;height:5px;border-radius:50%;background:#3d4043"></div>
