@@ -1570,14 +1570,14 @@ function buildPrintReport() {
     const rowBg = d>=30?'#fff8f8':d>=21?'#fffcf0':'';
     const dayCol = d>=30?'#dc2626':d>=21?'#d97706':'#374151';
     // Truncate ref to 45 chars to prevent wrapping
-    const refShort = (j.ref||'—').length > 45 ? (j.ref||'—').substring(0,44)+'…' : (j.ref||'—');
+    const refShort = (j.ref||'—').length > 55 ? (j.ref||'—').substring(0,54)+'…' : (j.ref||'—');
     const supShort = (j.supplier||'').length > 22 ? (j.supplier||'').substring(0,21)+'…' : (j.supplier||'');
     return `<tr style="border-bottom:1px solid #f0f0f0;background:${rowBg}">
-      <td style="padding:2px 3px;width:10px">${statusDot(d)}</td>
-      <td style="padding:2px 3px;white-space:nowrap;width:38px"><span style="font-family:'DM Mono',monospace;font-size:6.5px;color:#6b7280">${esc(j.po)}</span></td>
-      <td style="padding:2px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;width:45%"><span style="font-weight:600;font-size:7.5px">${esc(refShort)}</span></td>
-      <td style="padding:2px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;width:30%"><span style="color:#6b7280;font-size:7px">${esc(supShort)}</span></td>
-      <td style="padding:2px 3px;text-align:right;white-space:nowrap;width:22px"><strong style="color:${dayCol};font-size:8px">${d}d</strong></td>
+      <td style="padding:2px 2px;width:8px">${statusDot(d)}</td>
+      <td style="padding:2px 2px;white-space:nowrap;width:32px"><span style="font-family:'DM Mono',monospace;font-size:6.5px;color:#6b7280">${esc(j.po)}</span></td>
+      <td style="padding:2px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="font-weight:600;font-size:7.5px">${esc(refShort)}</span></td>
+      <td style="padding:2px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:25%"><span style="color:#6b7280;font-size:7px">${esc(supShort)}</span></td>
+      <td style="padding:2px 2px;text-align:right;white-space:nowrap;width:18px"><strong style="color:${dayCol};font-size:8px">${d}d</strong></td>
     </tr>`;
   };
 
@@ -1596,7 +1596,7 @@ function buildPrintReport() {
   }).join('');
 
   const html = `
-  <div style="width:190mm;font-family:'Plus Jakarta Sans',sans-serif;font-size:8.5px;color:#1e2024;-webkit-print-color-adjust:exact;print-color-adjust:exact;overflow:hidden;box-sizing:border-box">
+  <div style="width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-size:8.5px;color:#1e2024;-webkit-print-color-adjust:exact;print-color-adjust:exact;box-sizing:border-box">
 
     <!-- ══ HEADER ══ -->
     <div style="display:flex;justify-content:space-between;align-items:stretch;margin-bottom:8px;gap:0">
@@ -1694,7 +1694,7 @@ function buildPrintReport() {
         </div>`}
 
         <!-- Service Co + Stats side by side -->
-        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:6px;margin-top:0">
+        <div style="display:grid;grid-template-columns:1.2fr 0.8fr;gap:5px;margin-top:0">
           <div>
             ${sHead('Service Co. Breakdown','#1e2024')}
             <table style="width:100%;border-collapse:collapse;table-layout:fixed">
