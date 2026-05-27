@@ -1436,6 +1436,15 @@ function buildPrintReport() {
     return last && last.date >= weekStartStr;
   });
 
+  // Last week comparison
+  const lastWeekStart = new Date(weekStart); lastWeekStart.setDate(lastWeekStart.getDate()-7);
+  const lastWeekStartStr = lastWeekStart.toISOString().split('T')[0];
+  const completedLastWeek = done.filter(j => {
+    const last = j.history?.[j.history.length-1];
+    return last && last.date >= lastWeekStartStr && last.date < weekStartStr;
+  });
+  const weekVsLastWeek = completedThisWeek.length - completedLastWeek.length;
+
   // Longest single open job
   const longestJob = allOpen.length ? allOpen.reduce((a,b) => daysBetween(b.poDate,null) > daysBetween(a.poDate,null) ? b : a) : null;
   const longestDays = longestJob ? daysBetween(longestJob.poDate,null) : 0;
@@ -1634,12 +1643,15 @@ function buildPrintReport() {
 
     <!-- ══ WINS STRIP ══ -->
     ${wins.length ? `
-    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:6px 10px;margin-bottom:7px">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <span style="font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#15803d;flex-shrink:0">✅ This week</span>
-        ${wins.map(w => `<span style="font-size:7.5px;color:#166534;padding:1px 7px;background:white;border:1px solid #bbf7d0;border-radius:10px">${w}</span>`).join('')}
+    <div style="background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1.5px solid #86efac;border-radius:7px;padding:7px 12px;margin-bottom:8px">
+      <div style="font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#15803d;margin-bottom:4px">✅ Wins this week</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">
+        ${wins.map(w => `<span style="font-size:7.5px;color:#166534;padding:2px 8px;background:white;border:1px solid #86efac;border-radius:10px;font-weight:600">${w}</span>`).join('')}
       </div>
-    </div>` : ''}
+    </div>` : `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:6px 10px;margin-bottom:7px">
+      <span style="font-size:7.5px;font-weight:700;color:#16a34a">✅ All jobs tracking normally — no critical issues this week</span>
+    </div>`}
 
     <!-- ══ TWO-COLUMN BODY ══ -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start">
@@ -1674,9 +1686,9 @@ function buildPrintReport() {
         ${waiting.length ? `
         <table style="width:100%;border-collapse:collapse;table-layout:fixed">
           <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
-          <tbody>${waiting.slice(0,5).map(j=>jobRow(j)).join('')}</tbody>
+          <tbody>${waiting.slice(0,6).map(j=>jobRow(j)).join('')}</tbody>
         </table>
-        ${waiting.length>5?`<div style="font-size:7px;color:#9ba3af;padding:2px 0 0 5px;font-style:italic">+${waiting.length-5} more</div>`:''}
+        ${waiting.length>6?`<div style="font-size:7px;color:#9ba3af;padding:2px 0 0 5px;font-style:italic">+${waiting.length-6} more overleaf</div>`:''}
         ` : `<div style="display:flex;align-items:center;gap:6px;padding:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;margin-top:3px">
           <span style="font-size:12px">✓</span><span style="font-weight:700;color:#16a34a;font-size:8.5px">No parts delays</span>
         </div>`}
@@ -1697,35 +1709,37 @@ function buildPrintReport() {
             </table>
           </div>
           <div>
-            ${sHead('Stage Bottleneck',stageAvgs[0]&&stageAvgs[0].avg>14?'#dc2626':'#1e2024')}
-            ${stageAvgs.slice(0,4).map(d=>{
-              const maxA = stageAvgs[0].avg||1;
-              const barW = Math.round(d.avg/maxA*100);
-              const barC = d.avg>21?'#dc2626':d.avg>14?'#d97706':'#22c55e';
-              const shortName = d.s.replace('Waiting for ','Wait ').replace('Incoming Job','Incoming').replace('Job Booked','Booked');
-              return `<div style="margin-bottom:4px">
-                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1px">
-                  <span style="font-size:7px;font-weight:600;color:#374151">${shortName}</span>
-                  <span style="font-size:7px;font-weight:700;color:${barC}">${d.avg}d</span>
-                </div>
-                <div style="background:#f0f0f0;border-radius:3px;height:4px;overflow:hidden">
-                  <div style="width:${barW}%;background:${barC};height:100%;border-radius:3px"></div>
-                </div>
-              </div>`;
-            }).join('')}
+            ${sHead('Monthly Jobs Completed','#1e2024')}
+            <div style="display:flex;align-items:flex-end;gap:2px;height:32px;margin-bottom:3px">
+              ${mBuckets.map(b => {
+                const maxV = Math.max(...mBuckets.map(x=>x.count),1);
+                const pct = Math.max(Math.round(b.count/maxV*100),4);
+                const isLatest = b === mBuckets[mBuckets.length-1];
+                const isPrev = b === mBuckets[mBuckets.length-2];
+                return '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex:1">'
+                  + '<div style="font-size:6px;font-weight:' + (isLatest?'800':'500') + ';color:' + (isLatest?'#1e2024':'#9ba3af') + '">' + b.count + '</div>'
+                  + '<div style="width:100%;background:#e5e7eb;border-radius:2px 2px 0 0;height:24px;display:flex;align-items:flex-end">'
+                  + '<div style="width:100%;height:' + pct + '%;background:' + (isLatest?'#3d4043':isPrev?'#9ba3af':'#d1d5db') + ';border-radius:2px 2px 0 0"></div>'
+                  + '</div>'
+                  + '<div style="font-size:5.5px;color:#9ba3af;text-align:center">' + b.label + '</div>'
+                  + '</div>';
+              }).join('')}
+            </div>
+            <div style="font-size:7px;color:${weekVsLastWeek>0?'#16a34a':weekVsLastWeek<0?'#dc2626':'#6b7280'};font-weight:600;margin-bottom:4px">
+              This week: ${completedThisWeek.length} jobs ${weekVsLastWeek>0?'▲ +'+weekVsLastWeek+' vs last week':weekVsLastWeek<0?'▼ '+Math.abs(weekVsLastWeek)+' vs last week':'· same as last week'}
+            </div>
 
             ${sHead('Key Stats','#1e2024')}
-            <div style="font-size:7.5px">
-              <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Fix rate (90d)</span><strong style="color:${fixRate!==null&&fixRate>=75?'#16a34a':'#dc2626'}">${fixRate!==null?fixRate+'%':'—'}</strong></div>
+            <div style="font-size:7px">
+              <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Done this week</span><strong style="color:${completedThisWeek.length>0?'#16a34a':'#374151'}">${completedThisWeek.length} <span style="font-weight:400;color:${weekVsLastWeek>=0?'#16a34a':'#dc2626'}">(${weekVsLastWeek>=0?'+':''}${weekVsLastWeek} vs last wk)</span></strong></div>
+              <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Done this month</span><strong style="color:${doneThisMonth>=doneLastMonth?'#16a34a':'#d97706'}">${doneThisMonth} <span style="font-weight:400;color:#9ba3af">(${doneLastMonth} last mo)</span></strong></div>
               <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Avg duration</span><strong>${fmtD(avgDur)}</strong></div>
-              <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Done this week</span><strong style="color:${completedThisWeek.length>0?'#16a34a':'#374151'}">${completedThisWeek.length}</strong></div>
-              <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#6b7280">This month</span><strong>${mBuckets[mBuckets.length-1]?.count||0} jobs</strong></div>
-              ${longestJob?`<div style="margin-top:4px;padding-top:4px;border-top:1px solid #e5e7eb">
-                <div style="font-size:6.5px;font-weight:700;text-transform:uppercase;color:#dc2626;margin-bottom:1px">Longest open</div>
-                <div style="font-size:7.5px;font-weight:600;color:#1e2024;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(longestJob.ref||longestJob.po)}</div>
-                <div style="font-size:7px;color:#6b7280">${esc(longestJob.supplier)} · <strong style="color:#dc2626">${longestDays}d</strong></div>
-              </div>`:''}
+              ${longestJob?'<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Longest open</span><strong style="color:#dc2626">'+longestDays+'d</strong></div>':''}
+              <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#6b7280">Open jobs</span><strong>${allOpen.length}</strong></div>
             </div>
+
+            ${sHead('Notes','#1e2024')}
+            ${[0,1,2].map(()=>'<div style="border-bottom:1px solid #d1d5db;height:10px;margin-bottom:3px;width:100%"></div>').join('')}
           </div>
         </div>
       </div>
