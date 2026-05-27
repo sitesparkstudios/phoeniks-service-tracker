@@ -1440,6 +1440,54 @@ function buildPrintReport() {
   const longestJob = allOpen.length ? allOpen.reduce((a,b) => daysBetween(b.poDate,null) > daysBetween(a.poDate,null) ? b : a) : null;
   const longestDays = longestJob ? daysBetween(longestJob.poDate,null) : 0;
 
+  // ── WINS DATA ──
+  // Fastest job completed this week
+  const weekDoneWithDur = completedThisWeek.filter(j => getTotalDays(j) !== null);
+  const fastestThisWeek = weekDoneWithDur.length
+    ? weekDoneWithDur.reduce((a,b) => getTotalDays(a) < getTotalDays(b) ? a : b)
+    : null;
+
+  // Jobs completed this month vs last month
+  const thisMonthKey = now.toISOString().substring(0,7);
+  const lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const lastMonthKey = lastMonth.toISOString().substring(0,7);
+  const doneThisMonth = done.filter(j => {
+    const last = j.history?.[j.history.length-1];
+    return last && last.date && last.date.startsWith(thisMonthKey);
+  }).length;
+  const doneLastMonth = done.filter(j => {
+    const last = j.history?.[j.history.length-1];
+    return last && last.date && last.date.startsWith(lastMonthKey);
+  }).length;
+
+  // Suppliers with zero overdue jobs (have open jobs but none overdue)
+  const suppliersWithOpenJobs = [...new Set(allOpen.map(j=>j.supplier))];
+  const onTrackSuppliers = suppliersWithOpenJobs.filter(s => {
+    const sOpen = allOpen.filter(j=>j.supplier===s);
+    return sOpen.length > 0 && sOpen.every(j=>daysBetween(j.poDate,null) < 21);
+  });
+
+  // Jobs closed out this week that were previously stuck (>21d when resolved)
+  const resolvedStuck = completedThisWeek.filter(j => getTotalDays(j) >= 21);
+
+  // Total jobs open this week vs last week (rough — jobs with poDate in last 7d)
+  const newJobsThisWeek = jobs.filter(j => (j.poDate||'') >= weekStartStr).length;
+
+  // Build wins array — only include genuine wins
+  const wins = [];
+  if (completedThisWeek.length > 0)
+    wins.push(completedThisWeek.length + ' job' + (completedThisWeek.length!==1?'s':'') + ' completed this week');
+  if (fastestThisWeek && getTotalDays(fastestThisWeek) <= 7)
+    wins.push('Fastest turnaround: ' + esc(fastestThisWeek.ref||fastestThisWeek.po) + ' closed in ' + getTotalDays(fastestThisWeek) + 'd');
+  if (doneThisMonth > doneLastMonth && doneLastMonth > 0)
+    wins.push(doneThisMonth + ' jobs closed this month vs ' + doneLastMonth + ' last month — up ' + (doneThisMonth-doneLastMonth));
+  if (resolvedStuck.length > 0)
+    wins.push(resolvedStuck.length + ' long-running job' + (resolvedStuck.length!==1?'s':'') + ' finally resolved this week');
+  if (onTrackSuppliers.length > 0)
+    wins.push(onTrackSuppliers.length + ' service co' + (onTrackSuppliers.length!==1?'s':'') + ' fully on track — ' + onTrackSuppliers.slice(0,2).map(s=>s.split(' ')[0]).join(', ') + (onTrackSuppliers.length>2?' +more':''));
+  if (newJobsThisWeek > 0 && completedThisWeek.length >= newJobsThisWeek)
+    wins.push('Closed as many jobs as opened this week — holding steady');
+
   // Fix rate trend — compare last 90d vs 90-180d
   const now180 = new Date(); now180.setDate(now180.getDate()-180);
   const cut180 = now180.toISOString().split('T')[0];
@@ -1448,14 +1496,16 @@ function buildPrintReport() {
   const prevFixRate   = prev90.length ? Math.round((1-prevRevisited/prev90.length)*100) : null;
   const fixRateTrend  = fixRate !== null && prevFixRate !== null ? fixRate - prevFixRate : null;
 
-  // Auto-generated headline
+  // Auto-generated headline — lead with positive, then concerns
   const headlines = [];
-  if (critical.length > 0) headlines.push(`${critical.length} critical job${critical.length>1?'s':''} require immediate attention`);
-  if (revisiting.length > 0) headlines.push(`${revisiting.length} job${revisiting.length>1?'s':''} revisiting (avg ${avgRevisit}d open)`);
-  if (fixRateTrend !== null && fixRateTrend > 0) headlines.push(`Fix rate up ${fixRateTrend}% vs last quarter`);
-  else if (fixRateTrend !== null && fixRateTrend < 0) headlines.push(`Fix rate down ${Math.abs(fixRateTrend)}% vs last quarter`);
-  if (stageAvgs[0] && stageAvgs[0].avg > 21) headlines.push(`${stageAvgs[0].s} is the main bottleneck at ${stageAvgs[0].avg}d avg`);
-  const headline = headlines.length ? headlines.join(' · ') : 'All service jobs tracking normally';
+  // Positive first
+  if (completedThisWeek.length > 0) headlines.push(completedThisWeek.length + ' job' + (completedThisWeek.length!==1?'s':'') + ' completed this week');
+  if (doneThisMonth > doneLastMonth && doneLastMonth > 0) headlines.push('completions up vs last month');
+  // Then concerns
+  if (critical.length > 0) headlines.push(critical.length + ' critical job' + (critical.length>1?'s':'') + ' need attention');
+  else if (urgent.length > 0) headlines.push(urgent.length + ' job' + (urgent.length>1?'s':'') + ' overdue 21d+');
+  if (stageAvgs[0] && stageAvgs[0].avg > 21) headlines.push(stageAvgs[0].s.replace('Waiting for ','Wait ') + ' bottleneck at ' + stageAvgs[0].avg + 'd avg');
+  const headline = headlines.length ? headlines.join(' · ') : 'All service jobs tracking normally — no critical issues';
 
   // Most overdue service co.
   const topSupplier = [...new Set(urgent.map(j=>j.supplier))]
@@ -1575,9 +1625,18 @@ function buildPrintReport() {
       ${kpi(critical.length,'Critical 30d+',critical.length>0?'#dc2626':'#16a34a','needs action now',critical.length>0?'#fff8f8':'#f8f9fa',critical.length>0?'#fecaca':'#e5e7eb')}
       ${kpi(waiting.length,'Parts Waiting','#d97706',avgParts?`avg ${avgParts}d open`:'','#fffcf0','#fde68a')}
       ${kpi(revisiting.length,'Revisiting',revisiting.length>0?'#d97706':'#16a34a',avgRevisit?`avg ${avgRevisit}d`:'none','#fffcf0','#fde68a')}
-      ${kpi(fixRate!==null?fixRate+'%':'—','1st Fix Rate',fixRate!==null&&fixRate>=75?'#16a34a':'#dc2626',fixRate!==null?(fixRateTrend!==null?(fixRateTrend>=0?`▲ +${fixRateTrend}% vs prev`:`▼ ${fixRateTrend}% vs prev`):'90d rolling'):'no data',fixRate!==null&&fixRate>=75?'#f0fdf4':'#fff8f8',fixRate!==null&&fixRate>=75?'#bbf7d0':'#fecaca')}
+      ${kpi(doneThisMonth,'Closed This Month',doneThisMonth>doneLastMonth?'#16a34a':doneThisMonth===doneLastMonth?'#374151':'#d97706',doneLastMonth>0?(doneThisMonth>doneLastMonth?'▲ up vs last month':doneThisMonth===doneLastMonth?'same as last month':'▼ down vs last month'):'month to date',doneThisMonth>0?'#f0fdf4':'#f8f9fa',doneThisMonth>0?'#bbf7d0':'#e5e7eb')}
       ${kpi(avgDur!==null?avgDur+'d':'—','Avg Duration','#1e2024','last 90 days','#f8f9fa')}
     </div>
+
+    <!-- ══ WINS STRIP ══ -->
+    ${wins.length ? `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:6px 10px;margin-bottom:7px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#15803d;flex-shrink:0">✅ This week</span>
+        ${wins.map(w => `<span style="font-size:7.5px;color:#166534;padding:1px 7px;background:white;border:1px solid #bbf7d0;border-radius:10px">${w}</span>`).join('')}
+      </div>
+    </div>` : ''}
 
     <!-- ══ TWO-COLUMN BODY ══ -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start">
