@@ -1710,21 +1710,21 @@ function buildPrintReport() {
           <span style="font-size:14px">✓</span><span style="font-weight:700;color:#16a34a;font-size:10px">No parts delays</span>
         </div>`}
 
-        <!-- Service Co + Chart/Stats side by side -->
-        <div style="display:grid;grid-template-columns:1.3fr 0.7fr;gap:8px;margin-top:2px">
-          <div>
-            ${sHead('Service Co. Breakdown','#1e2024')}
-            <table style="width:100%;border-collapse:collapse">
-              <thead><tr>${th('Company')}${th('Open','center','32px')}${th('21d+','center','32px')}${th('Avg','right','38px')}</tr></thead>
-              <tbody>${supplierStats.slice(0,8).map(x=>`<tr style="border-bottom:1px solid #f3f4f6">
-                ${td(`<span style="font-size:9px;font-weight:600">${esc(x.s)}</span>`,'padding:3px 6px')}
-                ${td(`<strong style="font-size:9.5px">${x.total}</strong>`,'text-align:center;padding:3px 6px')}
-                ${td(x.urgent>0?`<span style="color:#d97706;font-weight:700;font-size:9.5px">${x.urgent}</span>`:`<span style="color:#d1d5db;font-size:9.5px">—</span>`,'text-align:center;padding:3px 6px')}
-                ${td(`<span style="font-size:9.5px;color:${x.avg>21?'#dc2626':x.avg>14?'#d97706':'#374151'};font-weight:600">${x.avg}d</span>`,'text-align:right;padding:3px 6px')}
-              </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>
+        <!-- Service Co — full width -->
+        ${sHead('Service Co. Breakdown','#1e2024')}
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>${th('Company')}${th('Open','center','36px')}${th('21d+','center','36px')}${th('Avg','right','42px')}</tr></thead>
+          <tbody>${supplierStats.slice(0,8).map(x=>`<tr style="border-bottom:1px solid #f3f4f6">
+            ${td(`<span style="font-size:9px;font-weight:600">${esc(x.s)}</span>`,'padding:3px 6px')}
+            ${td(`<strong style="font-size:9.5px">${x.total}</strong>`,'text-align:center;padding:3px 6px')}
+            ${td(x.urgent>0?`<span style="color:#d97706;font-weight:700;font-size:9.5px">${x.urgent}</span>`:`<span style="color:#d1d5db;font-size:9.5px">—</span>`,'text-align:center;padding:3px 6px')}
+            ${td(`<span style="font-size:9.5px;color:${x.avg>21?'#dc2626':x.avg>14?'#d97706':'#374151'};font-weight:600">${x.avg}d</span>`,'text-align:right;padding:3px 6px')}
+          </tr>`).join('')}
+          </tbody>
+        </table>
+
+        <!-- Chart + Key Stats side by side (both narrow, fits fine) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px">
           <div>
             ${sHead('Monthly Volume','#1e2024')}
             <div style="display:flex;align-items:flex-end;gap:3px;height:44px;margin-bottom:4px">
@@ -1734,27 +1734,27 @@ function buildPrintReport() {
                 const isLatest = b === mBuckets[mBuckets.length-1];
                 const isPrev = b === mBuckets[mBuckets.length-2];
                 return '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex:1">'
-                  + '<div style="font-size:7.5px;font-weight:' + (isLatest?'800':'500') + ';color:' + (isLatest?'#1e2024':'#9ba3af') + '">' + b.count + '</div>'
+                  + '<div style="font-size:7px;font-weight:' + (isLatest?'800':'500') + ';color:' + (isLatest?'#1e2024':'#9ba3af') + '">' + b.count + '</div>'
                   + '<div style="width:100%;background:#e5e7eb;border-radius:2px 2px 0 0;height:32px;display:flex;align-items:flex-end">'
                   + '<div style="width:100%;height:' + pct + '%;background:' + (isLatest?'#3d4043':isPrev?'#9ba3af':'#d1d5db') + ';border-radius:2px 2px 0 0"></div>'
                   + '</div>'
-                  + '<div style="font-size:6.5px;color:#9ba3af;text-align:center">' + b.label + '</div>'
+                  + '<div style="font-size:6px;color:#9ba3af;text-align:center">' + b.label + '</div>'
                   + '</div>';
               }).join('')}
             </div>
-            <div style="font-size:8.5px;color:${weekVsLastWeek>0?'#16a34a':weekVsLastWeek<0?'#dc2626':'#6b7280'};font-weight:600;margin-bottom:6px">
-              This week: ${completedThisWeek.length} ${weekVsLastWeek>0?'▲ +'+weekVsLastWeek:weekVsLastWeek<0?'▼ '+Math.abs(weekVsLastWeek):'·'} vs last
+            <div style="font-size:8.5px;color:${weekVsLastWeek>0?'#16a34a':weekVsLastWeek<0?'#dc2626':'#6b7280'};font-weight:600">
+              This week: ${completedThisWeek.length} ${weekVsLastWeek>0?'▲ +'+weekVsLastWeek:weekVsLastWeek<0?'▼ '+Math.abs(weekVsLastWeek):'—'} vs last
             </div>
-
+          </div>
+          <div>
             ${sHead('Key Stats','#1e2024')}
             <div style="font-size:9px">
               <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Done this week</span><strong style="color:${completedThisWeek.length>0?'#16a34a':'#374151'}">${completedThisWeek.length} <span style="font-weight:400;color:${weekVsLastWeek>=0?'#16a34a':'#dc2626'}">(${weekVsLastWeek>=0?'+':''}${weekVsLastWeek})</span></strong></div>
-              <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Done this month</span><strong style="color:${doneThisMonth>=doneLastMonth?'#16a34a':'#d97706'}">${doneThisMonth} <span style="font-weight:400;color:#9ba3af">(${doneLastMonth} last mo)</span></strong></div>
+              <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">This month</span><strong style="color:${doneThisMonth>=doneLastMonth?'#16a34a':'#d97706'}">${doneThisMonth} <span style="font-weight:400;color:#9ba3af">(${doneLastMonth} last)</span></strong></div>
               <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Avg duration</span><strong>${fmtD(avgDur)}</strong></div>
               ${longestJob?`<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Longest open</span><strong style="color:#dc2626">${longestDays}d</strong></div>`:''}
               <div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:#6b7280">Open jobs</span><strong>${allOpen.length}</strong></div>
             </div>
-
             ${sHead('Notes','#1e2024')}
             ${[0,1,2,3].map(()=>'<div style="border-bottom:1px solid #d1d5db;height:14px;margin-bottom:4px;width:100%"></div>').join('')}
           </div>
