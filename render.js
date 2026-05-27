@@ -984,25 +984,22 @@ function renderPerformance() {
     if (doneJobs.length === 0) {
       dataNote.style.display = 'none';
     } else if (durPct >= 80 && histPct >= 80) {
-      // Good data — green banner
-      dataNote.style.background = 'var(--green-dim)';
+      dataNote.style.background = 'rgba(22,163,74,0.06)';
       dataNote.style.borderColor = 'rgba(22,163,74,0.2)';
-      dataNote.innerHTML = \`<span style="font-size:16px;flex-shrink:0">✅</span>
-        <span style="color:var(--green)"><strong>Good data quality</strong> — \${durPct}% of completed jobs have duration data. Metrics are reliable.</span>\`;
+      dataNote.innerHTML = '<span style="font-size:16px;flex-shrink:0">✅</span> '
+        + '<span style="color:var(--green)"><strong>Good data quality</strong> — ' + durPct + '% of completed jobs have duration data. Metrics are reliable.</span>';
     } else {
-      // Needs improvement — amber banner with specific actions
-      const isRevisitedFn = j => j.history?.some(h => h.status === 'Revisiting') || j.status === 'Revisiting';
       dataNote.style.background = 'rgba(217,119,6,0.08)';
       dataNote.style.borderColor = 'rgba(217,119,6,0.25)';
-      dataNote.innerHTML = \`<span style="font-size:16px;flex-shrink:0">⚠️</span>
-        <div style="color:var(--text2)">
-          <div style="font-weight:700;color:var(--text);margin-bottom:6px">Data quality check — some metrics may be incomplete</div>
-          <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
-            \${durPct < 80 ? \`<div>📅 <strong>\${noHistory} completed job\${noHistory !== 1 ? 's' : ''}</strong> have no chatter history — duration and fix rate data is missing for these. <span style="color:var(--blue);cursor:pointer;text-decoration:underline" onclick="showPage('add')">Add status history via the job editor →</span></div>\` : ''}
-            \${openNoHistory > 0 ? \`<div>📋 <strong>\${openNoHistory} open job\${openNoHistory !== 1 ? 's' : ''}</strong> only have their import date tracked — status changes haven't been recorded yet.</div>\` : ''}
-            <div style="color:var(--text3);margin-top:2px">To improve accuracy: open each job → Edit → paste the Odoo chatter notes to auto-extract status history. Duration data: <strong>\${durPct}%</strong> complete · History: <strong>\${histPct}%</strong> complete.</div>
-          </div>
-        </div>\`;
+      const lines = [];
+      if (durPct < 80) lines.push('<div>📅 <strong>' + noHistory + ' completed job' + (noHistory !== 1 ? 's' : '') + '</strong> have no chatter history — duration and fix rate data is missing. Open each job → Edit → paste the Odoo chatter to fix.</div>');
+      if (openNoHistory > 0) lines.push('<div>📋 <strong>' + openNoHistory + ' open job' + (openNoHistory !== 1 ? 's' : '') + '</strong> only have their import date — status changes not yet recorded.</div>');
+      lines.push('<div style="color:var(--text3);margin-top:2px">Duration data: <strong>' + durPct + '%</strong> complete · History: <strong>' + histPct + '%</strong> complete.</div>');
+      dataNote.innerHTML = '<span style="font-size:16px;flex-shrink:0">⚠️</span>'
+        + '<div style="color:var(--text2)">'
+        + '<div style="font-weight:700;color:var(--text);margin-bottom:6px">Data quality check — some metrics may be incomplete</div>'
+        + '<div style="display:flex;flex-direction:column;gap:4px;font-size:12px">' + lines.join('') + '</div>'
+        + '</div>';
     }
   }
 
