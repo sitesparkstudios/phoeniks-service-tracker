@@ -1532,8 +1532,8 @@ function buildPrintReport() {
   }).filter(x=>x.total>0).sort((a,b)=>b.critical-a.critical||b.urgent-a.urgent||b.total-a.total);
 
   /* ── HELPERS ── */
-  const th = (txt,align='left') => `<th style="padding:4px 6px;text-align:${align};border-bottom:1.5px solid #e5e7eb;font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;background:#fafafa">${txt}</th>`;
-  const td = (txt,style='') => `<td style="padding:3px 6px;${style}">${txt}</td>`;
+  const th = (txt,align='left') => `<th style="padding:3px 4px;text-align:${align};border-bottom:1.5px solid #e5e7eb;font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;background:#fafafa;overflow:hidden;white-space:nowrap">${txt}</th>`;
+  const td = (txt,style='') => `<td style="padding:2px 4px;overflow:hidden;${style}">${txt}</td>`;
 
   const sHead = (title,color='#1e2024',sub='') => `
     <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0 4px;padding-bottom:3px;border-bottom:1.5px solid ${color}">
@@ -1560,12 +1560,15 @@ function buildPrintReport() {
     const d = daysBetween(j.poDate,null);
     const rowBg = d>=30?'#fff8f8':d>=21?'#fffcf0':'';
     const dayCol = d>=30?'#dc2626':d>=21?'#d97706':'#374151';
+    // Truncate ref to 45 chars to prevent wrapping
+    const refShort = (j.ref||'—').length > 45 ? (j.ref||'—').substring(0,44)+'…' : (j.ref||'—');
+    const supShort = (j.supplier||'').length > 22 ? (j.supplier||'').substring(0,21)+'…' : (j.supplier||'');
     return `<tr style="border-bottom:1px solid #f0f0f0;background:${rowBg}">
-      <td style="padding:2px 4px;width:14px">${statusDot(d)}</td>
-      ${td(`<span style="font-family:'DM Mono',monospace;font-size:7px;color:#6b7280">${esc(j.po)}</span>`,'padding:2px 4px')}
-      ${td(`<span style="font-weight:600;font-size:8px;line-height:1.3">${esc(j.ref||'—')}</span>`,'padding:2px 4px;max-width:160px;word-wrap:break-word;white-space:normal')}
-      ${td(`<span style="color:#6b7280;font-size:7.5px">${esc(j.supplier)}</span>`,'padding:2px 4px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}
-      ${td(`<strong style="color:${dayCol};font-size:8.5px">${d}d</strong>`,'padding:2px 4px;text-align:right;white-space:nowrap')}
+      <td style="padding:2px 3px;width:10px">${statusDot(d)}</td>
+      <td style="padding:2px 3px;white-space:nowrap;width:38px"><span style="font-family:'DM Mono',monospace;font-size:6.5px;color:#6b7280">${esc(j.po)}</span></td>
+      <td style="padding:2px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;width:45%"><span style="font-weight:600;font-size:7.5px">${esc(refShort)}</span></td>
+      <td style="padding:2px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;width:30%"><span style="color:#6b7280;font-size:7px">${esc(supShort)}</span></td>
+      <td style="padding:2px 3px;text-align:right;white-space:nowrap;width:22px"><strong style="color:${dayCol};font-size:8px">${d}d</strong></td>
     </tr>`;
   };
 
@@ -1584,7 +1587,7 @@ function buildPrintReport() {
   }).join('');
 
   const html = `
-  <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:#1e2024;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+  <div style="width:190mm;font-family:'Plus Jakarta Sans',sans-serif;font-size:8.5px;color:#1e2024;-webkit-print-color-adjust:exact;print-color-adjust:exact;overflow:hidden;box-sizing:border-box">
 
     <!-- ══ HEADER ══ -->
     <div style="display:flex;justify-content:space-between;align-items:stretch;margin-bottom:8px;gap:0">
@@ -1619,7 +1622,7 @@ function buildPrintReport() {
     </div>
 
     <!-- ══ KPI STRIP ══ -->
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:7px">
       ${kpi(allOpen.length,'Open Jobs','#1e2024','all service jobs','#f8f9fa')}
       ${kpi(urgent.length,'Overdue 21d+',urgent.length>0?'#dc2626':'#16a34a',urgent.length>0?`${critical.length} critical`:'all on track',urgent.length>0?'#fff8f8':'#f0fdf4',urgent.length>0?'#fecaca':'#bbf7d0')}
       ${kpi(critical.length,'Critical 30d+',critical.length>0?'#dc2626':'#16a34a','needs action now',critical.length>0?'#fff8f8':'#f8f9fa',critical.length>0?'#fecaca':'#e5e7eb')}
@@ -1645,7 +1648,7 @@ function buildPrintReport() {
       <div>
         ${sHead(`Overdue Jobs — 21d+ open`,'#dc2626',urgent.length ? urgent.length+' jobs' : '')}
         ${urgent.length ? `
-        <table style="width:100%;border-collapse:collapse">
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed">
           <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
           <tbody>${urgent.slice(0,10).map(j=>jobRow(j)).join('')}</tbody>
         </table>
@@ -1656,7 +1659,7 @@ function buildPrintReport() {
 
         ${sHead('Revisiting Jobs','#d97706',revisiting.length?`${revisiting.length} jobs · avg ${avgRevisit}d`:'')}
         ${revisiting.length ? `
-        <table style="width:100%;border-collapse:collapse">
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed">
           <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
           <tbody>${revisiting.slice(0,4).map(j=>jobRow(j)).join('')}</tbody>
         </table>
@@ -1669,7 +1672,7 @@ function buildPrintReport() {
       <div>
         ${sHead('Waiting on Parts','#d97706',waiting.length?`${waiting.length} jobs · avg ${avgParts}d`:'')}
         ${waiting.length ? `
-        <table style="width:100%;border-collapse:collapse">
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed">
           <thead><tr><td style="width:10px"></td>${th('PO')}${th('Reference')}${th('Service Co.')}${th('Age','right')}</tr></thead>
           <tbody>${waiting.slice(0,5).map(j=>jobRow(j)).join('')}</tbody>
         </table>
@@ -1682,7 +1685,7 @@ function buildPrintReport() {
         <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:6px;margin-top:0">
           <div>
             ${sHead('Service Co. Breakdown','#1e2024')}
-            <table style="width:100%;border-collapse:collapse">
+            <table style="width:100%;border-collapse:collapse;table-layout:fixed">
               <thead><tr>${th('Company')}${th('Open','center')}${th('21d+','center')}${th('Avg','right')}</tr></thead>
               <tbody>${supplierStats.slice(0,7).map(x=>`<tr style="border-bottom:1px solid #f3f4f6">
                 ${td(`<span style="font-size:7.5px;font-weight:600;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${esc(x.s)}</span>`,'padding:2px 4px')}
