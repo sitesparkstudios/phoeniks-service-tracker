@@ -527,6 +527,7 @@ function renderBottleneck() {
       <td>${cell('Job Booked',true)}</td>
       <td>${cell('Waiting for Parts',false)}</td>
       <td>${cell('Revisiting',false)}</td>
+      <td>${cell('Awaiting Closeout',false)}</td>
       <td>${badge(j.status)}</td>
       <td><strong class="mono" style="color:var(--text)">${total !== null ? total+'d' : '—'}</strong></td>
     </tr>`;
