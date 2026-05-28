@@ -1654,9 +1654,9 @@ function buildPrintReport() {
 
     <!-- ══ WINS STRIP ══ -->
     ${wins.length ? `
-    <div style="background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1.5px solid #86efac;border-radius:7px;padding:8px 14px;margin-bottom:10px">
-      <div style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#15803d;margin-bottom:5px">✅ Wins this week</div>
-      <div style="display:flex;flex-wrap:nowrap;gap:5px;overflow:hidden">
+    <div style="background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1.5px solid #86efac;border-radius:7px;padding:7px 14px;margin-bottom:10px;display:flex;align-items:center;gap:8px;overflow:hidden">
+      <span style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#15803d;white-space:nowrap;flex-shrink:0">✅ Wins</span>
+      <div style="display:flex;flex-wrap:nowrap;gap:5px;overflow:hidden;min-width:0">
         ${wins.map(w => `<span style="font-size:9px;color:#166534;padding:3px 10px;background:white;border:1px solid #86efac;border-radius:10px;font-weight:600;white-space:nowrap">${w}</span>`).join('')}
       </div>
     </div>` : `

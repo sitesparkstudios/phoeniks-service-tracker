@@ -104,8 +104,8 @@ const STATUS_BADGE = {
   'Maintenance':       'b-maintenance',
 };
 
-const STAGE_COLORS  = ['#3b82f6','#a855f7','#f59e0b','#ff5f1f','#22c55e','#6b7280'];
-const ACTIVE_STAGES = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting'];
+const STAGE_COLORS  = ['#3b82f6','#a855f7','#f59e0b','#ff5f1f','#0d9488','#22c55e','#6b7280'];
+const ACTIVE_STAGES = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting','Awaiting Closeout'];
 
 const isServiceJob  = j => j.status !== 'Maintenance';
 const isOpenService = j => j.status !== 'Job Done' && j.status !== 'Maintenance';
