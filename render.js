@@ -83,7 +83,7 @@ function renderDashboard() {
       ).join(', ');
       healthEl.style.display = 'flex';
       healthEl.innerHTML = `<span style="font-size:16px;flex-shrink:0">⚠️</span>
-        <span><strong>${waitingBillsJobs.length} job${waitingBillsJobs.length!==1?'s':''} waiting on bills</strong> — invoices raised in Odoo but not confirmed yet. Chase accounts to match: ${poList}</span>`;
+        <span><strong>${waitingBillsJobs.length} job${waitingBillsJobs.length!==1?'s':''} waiting on bills</strong> — invoices have been raised in Odoo but supplier bills haven't been matched yet. <strong>Action needed:</strong> go to Odoo → Purchases → these POs and match/confirm the supplier invoice against each one: ${poList}</span>`;
     } else if (!hasBillingData) {
       const inv90h   = last90h.filter(j=>parseFloat(j.value)>0).length;
       const invRateH = last90h.length ? Math.round(inv90h/last90h.length*100) : null;
@@ -173,7 +173,7 @@ function renderDashboard() {
   const sc = {};
   jobs.forEach(j => { sc[j.status] = (sc[j.status]||0) + 1; });
   const slabels = Object.keys(sc);
-  const sColors = { 'Incoming Job':'#2563eb','Job Booked':'#7c3aed','Waiting for Parts':'#d97706','Revisiting':'#b8960a','Job Done':'#16a34a','Maintenance':'#6b7280' };
+  const sColors = { 'Incoming Job':'#2563eb','Job Booked':'#7c3aed','Waiting for Parts':'#d97706','Revisiting':'#b8960a','Awaiting Closeout':'#0d9488','Job Done':'#16a34a','Maintenance':'#6b7280' };
   if (statusChartInst) statusChartInst.destroy();
   statusChartInst = new Chart(document.getElementById('statusChart'), {
     type: 'doughnut',
@@ -809,6 +809,7 @@ function renderReports() {
         <div class="report-kpi"><strong>${r.openJobs}</strong>Open jobs</div>
         <div class="report-kpi"><strong>${r.doneJobs}</strong>Completed</div>
         <div class="report-kpi"><strong style="color:${r.stuck>0?'var(--amber)':'var(--green)'}">${r.stuck}</strong>Needs attention</div>
+        ${(r.byStatus?.['Awaiting Closeout']||0) > 0 ? `<div class="report-kpi"><strong style="color:#0d9488">${r.byStatus['Awaiting Closeout']}</strong>Awaiting closeout</div>` : ''}
         <div class="report-kpi"><strong>${r.avgDays !== null ? r.avgDays+'d' : '—'}</strong>Avg duration</div>
         <div class="report-kpi"><strong>${r.openValue > 0 ? '$'+Math.round(r.openValue).toLocaleString() : '—'}</strong>Open value</div>
         <div class="report-kpi"><strong>${r.totalJobs}</strong>Total jobs</div>
@@ -1655,8 +1656,8 @@ function buildPrintReport() {
     ${wins.length ? `
     <div style="background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1.5px solid #86efac;border-radius:7px;padding:8px 14px;margin-bottom:10px">
       <div style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#15803d;margin-bottom:5px">✅ Wins this week</div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px">
-        ${wins.map(w => `<span style="font-size:9px;color:#166534;padding:3px 10px;background:white;border:1px solid #86efac;border-radius:10px;font-weight:600">${w}</span>`).join('')}
+      <div style="display:flex;flex-wrap:nowrap;gap:5px;overflow:hidden">
+        ${wins.map(w => `<span style="font-size:9px;color:#166534;padding:3px 10px;background:white;border:1px solid #86efac;border-radius:10px;font-weight:600;white-space:nowrap">${w}</span>`).join('')}
       </div>
     </div>` : `
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:7px 12px;margin-bottom:10px">
@@ -1757,8 +1758,6 @@ function buildPrintReport() {
               ${longestJob?`<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Longest open</span><strong style="color:#dc2626">${longestDays}d</strong></div>`:''}
               <div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:#6b7280">Open jobs</span><strong>${allOpen.length}</strong></div>
             </div>
-            ${sHead('Notes','#1e2024')}
-            ${[0,1,2,3].map(()=>'<div style="border-bottom:1px solid #d1d5db;height:14px;margin-bottom:4px;width:100%"></div>').join('')}
           </div>
         </div>
       </div>

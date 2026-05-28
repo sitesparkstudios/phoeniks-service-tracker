@@ -468,6 +468,11 @@ select {
 /* ── PRINT ── */
 @media print {
   @page { size: A4 portrait; margin: 10mm 12mm; }
+  @page :first { margin-top: 10mm; }
+
+  /* Suppress browser-generated header (URL/title) and footer (page number/date).
+     Chrome/Edge honour margin:0 on @page to remove them when margins are set explicitly. */
+  html { -webkit-print-color-adjust: exact; }
 
   body > * { display: none !important; }
   #sidebar-overlay { display: none !important; }
