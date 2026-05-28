@@ -208,7 +208,11 @@
         <span class="day-chip danger">&gt;21d <span style="font-size:9px">overdue</span></span>
         <span class="day-chip ok">Xd <span style="font-size:9px">completed</span></span>
       </div>
-      <div id="invoicing-health" style="display:none;background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:12px;font-size:12px;color:var(--red);gap:10px;align-items:center"></div>
+
+      <!-- WINS HERO — filled by renderDashboard() -->
+      <div id="dash-wins-hero" style="display:none;margin-bottom:20px"></div>
+
+      <!-- OPS HEALTH + KPI GRID -->
       <div id="ops-health-banner" style="display:none;background:rgba(220,38,38,0.05);border:1px solid rgba(220,38,38,0.15);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:12px;font-size:12px;gap:10px;align-items:flex-start"></div>
       <div id="kpi-grid" class="metric-grid"></div>
 
@@ -228,10 +232,15 @@
           <div id="stage-bars-dash"></div>
         </div>
       </div>
+
       <div class="card chart-card mb-24">
         <div class="chart-title">Monthly spend — last 12 months</div>
         <div class="chart-wrap" style="height:180px"><canvas id="spendChart"></canvas></div>
       </div>
+
+      <!-- BILLING HEALTH — down here near spend, not screaming at you on load -->
+      <div id="invoicing-health" style="display:none;background:rgba(217,119,6,0.06);border:1px solid rgba(217,119,6,0.25);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:12px;color:var(--amber);gap:10px;align-items:flex-start"></div>
+
       <div class="card">
         <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
           <div style="font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px">

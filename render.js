@@ -68,6 +68,56 @@ function renderDashboard() {
   const _month = _now.toLocaleDateString('en-AU', { month:'long', year:'numeric' });
   document.getElementById('dash-date').textContent = `${_day}, ${_ord(_now.getDate())} ${_month}`;
 
+  // ── WINS HERO BANNER ──
+  const heroEl = document.getElementById('dash-wins-hero');
+  if (heroEl) {
+    // Compute quick wins for dashboard (reuse same logic as print report)
+    const dashWins = [];
+    const _weekDoneWithDur = done.filter(j => getTotalDays(j) !== null && (j.history?.[j.history.length-1]?.date||'') >= weekStartStr);
+    const _fastest = _weekDoneWithDur.length ? _weekDoneWithDur.reduce((a,b) => getTotalDays(a)<getTotalDays(b)?a:b) : null;
+    const _allOpenNow = jobs.filter(isOpenService);
+    const _critical = _allOpenNow.filter(j=>daysBetween(j.poDate,null)>=30);
+    const _waiting  = _allOpenNow.filter(j=>j.status==='Waiting for Parts');
+    const _revisit  = _allOpenNow.filter(j=>j.status==='Revisiting');
+    const _suppAll  = [...new Set(_allOpenNow.map(j=>j.supplier))];
+    const _onTrack  = _suppAll.filter(s=>_allOpenNow.filter(j=>j.supplier===s).every(j=>daysBetween(j.poDate,null)<21));
+    const _newThis  = jobs.filter(j=>(j.poDate||'')>=weekStartStr).length;
+    const _thisMonthKey2 = now.toISOString().substring(0,7);
+    const _lastMonth2 = new Date(now.getFullYear(),now.getMonth()-1,1);
+    const _lastMonthKey2 = _lastMonth2.toISOString().substring(0,7);
+    const _doneThisMonth2 = done.filter(j=>{const l=j.history?.[j.history.length-1];return l&&l.date&&l.date.startsWith(_thisMonthKey2);}).length;
+    const _doneLastMonth2 = done.filter(j=>{const l=j.history?.[j.history.length-1];return l&&l.date&&l.date.startsWith(_lastMonthKey2);}).length;
+    const _resolvedStuck = completedThisWeek.filter(j=>getTotalDays(j)>=21);
+    if (completedThisWeek.length > 0) dashWins.push(completedThisWeek.length + ' job' + (completedThisWeek.length!==1?'s':'') + ' completed this week');
+    if (_fastest && getTotalDays(_fastest)<=7) dashWins.push('Fastest: ' + esc(_fastest.ref||_fastest.po) + ' in ' + getTotalDays(_fastest) + 'd');
+    if (_doneThisMonth2 > _doneLastMonth2 && _doneLastMonth2>0) dashWins.push(_doneThisMonth2 + ' closed this month — up ' + (_doneThisMonth2-_doneLastMonth2) + ' vs last');
+    if (_resolvedStuck.length > 0) dashWins.push(_resolvedStuck.length + ' long-runner' + (_resolvedStuck.length!==1?'s':'') + ' resolved');
+    if (_onTrack.length===_suppAll.length && _suppAll.length>=2) dashWins.push('All ' + _suppAll.length + ' service cos. on track');
+    else if (_onTrack.length>0) dashWins.push(_onTrack.length + ' service co' + (_onTrack.length!==1?'s':'') + ' fully on track');
+    if (_newThis>0 && completedThisWeek.length>=_newThis) dashWins.push('Closed as many as opened — holding steady');
+    if (_critical.length===0 && _allOpenNow.length>0) dashWins.push('No critical jobs (30d+)');
+    if (_waiting.length===0 && _allOpenNow.length>0) dashWins.push('No parts delays');
+    if (_revisit.length===0 && _allOpenNow.length>0) dashWins.push('Zero revisits this week');
+
+    if (dashWins.length > 0) {
+      heroEl.style.display = 'block';
+      heroEl.innerHTML = `
+        <div style="background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1.5px solid #86efac;border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#15803d;white-space:nowrap;flex-shrink:0">✅ This week</span>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;flex:1">
+            ${dashWins.map(w=>`<span style="font-size:12px;color:#166534;padding:4px 12px;background:white;border:1px solid #86efac;border-radius:20px;font-weight:600">${w}</span>`).join('')}
+          </div>
+        </div>`;
+    } else {
+      heroEl.style.display = 'block';
+      heroEl.innerHTML = `
+        <div style="background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%);border:1.5px solid #86efac;border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:20px">✅</span>
+          <span style="font-size:13px;font-weight:600;color:#166534">All service jobs tracking normally — no issues detected</span>
+        </div>`;
+    }
+  }
+
   // ── INVOICING HEALTH BANNER ──
   const now90h       = new Date(); now90h.setDate(now90h.getDate()-90);
   const cut90h       = now90h.toISOString().split('T')[0];
@@ -77,13 +127,12 @@ function renderDashboard() {
   const healthEl = document.getElementById('invoicing-health');
   if (healthEl) {
     if (hasBillingData && waitingBillsJobs.length > 0) {
-      // Show which POs are waiting — actionable
       const poList = waitingBillsJobs.map(j=>
         `<span onclick="openJobModal('${j.id}')" style="cursor:pointer;text-decoration:underline;font-family:'DM Mono',monospace;font-size:11px">${esc(j.po)}</span>`
       ).join(', ');
       healthEl.style.display = 'flex';
-      healthEl.innerHTML = `<span style="font-size:16px;flex-shrink:0">⚠️</span>
-        <span><strong>${waitingBillsJobs.length} job${waitingBillsJobs.length!==1?'s':''} waiting on bills</strong> — invoices have been raised in Odoo but supplier bills haven't been matched yet. <strong>Action needed:</strong> go to Odoo → Purchases → these POs and match/confirm the supplier invoice against each one: ${poList}</span>`;
+      healthEl.innerHTML = `<span style="font-size:15px;flex-shrink:0">📋</span>
+        <span><strong>${waitingBillsJobs.length} job${waitingBillsJobs.length!==1?'s':''} waiting on bills</strong> — invoices raised in Odoo but supplier bills not yet matched. <strong>Action:</strong> Odoo → Purchases → match/confirm the supplier invoice on these POs: ${poList}</span>`;
     } else if (!hasBillingData) {
       const inv90h   = last90h.filter(j=>parseFloat(j.value)>0).length;
       const invRateH = last90h.length ? Math.round(inv90h/last90h.length*100) : null;
@@ -1485,20 +1534,99 @@ function buildPrintReport() {
   // Total jobs open this week vs last week (rough — jobs with poDate in last 7d)
   const newJobsThisWeek = jobs.filter(j => (j.poDate||'') >= weekStartStr).length;
 
-  // Build wins array — only include genuine wins
+  // Extra wins data
+  const closeoutThisWeek = jobs.filter(j => {
+    if (j.status !== 'Awaiting Closeout') return false;
+    const last = j.history?.[j.history.length-1];
+    return last && last.date >= weekStartStr;
+  });
+  const under7days = done.filter(j => getTotalDays(j) !== null && getTotalDays(j) <= 7);
+  const under3days = done.filter(j => getTotalDays(j) !== null && getTotalDays(j) <= 3);
+  const noCritical = critical.length === 0 && allOpen.length > 0;
+  const noWaiting  = waiting.length === 0 && allOpen.length > 0;
+  const noRevisiting = revisiting.length === 0 && allOpen.length > 0;
+  const allSuppliersOnTrack = onTrackSuppliers.length === suppliersWithOpenJobs.length && suppliersWithOpenJobs.length > 0;
+  const completedLast30 = done.filter(j => {
+    const last = j.history?.[j.history.length-1];
+    const cut30 = new Date(now); cut30.setDate(cut30.getDate()-30);
+    return last && last.date >= cut30.toISOString().split('T')[0];
+  });
+  const bestSingleWeekInMonth = (() => {
+    // Find the week in the last 30d with the most completions (to compare vs this week)
+    let best = 0;
+    for (let w = 1; w <= 4; w++) {
+      const ws = new Date(weekStart); ws.setDate(ws.getDate() - w*7);
+      const we = new Date(ws); we.setDate(we.getDate()+7);
+      const wsStr = ws.toISOString().split('T')[0];
+      const weStr = we.toISOString().split('T')[0];
+      const cnt = done.filter(j => { const l=j.history?.[j.history.length-1]; return l && l.date>=wsStr && l.date<weStr; }).length;
+      if (cnt > best) best = cnt;
+    }
+    return best;
+  })();
+
+  // Build wins array
   const wins = [];
+
+  // Completions this week
   if (completedThisWeek.length > 0)
     wins.push(completedThisWeek.length + ' job' + (completedThisWeek.length!==1?'s':'') + ' completed this week');
+
+  // Best week this month
+  if (completedThisWeek.length > 0 && completedThisWeek.length > bestSingleWeekInMonth)
+    wins.push('Best week of the month — ' + completedThisWeek.length + ' done');
+
+  // Fastest turnaround this week
   if (fastestThisWeek && getTotalDays(fastestThisWeek) <= 7)
-    wins.push('Fastest turnaround: ' + esc(fastestThisWeek.ref||fastestThisWeek.po) + ' closed in ' + getTotalDays(fastestThisWeek) + 'd');
+    wins.push('Fastest: ' + esc(fastestThisWeek.ref||fastestThisWeek.po) + ' closed in ' + getTotalDays(fastestThisWeek) + 'd');
+
+  // Same-day or next-day close
+  if (fastestThisWeek && getTotalDays(fastestThisWeek) <= 1)
+    wins.push('Same-day close this week 🔥');
+
+  // Monthly trend
   if (doneThisMonth > doneLastMonth && doneLastMonth > 0)
-    wins.push(doneThisMonth + ' jobs closed this month vs ' + doneLastMonth + ' last month — up ' + (doneThisMonth-doneLastMonth));
+    wins.push(doneThisMonth + ' closed this month — up ' + (doneThisMonth-doneLastMonth) + ' vs last');
+
+  // Long-running jobs resolved
   if (resolvedStuck.length > 0)
-    wins.push(resolvedStuck.length + ' long-running job' + (resolvedStuck.length!==1?'s':'') + ' finally resolved this week');
-  if (onTrackSuppliers.length > 0)
-    wins.push(onTrackSuppliers.length + ' service co' + (onTrackSuppliers.length!==1?'s':'') + ' fully on track — ' + onTrackSuppliers.slice(0,2).map(s=>s.split(' ')[0]).join(', ') + (onTrackSuppliers.length>2?' +more':''));
+    wins.push(resolvedStuck.length + ' long-runner' + (resolvedStuck.length!==1?'s':'') + ' finally resolved');
+
+  // All suppliers on track
+  if (allSuppliersOnTrack && suppliersWithOpenJobs.length >= 2)
+    wins.push('All ' + suppliersWithOpenJobs.length + ' service cos. on track');
+  else if (onTrackSuppliers.length > 0)
+    wins.push(onTrackSuppliers.length + ' service co' + (onTrackSuppliers.length!==1?'s':'') + ' fully on track');
+
+  // Holding steady
   if (newJobsThisWeek > 0 && completedThisWeek.length >= newJobsThisWeek)
-    wins.push('Closed as many jobs as opened this week — holding steady');
+    wins.push('Closed as many as opened — holding steady');
+
+  // No critical jobs
+  if (noCritical)
+    wins.push('No critical jobs (30d+) — clean sheet');
+
+  // No parts delays
+  if (noWaiting)
+    wins.push('No parts delays this week');
+
+  // No revisiting
+  if (noRevisiting)
+    wins.push('Zero revisits — first-time fix streak');
+
+  // Awaiting closeout progress (paperwork moving)
+  if (closeoutThisWeek.length > 0)
+    wins.push(closeoutThisWeek.length + ' job' + (closeoutThisWeek.length!==1?'s':'') + ' moved to closeout this week');
+
+  // Strong recent throughput
+  if (completedLast30.length >= 10)
+    wins.push(completedLast30.length + ' jobs closed in the last 30 days');
+
+  // Under-7-day close rate (at least 3 quick jobs)
+  if (under7days.length >= 3 && done.length > 0) {
+    const pct = Math.round(under7days.length / done.length * 100);
+    if (pct >= 30) wins.push(pct + '% of all jobs closed within 7 days');
+  }
 
   // Fix rate trend — compare last 90d vs 90-180d
   const now180 = new Date(); now180.setDate(now180.getDate()-180);
