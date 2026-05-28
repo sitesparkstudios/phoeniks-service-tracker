@@ -68,6 +68,15 @@ function renderDashboard() {
   const _month = _now.toLocaleDateString('en-AU', { month:'long', year:'numeric' });
   document.getElementById('dash-date').textContent = `${_day}, ${_ord(_now.getDate())} ${_month}`;
 
+  // Week boundaries (needed for wins hero)
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay() + 1); weekStart.setHours(0,0,0,0);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+  const completedThisWeek = jobs.filter(j => {
+    if (j.status !== 'Job Done') return false;
+    const last = j.history?.[j.history.length-1];
+    return last && last.date >= weekStartStr;
+  });
+
   // ── WINS HERO BANNER ──
   const heroEl = document.getElementById('dash-wins-hero');
   if (heroEl) {
