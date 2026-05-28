@@ -1850,7 +1850,7 @@ function buildPrintReport() {
 
     <!-- ══ ALL OPEN JOBS — full width ══ -->
     ${(() => {
-      const STATUS_ORDER = ['Revisiting','Waiting for Parts','Incoming Job','Job Booked','Awaiting Closeout'];
+      const STATUS_ORDER = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting','Awaiting Closeout'];
       const STATUS_COLOR = {'Revisiting':'#b8960a','Waiting for Parts':'#d97706','Incoming Job':'#2563eb','Job Booked':'#7c3aed','Awaiting Closeout':'#0d9488'};
       const STATUS_BG    = {'Revisiting':'#fffcf0','Waiting for Parts':'#fffcf0','Incoming Job':'#eff6ff','Job Booked':'#f5f3ff','Awaiting Closeout':'#f0fdfa'};
       const sorted = [...allOpen].sort((a,b) => {
