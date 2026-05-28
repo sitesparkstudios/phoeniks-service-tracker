@@ -753,7 +753,6 @@ function processCSVFile(file) {
         if (get('ref'))           existing.ref           = get('ref');
         if (get('value'))         existing.value         = get('value');
         if (get('buyer'))         existing.buyer         = get('buyer');
-        const dl = normalizeOdooDate(get('deadline')); if (dl && dl !== existing.poDate) existing.deadline = dl;
         if (get('priority'))      existing.priority      = get('priority');
         if (get('receiptStatus')) existing.receiptStatus = get('receiptStatus');
         if (get('sourceDoc'))     existing.sourceDoc     = get('sourceDoc');
@@ -774,7 +773,7 @@ function processCSVFile(file) {
           id: 'j' + Date.now() + Math.random().toString(36).slice(2),
           po: po, supplier: get('supplier'), ref: get('ref'), equipment: '',
           poDate, status: newStatus, value: get('value'), buyer: get('buyer'),
-          deadline: (() => { const dl = normalizeOdooDate(get('deadline')); return (dl && dl !== poDate) ? dl : ''; })(), priority: get('priority'),
+          deadline: '', priority: get('priority'),
           receiptStatus: get('receiptStatus'),
           sourceDoc:       get('sourceDoc') || '',
           notes:           get('odooNotes') || '',

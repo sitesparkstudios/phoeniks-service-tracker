@@ -1849,44 +1849,62 @@ function buildPrintReport() {
     </div>`}
 
     <!-- ══ ALL OPEN JOBS — full width ══ -->
-    ${sHead('All Open Jobs','#1e2024', allOpen.length + ' jobs · sorted by age')}
-    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
-      <thead><tr>
-        <th style="width:14px;border-bottom:2px solid #e5e7eb;background:#fafafa;padding:4px 4px"></th>
-        ${th('PO','left','58px')}${th('Reference')}${th('Service Co.','left','22%')}${th('Status','left','14%')}${th('Age','right','36px')}
-      </tr></thead>
-      <tbody>${allOpen.sort((a,b)=>daysBetween(b.poDate,null)-daysBetween(a.poDate,null)).map(j=>{
+    ${(() => {
+      const STATUS_ORDER = ['Revisiting','Waiting for Parts','Incoming Job','Job Booked','Awaiting Closeout'];
+      const STATUS_COLOR = {'Revisiting':'#b8960a','Waiting for Parts':'#d97706','Incoming Job':'#2563eb','Job Booked':'#7c3aed','Awaiting Closeout':'#0d9488'};
+      const STATUS_BG    = {'Revisiting':'#fffcf0','Waiting for Parts':'#fffcf0','Incoming Job':'#eff6ff','Job Booked':'#f5f3ff','Awaiting Closeout':'#f0fdfa'};
+      const sorted = [...allOpen].sort((a,b) => {
+        const oa = STATUS_ORDER.indexOf(a.status)===-1?99:STATUS_ORDER.indexOf(a.status);
+        const ob = STATUS_ORDER.indexOf(b.status)===-1?99:STATUS_ORDER.indexOf(b.status);
+        if (oa!==ob) return oa-ob;
+        return daysBetween(b.poDate,null)-daysBetween(a.poDate,null);
+      });
+      const showNotes = sorted.length <= 40;
+      const fz = sorted.length > 35 ? '8.5px' : '9px';
+      const rp = sorted.length > 35 ? '2px 5px' : '3px 5px';
+      let rows = '';
+      let lastStatus = null;
+      sorted.forEach(j => {
         const d = daysBetween(j.poDate,null);
         const rowBg = d>=30?'#fff8f8':d>=21?'#fffcf0':'';
         const dayCol = d>=30?'#dc2626':d>=21?'#d97706':'#374151';
-        const statusColor = {
-          'Incoming Job':'#2563eb','Job Booked':'#7c3aed',
-          'Waiting for Parts':'#d97706','Revisiting':'#b8960a',
-          'Awaiting Closeout':'#0d9488'
-        }[j.status]||'#6b7280';
-        const statusBg = {
-          'Incoming Job':'#eff6ff','Job Booked':'#f5f3ff',
-          'Waiting for Parts':'#fffcf0','Revisiting':'#fffcf0',
-          'Awaiting Closeout':'#f0fdfa'
-        }[j.status]||'#f8f9fa';
-        return `<tr style="border-bottom:1px solid #f0f0f0;background:${rowBg}">
-          <td style="padding:3px 4px;width:14px;vertical-align:middle">${statusDot(d)}</td>
-          <td style="padding:3px 5px;white-space:nowrap;vertical-align:middle"><span style="font-family:'DM Mono',monospace;font-size:8px;color:#6b7280">${esc(j.po)}</span></td>
-          <td style="padding:3px 5px;vertical-align:middle"><span style="font-weight:600;font-size:9px;color:#1e2024">${esc(j.ref||'—')}</span></td>
-          <td style="padding:3px 5px;vertical-align:middle"><span style="font-size:8.5px;color:#6b7280">${esc(j.supplier||'—')}</span></td>
-          <td style="padding:3px 5px;vertical-align:middle"><span style="font-size:7.5px;font-weight:700;padding:2px 6px;border-radius:8px;background:${statusBg};color:${statusColor}">${j.status}</span></td>
-          <td style="padding:3px 5px;text-align:right;white-space:nowrap;vertical-align:middle"><strong style="color:${dayCol};font-size:9.5px">${d}d</strong></td>
-        </tr>
-        <tr style="border-bottom:1px solid #e8e8e8;background:${rowBg}">
-          <td style="padding:0 4px 4px;"></td>
-          <td colspan="5" style="padding:1px 5px 5px;">
-            <span style="font-size:7.5px;font-weight:600;color:#c0c4cc;text-transform:uppercase;letter-spacing:0.05em">Notes: </span>
-            <span style="display:inline-block;border-bottom:1px solid #e5e7eb;width:calc(100% - 38px);vertical-align:bottom;">&nbsp;</span>
-          </td>
+        const sc = STATUS_COLOR[j.status]||'#6b7280';
+        const sb = STATUS_BG[j.status]||'#f8f9fa';
+        if (j.status !== lastStatus) {
+          const grp = sorted.filter(x=>x.status===j.status);
+          const ga  = grp.length ? Math.round(grp.reduce((a,x)=>a+daysBetween(x.poDate,null),0)/grp.length) : 0;
+          rows += `<tr><td colspan="6" style="padding:5px 6px 2px;background:#f8f9fa;border-top:2px solid ${sc}30;border-bottom:1px solid #efefef">
+            <span style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:${sc}">${j.status}</span>
+            <span style="font-size:7.5px;color:#9ba3af;margin-left:8px">${grp.length} job${grp.length!==1?'s':''} · avg ${ga}d open</span>
+          </td></tr>`;
+          lastStatus = j.status;
+        }
+        rows += `<tr style="border-bottom:${showNotes?'none':'1px solid #f0f0f0'};background:${rowBg}">
+          <td style="padding:${rp};width:12px;vertical-align:middle">${statusDot(d)}</td>
+          <td style="padding:${rp};white-space:nowrap;vertical-align:middle"><span style="font-family:'DM Mono',monospace;font-size:7.5px;color:#6b7280">${esc(j.po)}</span></td>
+          <td style="padding:${rp};vertical-align:middle"><span style="font-weight:600;font-size:${fz};color:#1e2024">${esc(j.ref||'—')}</span></td>
+          <td style="padding:${rp};vertical-align:middle"><span style="font-size:8px;color:#6b7280">${esc(j.supplier||'—')}</span></td>
+          <td style="padding:${rp};text-align:right;white-space:nowrap;vertical-align:middle"><strong style="color:${dayCol};font-size:9px">${d}d</strong></td>
         </tr>`;
-      }).join('')}
-      </tbody>
-    </table>
+        if (showNotes) {
+          rows += `<tr style="border-bottom:1px solid #f0f0f0;background:${rowBg}">
+            <td style="padding:0 3px 4px;"></td>
+            <td colspan="4" style="padding:1px 5px 4px;">
+              <span style="font-size:7px;font-weight:600;color:#c0c4cc;text-transform:uppercase;letter-spacing:0.05em">Notes: </span>
+              <span style="display:inline-block;border-bottom:1px solid #e5e7eb;width:calc(100% - 36px);vertical-align:bottom;">&nbsp;</span>
+            </td>
+          </tr>`;
+        }
+      });
+      return `${sHead('All Open Jobs','#1e2024', sorted.length + ' jobs · by status · oldest first within group')}
+      <table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:${fz}">
+        <thead><tr>
+          <th style="width:12px;border-bottom:2px solid #e5e7eb;background:#fafafa;padding:3px"></th>
+          ${th('PO','left','54px')}${th('Reference')}${th('Service Co.','left','22%')}${th('Age','right','34px')}
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>${!showNotes?`<div style="font-size:8px;color:#9ba3af;font-style:italic;margin:-8px 0 10px">Notes suppressed — ${sorted.length} jobs over single-page limit.</div>`:''}`;
+    })()}
 
     <!-- ══ TWO-COLUMN: SERVICE CO + STATS / CHART ══ -->
     <div style="display:grid;grid-template-columns:1.4fr 0.6fr;gap:12px;align-items:start">
