@@ -92,7 +92,7 @@ let confirmCallback = null;
 let _dataLoaded   = false;
 
 /* ── STATUS CONSTANTS ─────────────────────────────────────── */
-const STATUSES = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting','Job Done','Maintenance'];
+const STATUSES = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting','Awaiting Closeout','Job Done','Maintenance'];
 
 const STATUS_BADGE = {
   'Incoming Job':      'b-incoming',
@@ -530,9 +530,9 @@ async function saveReports() {
    ─────────────────────────────────────────────────────────── */
 async function saveReport() {
   if (!isAuthed()) { showToast('Sign in to save reports'); return; }
-  const open   = jobs.filter(j => j.status !== 'Job Done');
+  const open   = jobs.filter(j => j.status !== 'Job Done' && j.status !== 'Maintenance');
   const done   = jobs.filter(j => j.status === 'Job Done');
-  const stuck  = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 14);
+  const stuck  = jobs.filter(j => j.status !== 'Job Done' && j.status !== 'Maintenance' && daysBetween(j.poDate, null) > 14);
   const avgTotal = done.length ? Math.round(done.reduce((a,j) => a + (getTotalDays(j)||0), 0) / done.length) : null;
   const totalValue = open.reduce((a,j) => a + (parseFloat(j.value)||0), 0);
 
@@ -717,6 +717,7 @@ function mapOdooStatus(v) {
     'job booked':'Job Booked','booked':'Job Booked',
     'waiting for parts':'Waiting for Parts','waiting':'Waiting for Parts',
     'revisiting':'Revisiting',
+    'awaiting closeout':'Awaiting Closeout','closeout':'Awaiting Closeout',
     'job done':'Job Done','done':'Job Done','completed':'Job Done',
     'maintenance':'Maintenance',
   };

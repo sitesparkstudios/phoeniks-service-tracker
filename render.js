@@ -626,11 +626,12 @@ function renderJobs() {
   }
 
   document.getElementById('jobs-tbody').innerHTML = filtered.map(j => {
-    const open    = daysBetween(j.poDate, j.status === 'Job Done' ? j.history?.[j.history.length-1]?.date : null);
+    const open    = daysBetween(j.poDate, (j.status === 'Job Done' || j.status === 'Awaiting Closeout') ? j.history?.[j.history.length-1]?.date : null);
     const dw      = getDwellTimes(j);
     const inStage = dw[j.status] !== undefined ? dw[j.status] : null;
     const isDone  = j.status === 'Job Done';
-    const flagged = !isDone && (open||0) > 14;
+    const isCloseout = j.status === 'Awaiting Closeout';
+    const flagged = !isDone && !isCloseout && (open||0) > 14;
     return `<tr class="${flagged?'flagged':''}" onclick="openJobModal('${j.id}')">
       <td><span class="po-link">${esc(j.po)}</span></td>
       <td class="ref-cell">${esc(j.ref||'—')}</td>
@@ -927,9 +928,10 @@ function openSupplierModal(supplier, filter) {
           <th style="width:90px">Value</th>
         </tr></thead>
         <tbody>${filtered.map(j => {
-          const open = daysBetween(j.poDate, j.status === 'Job Done' ? j.history?.[j.history.length-1]?.date : null);
+          const open = daysBetween(j.poDate, (j.status === 'Job Done' || j.status === 'Awaiting Closeout') ? j.history?.[j.history.length-1]?.date : null);
           const isDone = j.status === 'Job Done';
-          const flagged = !isDone && (open||0) > 14;
+          const isCloseout = j.status === 'Awaiting Closeout';
+          const flagged = !isDone && !isCloseout && (open||0) > 14;
           return `<tr class="${flagged?'flagged':''}" onclick="openJobModal('${j.id}');closeSupplierModal()" style="cursor:pointer">
             <td><span class="po-link">${esc(j.po)}</span></td>
             <td class="ref-cell">${esc(j.ref||'—')}</td>
