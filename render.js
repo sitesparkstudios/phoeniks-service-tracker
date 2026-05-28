@@ -295,27 +295,73 @@ function renderDashboard() {
 function renderSpendChart() {
   const canvas = document.getElementById('spendChart');
   if (!canvas) return;
-  const months  = getMonthlySpend();
-  const hasData = months.some(m => m.total > 0);
+  const allMonths = getMonthlySpend();
+  // Always show last 12 months only — slice from the end
+  const months  = allMonths.slice(-12);
+  const hasSpend = months.some(m => m.total > 0);
+  const hasJobs  = months.some(m => m.count > 0);
   if (spendChartInst) spendChartInst.destroy();
-  if (!hasData) {
+  if (!hasJobs) {
     canvas.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text3);font-size:12px">Spend data appears after importing jobs with values from Odoo</div>';
     return;
   }
+
+  // If we have job counts but no spend values, show job volume instead with a note
+  const noteEl = canvas.parentElement.querySelector('.spend-note');
+  if (!hasSpend) {
+    if (!noteEl) {
+      const note = document.createElement('div');
+      note.className = 'spend-note';
+      note.style.cssText = 'font-size:11px;color:var(--text3);margin-bottom:6px;padding:0 4px';
+      note.textContent = 'Showing job volume — re-import Odoo CSV with Order Total column to see spend';
+      canvas.parentElement.insertBefore(note, canvas);
+    }
+  } else if (noteEl) {
+    noteEl.remove();
+  }
+
   spendChartInst = new Chart(canvas, {
     type: 'bar',
     data: {
       labels: months.map(m => m.label),
-      datasets: [{ label:'Monthly Spend ($)', data: months.map(m => m.total),
-        backgroundColor: months.map(m => m.total > 0 ? 'rgba(61,64,67,0.85)' : 'rgba(0,0,0,0.06)'),
-        borderRadius: 6, borderWidth: 0 }]
+      datasets: [
+        hasSpend ? {
+          label: 'Monthly Spend ($)',
+          data: months.map(m => m.total),
+          backgroundColor: months.map((m,i) => i === months.length-1 ? 'rgba(61,64,67,0.95)' : m.total > 0 ? 'rgba(61,64,67,0.75)' : 'rgba(0,0,0,0.06)'),
+          borderRadius: 6, borderWidth: 0,
+          yAxisID: 'y',
+        } : {
+          label: 'Jobs',
+          data: months.map(m => m.count),
+          backgroundColor: months.map((m,i) => i === months.length-1 ? 'rgba(61,64,67,0.95)' : 'rgba(61,64,67,0.65)'),
+          borderRadius: 6, borderWidth: 0,
+          yAxisID: 'y',
+        },
+        hasSpend && months.some(m => m.count > 0) ? {
+          label: 'Jobs',
+          data: months.map(m => m.count),
+          type: 'line',
+          borderColor: 'rgba(255,209,0,0.9)',
+          backgroundColor: 'rgba(255,209,0,0.15)',
+          borderWidth: 2,
+          pointBackgroundColor: 'rgba(255,209,0,1)',
+          pointRadius: 3,
+          tension: 0.3,
+          yAxisID: 'y2',
+        } : null,
+      ].filter(Boolean),
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' $' + Math.round(ctx.raw).toLocaleString() } } },
+      plugins: {
+        legend: { display: hasSpend, labels: { boxWidth: 10, padding: 12, font: { size: 11, family: 'Plus Jakarta Sans' }, color: '#5a6270' } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.yAxisID === 'y2' ? ` ${ctx.raw} jobs` : hasSpend ? ' $' + Math.round(ctx.raw).toLocaleString() : ` ${ctx.raw} jobs` } }
+      },
       scales: {
-        y: { beginAtZero: true, ticks: { ...CHART_TICK, callback: v => '$'+(v>=1000?(v/1000).toFixed(0)+'k':v) }, grid: CHART_GRID },
-        x: { ticks: CHART_TICK, grid: { display: false } }
+        y: { beginAtZero: true, ticks: { ...CHART_TICK, callback: v => hasSpend ? '$'+(v>=1000?(v/1000).toFixed(0)+'k':v) : v }, grid: CHART_GRID },
+        ...(hasSpend ? { y2: { beginAtZero: true, position: 'right', ticks: { ...CHART_TICK, callback: v => v+'j' }, grid: { display: false } } } : {}),
+        x: { ticks: CHART_TICK, grid: { display: false } },
       }
     }
   });
