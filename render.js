@@ -732,19 +732,21 @@ function renderChatterLog() {
   const el = document.getElementById('chatter-log-body');
   if (!el) return;
 
+  // A job "has chatter" if it has status transitions OR notes were captured from a chatter paste
+  const hasChatter = j => (j.history||[]).length > 1 || (j.notes && j.notes.trim().length > 20);
+
   // Open jobs only — exclude Job Done and Maintenance
   const open = jobs
     .filter(j => j.status !== 'Job Done' && j.status !== 'Maintenance')
     .sort((a, b) => {
-      // Sort: no-history first (needs most urgently), then by age desc
-      const aHist = (a.history||[]).length > 1;
-      const bHist = (b.history||[]).length > 1;
+      const aHist = hasChatter(a);
+      const bHist = hasChatter(b);
       if (aHist !== bHist) return aHist ? 1 : -1;
       return daysBetween(b.poDate, null) - daysBetween(a.poDate, null);
     });
 
-  const noHistory  = open.filter(j => (j.history||[]).length <= 1);
-  const hasHistory = open.filter(j => (j.history||[]).length > 1);
+  const noHistory  = open.filter(j => !hasChatter(j));
+  const hasHistory = open.filter(j => hasChatter(j));
 
   // Update badge
   const badge = document.getElementById('chatter-needs-badge');
@@ -756,8 +758,8 @@ function renderChatterLog() {
   const STATUS_COLOR = {'Incoming Job':'#2563eb','Job Booked':'#7c3aed','Waiting for Parts':'#d97706','Revisiting':'#b8960a','Awaiting Closeout':'#0d9488'};
 
   const row = j => {
-    const hist   = (j.history||[]).length > 1;
-    const stages = hist ? [...new Set(j.history.map(h=>h.status))].length - 1 : 0;
+    const hist   = hasChatter(j);
+    const stages = (j.history||[]).length > 1 ? [...new Set(j.history.map(h=>h.status))].length - 1 : 0;
     const d      = daysBetween(j.poDate, null);
     const sc     = STATUS_COLOR[j.status] || '#6b7280';
     const lastEntry = hist ? [...j.history].sort((a,b)=>(a.date||'')<(b.date||'')?1:-1)[0] : null;

@@ -154,7 +154,8 @@ function updateNavBadges() {
 
 function updateChatterBadge() {
   const noHistory = jobs.filter(j =>
-    j.status !== 'Job Done' && j.status !== 'Maintenance' && (j.history||[]).length <= 1
+    j.status !== 'Job Done' && j.status !== 'Maintenance' &&
+    (j.history||[]).length <= 1 && !(j.notes && j.notes.trim().length > 20)
   ).length;
   const badge = document.getElementById('chatter-needs-badge');
   if (badge) {
