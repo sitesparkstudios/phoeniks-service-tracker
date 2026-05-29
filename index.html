@@ -238,6 +238,9 @@
         <div class="chart-wrap" style="height:180px"><canvas id="spendChart"></canvas></div>
       </div>
 
+      <!-- STATE BREAKDOWN -->
+      <div id="dash-state-breakdown" class="mb-24"></div>
+
       <!-- BILLING HEALTH — down here near spend, not screaming at you on load -->
       <div id="invoicing-health" style="display:none;background:rgba(217,119,6,0.06);border:1px solid rgba(217,119,6,0.25);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:12px;color:var(--amber);gap:10px;align-items:flex-start"></div>
 
@@ -530,8 +533,8 @@
           </div>
           <select id="filter-supplier" onchange="renderJobs()"><option value="">All service cos.</option></select>
           <select id="filter-sort" onchange="renderJobs()" style="font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:var(--font)">
-            <option value="age-desc">Oldest first</option>
             <option value="age-asc">Newest first</option>
+            <option value="age-desc">Oldest first</option>
             <option value="closed-recent">Recently closed</option>
             <option value="status">By status</option>
             <option value="supplier">By service co.</option>

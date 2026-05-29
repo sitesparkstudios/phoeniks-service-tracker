@@ -11,6 +11,7 @@ function renderAll() {
   renderDashboard();
   renderJobs();
   renderChatterLog();
+  renderStateBreakdown();
   renderSuppliers();
   renderParts();
   renderReports();
@@ -275,6 +276,7 @@ function renderDashboard() {
       </tr>`).join('')}</tbody></table>`;
 
   renderSpendChart();
+  renderStateBreakdown();
 
   // Ops health banner — computed from all open jobs (not period-filtered)
   const _allOpen = jobs.filter(isOpenService);
@@ -866,15 +868,20 @@ function renderJobs() {
   });
 
   // Sort
-  const sortVal = document.getElementById('filter-sort')?.value || 'age-desc';
-  const getClosedDate = j => [...(j.history||[])].sort((a,b)=>(a.date||'')<(b.date||'')?1:-1)[0]?.date || '';
+  const sortVal = document.getElementById('filter-sort')?.value || 'age-asc';
+  // Get actual completion date — last history entry when status is Job Done
+  const getCompletionDate = j => {
+    if (j.status !== 'Job Done') return '';
+    return [...(j.history||[])].sort((a,b)=>(a.date||'')<(b.date||'')?1:-1)[0]?.date || j.poDate || '';
+  };
   const STATUS_SORT_ORDER = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting','Awaiting Closeout','Job Done','Maintenance'];
   filtered.sort((a,b) => {
-    if (sortVal === 'age-asc')       return daysBetween(a.poDate,null) - daysBetween(b.poDate,null);
-    if (sortVal === 'closed-recent') return getClosedDate(b).localeCompare(getClosedDate(a));
+    if (sortVal === 'age-asc')       return (b.poDate||'').localeCompare(a.poDate||'');  // newest PO first
+    if (sortVal === 'age-desc')      return (a.poDate||'').localeCompare(b.poDate||'');  // oldest PO first
+    if (sortVal === 'closed-recent') return getCompletionDate(b).localeCompare(getCompletionDate(a));
     if (sortVal === 'status')        return STATUS_SORT_ORDER.indexOf(a.status) - STATUS_SORT_ORDER.indexOf(b.status);
     if (sortVal === 'supplier')      return (a.supplier||'').localeCompare(b.supplier||'');
-    return daysBetween(b.poDate,null) - daysBetween(a.poDate,null);
+    return (b.poDate||'').localeCompare(a.poDate||'');
   });
 
   document.getElementById('jobs-count').textContent = `${filtered.length} of ${jobs.length} jobs`;
@@ -919,45 +926,78 @@ function renderJobs() {
 }
 
 function renderStateBreakdown() {
-  const el = document.getElementById('jobs-state-breakdown');
-  if (!el) return;
-  const STATE_COLORS = { VIC:'#3b82f6', NSW:'#16a34a', QLD:'#d97706', SA:'#dc2626', WA:'#7c3aed', TAS:'#0891b2', ACT:'#be185d', NT:'#c2410c', NAT:'#374151', '?':'#9ba3af' };
-  const openJobs    = jobs.filter(isOpenService);
-  const allSvcJobs  = jobs.filter(isServiceJob);
-  const stateCounts = {};
-  const stateOpen   = {};
-  allSvcJobs.forEach(j => { const s = getStateForSupplier(j.supplier)||'?'; stateCounts[s]=(stateCounts[s]||0)+1; });
-  openJobs.forEach(j   => { const s = getStateForSupplier(j.supplier)||'?'; stateOpen[s]  =(stateOpen[s]  ||0)+1; });
-  const states = Object.entries(stateCounts).filter(([s])=>s!=='?').sort((a,b)=>b[1]-a[1]);
-  if (!states.length) { el.innerHTML = ''; return; }
-  const maxCount = Math.max(...states.map(([,c])=>c), 1);
-  el.innerHTML = `<div class="card" style="padding:20px">
+  // Renders into both #jobs-state-breakdown (All Jobs) and #dash-state-breakdown (Dashboard)
+  const targets = ['jobs-state-breakdown','dash-state-breakdown'].map(id => document.getElementById(id)).filter(Boolean);
+  if (!targets.length) return;
+
+  const tags = loadSupplierTags();
+  const STATE_COLORS = { VIC:'#3b82f6', NSW:'#16a34a', QLD:'#d97706', SA:'#dc2626', WA:'#7c3aed', TAS:'#0891b2', ACT:'#be185d', NT:'#c2410c', NAT:'#374151' };
+
+  // Last 6 months buckets
+  const now6 = new Date();
+  const buckets = [];
+  for (let i=5;i>=0;i--) {
+    const d = new Date(now6.getFullYear(), now6.getMonth()-i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    buckets.push({ key, label: d.toLocaleDateString('en-AU',{month:'short',year:'2-digit'}) });
+  }
+
+  // Count jobs per state per month (service jobs in last 6 months)
+  const cut6 = new Date(now6.getFullYear(), now6.getMonth()-5, 1).toISOString().split('T')[0];
+  const recentJobs = jobs.filter(j => isServiceJob(j) && (j.poDate||'') >= cut6);
+  const stateMonthly = {}; // { VIC: { 'May 25': 3, ... }, ... }
+  const stateTotal   = {};
+  const stateOpen    = {};
+  recentJobs.forEach(j => {
+    const state = getSupplierState(j.supplier, tags);
+    if (!state || state === '?') return;
+    const mo = (j.poDate||'').substring(0,7);
+    if (!stateMonthly[state]) stateMonthly[state] = {};
+    stateMonthly[state][mo] = (stateMonthly[state][mo]||0)+1;
+    stateTotal[state] = (stateTotal[state]||0)+1;
+    if (isOpenService(j)) stateOpen[state] = (stateOpen[state]||0)+1;
+  });
+
+  const states = Object.entries(stateTotal).sort((a,b)=>b[1]-a[1]);
+  if (!states.length) { targets.forEach(el => el.innerHTML = ''); return; }
+
+  const allMonthMax = Math.max(...states.flatMap(([s]) => buckets.map(b => stateMonthly[s]?.[b.key]||0)), 1);
+
+  const html = `<div class="card" style="padding:20px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:700">Jobs by State</div>
-      <span style="font-size:11px;color:var(--text3)">based on service company location · all time</span>
+      <div style="font-size:13px;font-weight:700">Jobs by State — last 6 months</div>
+      <span style="font-size:11px;color:var(--text3)">by service company location</span>
     </div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      ${states.map(([state,total]) => {
-        const open  = stateOpen[state]||0;
-        const done  = total - open;
-        const pct   = Math.round(total/maxCount*100);
-        const color = STATE_COLORS[state]||'#9ba3af';
-        return `<div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:12px;font-weight:800;color:${color};min-width:36px">${state}</span>
-              <span style="font-size:12px;font-weight:600;color:var(--text)">${total} total</span>
-              ${open>0?`<span style="font-size:11px;padding:1px 7px;border-radius:10px;background:${color}18;color:${color};font-weight:600">${open} open</span>`:`<span style="font-size:11px;color:var(--text3)">all closed</span>`}
+    <!-- Month header -->
+    <div style="display:grid;grid-template-columns:80px repeat(6,1fr) 60px 60px;gap:4px;margin-bottom:6px;font-size:10px;font-weight:600;color:var(--text3);text-align:center">
+      <div></div>
+      ${buckets.map(b=>`<div>${b.label}</div>`).join('')}
+      <div>Total</div><div>Open</div>
+    </div>
+    ${states.map(([state,total]) => {
+      const color = STATE_COLORS[state]||'#9ba3af';
+      const open  = stateOpen[state]||0;
+      return `<div style="display:grid;grid-template-columns:80px repeat(6,1fr) 60px 60px;gap:4px;align-items:center;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:800;color:${color}">${state}</div>
+        ${buckets.map(b => {
+          const cnt = stateMonthly[state]?.[b.key]||0;
+          const h   = cnt ? Math.max(Math.round(cnt/allMonthMax*32),4) : 2;
+          return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            ${cnt>0?`<span style="font-size:9px;font-weight:600;color:${color}">${cnt}</span>`:'<span style="font-size:9px;color:transparent">0</span>'}
+            <div style="width:100%;height:32px;display:flex;align-items:flex-end">
+              <div style="width:100%;height:${h}px;background:${cnt?color:'var(--surface2)'};border-radius:2px 2px 0 0"></div>
             </div>
-            <span style="font-size:11px;color:var(--text3)">${done} completed</span>
-          </div>
-          <div style="height:6px;background:var(--surface2);border-radius:4px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:${color};border-radius:4px"></div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>
+          </div>`;
+        }).join('')}
+        <div style="text-align:center;font-size:12px;font-weight:700;color:var(--text)">${total}</div>
+        <div style="text-align:center">
+          ${open>0?`<span style="font-size:11px;padding:1px 6px;border-radius:10px;background:${color}18;color:${color};font-weight:600">${open}</span>`:`<span style="font-size:11px;color:var(--text3)">—</span>`}
+        </div>
+      </div>`;
+    }).join('')}
   </div>`;
+
+  targets.forEach(el => el.innerHTML = html);
 }
 
 /* ── PARTS TRACKER ── */
@@ -1998,10 +2038,18 @@ function buildPrintReport() {
     <div style="display:flex;justify-content:space-between;align-items:stretch;margin-bottom:10px;gap:0">
 
       <!-- Brand block -->
-      <div style="display:flex;align-items:center;gap:10px;padding:12px 18px;background:#FFD100;border-radius:8px;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#FFD100;border-radius:8px;flex-shrink:0">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;flex-shrink:0">
+          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:7px;height:7px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:7px;height:7px;border-radius:50%;background:transparent;border:2px solid #3d4043;box-sizing:border-box"></div>
+        </div>
         <div>
-          <div style="font-size:20px;font-weight:800;letter-spacing:1.5px;color:#3d4043;line-height:1">PHOENIKS</div>
-          <div style="font-size:8px;font-weight:600;letter-spacing:0.18em;color:rgba(61,64,67,0.6);margin-top:2px">ELECTRIC KITCHEN SPECIALISTS</div>
+          <div style="font-size:18px;font-weight:800;letter-spacing:1.5px;color:#3d4043;line-height:1">PHOENIKS</div>
+          <div style="font-size:7.5px;font-weight:600;letter-spacing:0.18em;color:rgba(61,64,67,0.6);margin-top:1px">ELECTRIC KITCHEN SPECIALISTS</div>
         </div>
       </div>
 
