@@ -702,7 +702,143 @@ function getSelectedStatuses() {
   return checked;
 }
 
-function renderJobs() {
+function switchJobsTab(tab) {
+  const allBtn  = document.getElementById('jobs-tab-all');
+  const chatBtn = document.getElementById('jobs-tab-chatter');
+  const allDiv  = document.getElementById('jobs-tab-all-content');
+  const chatDiv = document.getElementById('jobs-tab-chatter-content');
+  if (!allBtn) return;
+  if (tab === 'all') {
+    allBtn.style.borderBottomColor  = 'var(--text)';
+    allBtn.style.color              = 'var(--text)';
+    chatBtn.style.borderBottomColor = 'transparent';
+    chatBtn.style.color             = 'var(--text3)';
+    allDiv.style.display  = 'block';
+    chatDiv.style.display = 'none';
+  } else {
+    chatBtn.style.borderBottomColor = 'var(--text)';
+    chatBtn.style.color             = 'var(--text)';
+    allBtn.style.borderBottomColor  = 'transparent';
+    allBtn.style.color              = 'var(--text3)';
+    allDiv.style.display  = 'none';
+    chatDiv.style.display = 'block';
+    renderChatterLog();
+  }
+}
+
+function renderChatterLog() {
+  const el = document.getElementById('chatter-log-body');
+  if (!el) return;
+
+  // Open jobs only — exclude Job Done and Maintenance
+  const open = jobs
+    .filter(j => j.status !== 'Job Done' && j.status !== 'Maintenance')
+    .sort((a, b) => {
+      // Sort: no-history first (needs most urgently), then by age desc
+      const aHist = (a.history||[]).length > 1;
+      const bHist = (b.history||[]).length > 1;
+      if (aHist !== bHist) return aHist ? 1 : -1;
+      return daysBetween(b.poDate, null) - daysBetween(a.poDate, null);
+    });
+
+  const noHistory  = open.filter(j => (j.history||[]).length <= 1);
+  const hasHistory = open.filter(j => (j.history||[]).length > 1);
+
+  // Update badge
+  const badge = document.getElementById('chatter-needs-badge');
+  if (badge) {
+    if (noHistory.length > 0) { badge.textContent = noHistory.length + ' need updating'; badge.style.display = 'inline'; }
+    else { badge.style.display = 'none'; }
+  }
+
+  const STATUS_COLOR = {'Incoming Job':'#2563eb','Job Booked':'#7c3aed','Waiting for Parts':'#d97706','Revisiting':'#b8960a','Awaiting Closeout':'#0d9488'};
+
+  const row = j => {
+    const hist   = (j.history||[]).length > 1;
+    const stages = hist ? [...new Set(j.history.map(h=>h.status))].length - 1 : 0;
+    const d      = daysBetween(j.poDate, null);
+    const sc     = STATUS_COLOR[j.status] || '#6b7280';
+    const lastEntry = hist ? [...j.history].sort((a,b)=>(a.date||'')<(b.date||'')?1:-1)[0] : null;
+    const lastUpdated = lastEntry ? lastEntry.date : null;
+    const daysSinceUpdate = lastUpdated ? daysBetween(lastUpdated, null) : null;
+    const stale = hist && daysSinceUpdate !== null && daysSinceUpdate > 14;
+
+    let indicator, indicatorText, rowBg;
+    if (!hist) {
+      indicator = '#dc2626'; indicatorText = 'No chatter'; rowBg = 'rgba(220,38,38,0.03)';
+    } else if (stale) {
+      indicator = '#d97706'; indicatorText = `Last update ${daysSinceUpdate}d ago`; rowBg = 'rgba(217,119,6,0.03)';
+    } else {
+      indicator = '#16a34a'; indicatorText = `${stages} transition${stages!==1?'s':''}${lastUpdated?' · '+lastUpdated:''}`; rowBg = '';
+    }
+
+    return `<tr style="background:${rowBg};cursor:pointer" onclick="openJobModal('${j.id}')">
+      <td style="padding:10px 12px;width:8px">
+        <div style="width:8px;height:8px;border-radius:50%;background:${indicator};flex-shrink:0"></div>
+      </td>
+      <td style="padding:10px 8px;white-space:nowrap">
+        <span class="po-link" style="font-family:'DM Mono',monospace;font-size:12px">${esc(j.po)}</span>
+      </td>
+      <td style="padding:10px 8px;max-width:320px">
+        <div style="font-weight:600;font-size:13px;color:var(--text)">${esc(j.ref||'—')}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:1px">${esc(j.supplier||'')}</div>
+      </td>
+      <td style="padding:10px 8px">
+        <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:${sc}18;color:${sc}">${j.status}</span>
+      </td>
+      <td style="padding:10px 8px;white-space:nowrap">
+        <span style="font-size:12px;font-weight:600;color:${d>21?'#dc2626':d>14?'#d97706':'var(--text2)'}">${d}d open</span>
+      </td>
+      <td style="padding:10px 8px">
+        <span style="font-size:11px;color:${indicator};font-weight:600">${indicatorText}</span>
+      </td>
+      <td style="padding:10px 8px;text-align:right" onclick="event.stopPropagation()">
+        <button class="btn btn-primary btn-sm" onclick="editJob('${j.id}')" style="font-size:11px;padding:5px 12px">
+          + Update chatter
+        </button>
+      </td>
+    </tr>`;
+  };
+
+  let html = '';
+
+  if (noHistory.length > 0) {
+    html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <div style="width:8px;height:8px;border-radius:50%;background:#dc2626;flex-shrink:0"></div>
+      <span style="font-size:12px;font-weight:700;color:#dc2626">${noHistory.length} job${noHistory.length!==1?'s':''} with no chatter history — needs updating</span>
+    </div>`;
+  }
+
+  html += `<div class="card" style="margin-bottom:20px">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;align-items:center;gap:16px">
+        <span style="font-size:13px;font-weight:700">${open.length} open jobs</span>
+        <span style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:12px">
+          <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#dc2626;margin-right:4px"></span>No chatter (${noHistory.length})</span>
+          <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#d97706;margin-right:4px"></span>Stale &gt;14d</span>
+          <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#16a34a;margin-right:4px"></span>Up to date</span>
+        </span>
+      </div>
+      <span style="font-size:11px;color:var(--text3)">Click any row to view · "+ Update chatter" to edit</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:16px"></th>
+          <th style="width:90px">PO</th>
+          <th>Reference / Service Co.</th>
+          <th style="width:140px">Status</th>
+          <th style="width:90px">Age</th>
+          <th>Chatter</th>
+          <th style="width:140px"></th>
+        </tr></thead>
+        <tbody>${open.map(j => row(j)).join('')}</tbody>
+      </table>
+    </div>
+  </div>`;
+
+  el.innerHTML = html;
+}
   const selectedStatuses = getSelectedStatuses();
   const fsu = document.getElementById('filter-supplier')?.value || '';
   const fq  = (document.getElementById('filter-search')?.value || '').toLowerCase();

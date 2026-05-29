@@ -103,7 +103,7 @@ function showPage(name) {
   if (name === 'urgent')     renderUrgent();
   if (name === 'bottleneck') { if (typeof initBottleneckFilter === 'function') initBottleneckFilter(); renderBottleneck(); }
   if (name === 'performance') renderPerformance();
-  if (name === 'jobs')       { renderJobs(); populateSupplierDatalist(); }
+  if (name === 'jobs')       { renderJobs(); populateSupplierDatalist(); updateChatterBadge(); }
   if (name === 'parts')      renderParts();
   if (name === 'suppliers')  renderSuppliers();
   if (name === 'sites')      renderSites();
@@ -136,6 +136,8 @@ function updateNavBadges() {
   if (partsBadge)  { partsBadge.textContent  = waiting  || '';    partsBadge.style.display  = waiting    > 0 ? 'inline-block' : 'none'; }
   if (urgentBadge) { urgentBadge.textContent = urgentCount || ''; urgentBadge.style.display = urgentCount > 0 ? 'inline-block' : 'none'; }
 
+  updateChatterBadge();
+
   const pulseOpen  = document.getElementById('pulse-open');
   const pulseParts = document.getElementById('pulse-parts');
   const pulseDone  = document.getElementById('pulse-done');
@@ -147,6 +149,17 @@ function updateNavBadges() {
   if (pulseMaint) {
     pulseMaint.parentElement.style.display = maintCount > 0 ? 'flex' : 'none';
     pulseMaint.textContent = maintCount;
+  }
+}
+
+function updateChatterBadge() {
+  const noHistory = jobs.filter(j =>
+    j.status !== 'Job Done' && j.status !== 'Maintenance' && (j.history||[]).length <= 1
+  ).length;
+  const badge = document.getElementById('chatter-needs-badge');
+  if (badge) {
+    badge.textContent   = noHistory > 0 ? noHistory + ' need updating' : '';
+    badge.style.display = noHistory > 0 ? 'inline' : 'none';
   }
 }
 
