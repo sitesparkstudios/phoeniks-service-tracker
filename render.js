@@ -798,7 +798,7 @@ function renderChatterLog() {
         <span style="font-size:11px;color:${indicator};font-weight:600">${indicatorText}</span>
       </td>
       <td style="padding:10px 8px;text-align:right" onclick="event.stopPropagation()">
-        <button class="btn btn-primary btn-sm" onclick="editJob('${j.id}')" style="font-size:11px;padding:5px 12px">
+        <button class="btn btn-primary btn-sm" onclick="window._returnToChatterTab=true;editJob('${j.id}')" style="font-size:11px;padding:5px 12px">
           + Update chatter
         </button>
       </td>

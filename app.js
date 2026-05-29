@@ -103,7 +103,7 @@ function showPage(name) {
   if (name === 'urgent')     renderUrgent();
   if (name === 'bottleneck') { if (typeof initBottleneckFilter === 'function') initBottleneckFilter(); renderBottleneck(); }
   if (name === 'performance') renderPerformance();
-  if (name === 'jobs')       { renderJobs(); populateSupplierDatalist(); updateChatterBadge(); }
+  if (name === 'jobs')       { renderJobs(); renderChatterLog(); populateSupplierDatalist(); updateChatterBadge(); }
   if (name === 'parts')      renderParts();
   if (name === 'suppliers')  renderSuppliers();
   if (name === 'sites')      renderSites();
@@ -233,6 +233,11 @@ async function saveJob() {
   clearForm();
   showToast('Job saved');
   showPage('jobs');
+  // If user came from the chatter log tab, return them there
+  if (window._returnToChatterTab) {
+    window._returnToChatterTab = false;
+    if (typeof switchJobsTab === 'function') switchJobsTab('chatter');
+  }
 }
 
 function editJob(id) {
