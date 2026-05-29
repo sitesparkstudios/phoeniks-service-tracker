@@ -529,6 +529,13 @@
             </div>
           </div>
           <select id="filter-supplier" onchange="renderJobs()"><option value="">All service cos.</option></select>
+          <select id="filter-sort" onchange="renderJobs()" style="font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:var(--font)">
+            <option value="age-desc">Oldest first</option>
+            <option value="age-asc">Newest first</option>
+            <option value="closed-recent">Recently closed</option>
+            <option value="status">By status</option>
+            <option value="supplier">By service co.</option>
+          </select>
           <input type="text" id="filter-search" placeholder="Search PO, reference, equipment..." oninput="renderJobs()" style="max-width:300px">
         </div>
         <div class="card">
@@ -543,6 +550,9 @@
             </table>
           </div>
         </div>
+
+        <!-- STATE BREAKDOWN -->
+        <div id="jobs-state-breakdown" style="margin-top:20px"></div>
       </div>
 
       <!-- CHATTER LOG TAB -->

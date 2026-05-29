@@ -865,11 +865,24 @@ function renderJobs() {
     return true;
   });
 
+  // Sort
+  const sortVal = document.getElementById('filter-sort')?.value || 'age-desc';
+  const getClosedDate = j => [...(j.history||[])].sort((a,b)=>(a.date||'')<(b.date||'')?1:-1)[0]?.date || '';
+  const STATUS_SORT_ORDER = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting','Awaiting Closeout','Job Done','Maintenance'];
+  filtered.sort((a,b) => {
+    if (sortVal === 'age-asc')       return daysBetween(a.poDate,null) - daysBetween(b.poDate,null);
+    if (sortVal === 'closed-recent') return getClosedDate(b).localeCompare(getClosedDate(a));
+    if (sortVal === 'status')        return STATUS_SORT_ORDER.indexOf(a.status) - STATUS_SORT_ORDER.indexOf(b.status);
+    if (sortVal === 'supplier')      return (a.supplier||'').localeCompare(b.supplier||'');
+    return daysBetween(b.poDate,null) - daysBetween(a.poDate,null);
+  });
+
   document.getElementById('jobs-count').textContent = `${filtered.length} of ${jobs.length} jobs`;
 
   if (!filtered.length) {
     document.getElementById('jobs-tbody').innerHTML =
       '<tr><td colspan="8"><div class="empty-state"><p>No jobs match your filters.</p></div></td></tr>';
+    renderStateBreakdown();
     return;
   }
 
@@ -901,6 +914,50 @@ function renderJobs() {
 
   const dl = document.getElementById('supplier-datalist');
   if (dl) dl.innerHTML = suppliers.map(s => `<option value="${esc(s)}">`).join('');
+
+  renderStateBreakdown();
+}
+
+function renderStateBreakdown() {
+  const el = document.getElementById('jobs-state-breakdown');
+  if (!el) return;
+  const STATE_COLORS = { VIC:'#3b82f6', NSW:'#16a34a', QLD:'#d97706', SA:'#dc2626', WA:'#7c3aed', TAS:'#0891b2', ACT:'#be185d', NT:'#c2410c', NAT:'#374151', '?':'#9ba3af' };
+  const openJobs    = jobs.filter(isOpenService);
+  const allSvcJobs  = jobs.filter(isServiceJob);
+  const stateCounts = {};
+  const stateOpen   = {};
+  allSvcJobs.forEach(j => { const s = getStateForSupplier(j.supplier)||'?'; stateCounts[s]=(stateCounts[s]||0)+1; });
+  openJobs.forEach(j   => { const s = getStateForSupplier(j.supplier)||'?'; stateOpen[s]  =(stateOpen[s]  ||0)+1; });
+  const states = Object.entries(stateCounts).filter(([s])=>s!=='?').sort((a,b)=>b[1]-a[1]);
+  if (!states.length) { el.innerHTML = ''; return; }
+  const maxCount = Math.max(...states.map(([,c])=>c), 1);
+  el.innerHTML = `<div class="card" style="padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700">Jobs by State</div>
+      <span style="font-size:11px;color:var(--text3)">based on service company location · all time</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${states.map(([state,total]) => {
+        const open  = stateOpen[state]||0;
+        const done  = total - open;
+        const pct   = Math.round(total/maxCount*100);
+        const color = STATE_COLORS[state]||'#9ba3af';
+        return `<div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;font-weight:800;color:${color};min-width:36px">${state}</span>
+              <span style="font-size:12px;font-weight:600;color:var(--text)">${total} total</span>
+              ${open>0?`<span style="font-size:11px;padding:1px 7px;border-radius:10px;background:${color}18;color:${color};font-weight:600">${open} open</span>`:`<span style="font-size:11px;color:var(--text3)">all closed</span>`}
+            </div>
+            <span style="font-size:11px;color:var(--text3)">${done} completed</span>
+          </div>
+          <div style="height:6px;background:var(--surface2);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${color};border-radius:4px"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
 }
 
 /* ── PARTS TRACKER ── */
@@ -1941,15 +1998,7 @@ function buildPrintReport() {
     <div style="display:flex;justify-content:space-between;align-items:stretch;margin-bottom:10px;gap:0">
 
       <!-- Brand block -->
-      <div style="display:flex;align-items:center;gap:14px;padding:12px 18px;background:#FFD100;border-radius:8px;flex-shrink:0">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
-          <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:9px;height:9px;border-radius:50%;background:transparent;border:2px solid rgba(61,64,67,0.4);box-sizing:border-box"></div>
-        </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 18px;background:#FFD100;border-radius:8px;flex-shrink:0">
         <div>
           <div style="font-size:20px;font-weight:800;letter-spacing:1.5px;color:#3d4043;line-height:1">PHOENIKS</div>
           <div style="font-size:8px;font-weight:600;letter-spacing:0.18em;color:rgba(61,64,67,0.6);margin-top:2px">ELECTRIC KITCHEN SPECIALISTS</div>
@@ -2186,14 +2235,6 @@ function buildPrintReport() {
     <!-- ══ FOOTER ══ -->
     <div style="margin-top:9px;padding-top:6px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
       <div style="display:flex;align-items:center;gap:8px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">
-          <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>
-          <div style="width:6px;height:6px;border-radius:50%;background:transparent;border:1.5px solid #3d4043;box-sizing:border-box"></div>
-        </div>
         <span style="font-size:8.5px;color:#9ba3af">Prepared by <strong style="color:#3d4043">Sean Pickford</strong> · Technical Service Manager · Phoeniks Electric Kitchen Specialists</span>
       </div>
       <div style="display:flex;gap:10px;align-items:center">
