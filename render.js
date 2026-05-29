@@ -839,6 +839,8 @@ function renderChatterLog() {
 
   el.innerHTML = html;
 }
+
+function renderJobs() {
   const selectedStatuses = getSelectedStatuses();
   const fsu = document.getElementById('filter-supplier')?.value || '';
   const fq  = (document.getElementById('filter-search')?.value || '').toLowerCase();
