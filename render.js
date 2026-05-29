@@ -10,11 +10,13 @@ const CHART_TICK = { color: '#9ba3af', font: { size: 11, family: 'Plus Jakarta S
 function renderAll() {
   renderDashboard();
   renderJobs();
+  renderChatterLog();
   renderSuppliers();
   renderParts();
   renderReports();
   renderActivity();
   if (typeof updateNavBadges === 'function') updateNavBadges();
+  if (typeof updateChatterBadge === 'function') updateChatterBadge();
   // Ops health banner — quick bottleneck snapshot
   const _allOpen = jobs.filter(isOpenService);
   const _totals = {};
@@ -765,11 +767,12 @@ function renderChatterLog() {
 
     let indicator, indicatorText, rowBg;
     if (!hist) {
-      indicator = '#dc2626'; indicatorText = 'No chatter'; rowBg = 'rgba(220,38,38,0.03)';
+      // Never had chatter pasted — genuinely needs updating
+      indicator = '#dc2626'; indicatorText = 'No chatter logged'; rowBg = 'rgba(220,38,38,0.03)';
     } else if (stale) {
-      indicator = '#d97706'; indicatorText = `Last update ${daysSinceUpdate}d ago`; rowBg = 'rgba(217,119,6,0.03)';
+      indicator = '#d97706'; indicatorText = `Last update ${daysSinceUpdate}d ago — worth checking`; rowBg = 'rgba(217,119,6,0.03)';
     } else {
-      indicator = '#16a34a'; indicatorText = `${stages} transition${stages!==1?'s':''}${lastUpdated?' · '+lastUpdated:''}`; rowBg = '';
+      indicator = '#16a34a'; indicatorText = `${stages} transition${stages!==1?'s':''}${lastUpdated?' · updated '+lastUpdated:''}`; rowBg = '';
     }
 
     return `<tr style="background:${rowBg};cursor:pointer" onclick="openJobModal('${j.id}')">
