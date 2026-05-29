@@ -1942,7 +1942,9 @@ function buildPrintReport() {
 
       <!-- Brand block -->
       <div style="display:flex;align-items:center;gap:14px;padding:12px 18px;background:#FFD100;border-radius:8px;flex-shrink:0">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px">
+          <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
           <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
           <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
           <div style="width:9px;height:9px;border-radius:50%;background:#3d4043"></div>
@@ -2184,7 +2186,9 @@ function buildPrintReport() {
     <!-- ══ FOOTER ══ -->
     <div style="margin-top:9px;padding-top:6px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
       <div style="display:flex;align-items:center;gap:8px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px">
+          <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>
           <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>
           <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>
           <div style="width:6px;height:6px;border-radius:50%;background:#3d4043"></div>

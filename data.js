@@ -759,7 +759,11 @@ function processCSVFile(file) {
       if (existing) {
         if (get('supplier'))      existing.supplier      = get('supplier');
         if (get('ref'))           existing.ref           = get('ref');
-        if (get('value'))         existing.value         = get('value');
+        // Only update value if the CSV has a real positive number — never overwrite
+        // invoice-imported values (which are set separately and more accurate)
+        const csvVal = parseFloat(get('value'));
+        const existingVal = parseFloat(existing.value);
+        if (csvVal > 0 && (!(existingVal > 0) || csvVal > existingVal)) existing.value = get('value');
         if (get('buyer'))         existing.buyer         = get('buyer');
         if (get('priority'))      existing.priority      = get('priority');
         if (get('receiptStatus')) existing.receiptStatus = get('receiptStatus');
@@ -769,7 +773,9 @@ function processCSVFile(file) {
         if (get('amountToInvoice'))  existing.amountToInvoice= get('amountToInvoice');
         if (get('valueUntaxed'))     existing.valueUntaxed   = get('valueUntaxed');
         if (get('receiptStatus'))    existing.receiptStatus  = get('receiptStatus');
-        if (!parseFloat(existing.value) && parseFloat(get('valueUntaxed'))) existing.value = get('valueUntaxed');
+        // Only use untaxed as fallback if no real invoice-imported value exists
+        const _csvUntaxed = parseFloat(get('valueUntaxed'));
+        if (_csvUntaxed > 0 && !(parseFloat(existing.value) > 0)) existing.value = get('valueUntaxed');
         if (existing.status !== newStatus && existing.status !== 'Job Done') {
           if (!existing.history) existing.history = [{ status: existing.status, date: existing.poDate || today() }];
           existing.history.push({ status: newStatus, date: today() });
