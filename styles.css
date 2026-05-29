@@ -467,18 +467,20 @@ select {
 
 /* ── PRINT ── */
 @media print {
-  @page { size: A4 portrait; margin: 10mm 12mm; }
-  @page :first { margin-top: 10mm; }
+  @page {
+    size: A4 portrait;
+    margin: 8mm 8mm 8mm 8mm;
+  }
 
-  /* Suppress browser-generated header (URL/title) and footer (page number/date).
-     Chrome/Edge honour margin:0 on @page to remove them when margins are set explicitly. */
-  html { -webkit-print-color-adjust: exact; }
-
+  html, body { margin: 0 !important; padding: 0 !important; }
   body > * { display: none !important; }
   #sidebar-overlay { display: none !important; }
 
   #print-report {
     display: block !important;
+    /* Scale the entire report to 78% so it reliably fits A4 at 100% print scale.
+       Users no longer need to touch the browser scale slider. */
+    zoom: 0.78;
     width: 100% !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
     font-size: 10px !important;
@@ -502,12 +504,10 @@ select {
     text-overflow: clip !important;
     white-space: normal !important;
   }
-  /* Allow job note rows to show fully */
   #print-report tr.job-note-row td {
     white-space: normal !important;
     overflow: visible !important;
   }
-  /* Prevent page breaks inside job rows */
   #print-report .job-block {
     page-break-inside: avoid;
   }
