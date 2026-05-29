@@ -1852,9 +1852,9 @@ function buildPrintReport() {
     .map(s=>({ s, count: urgent.filter(j=>j.supplier===s).length }))
     .sort((a,b)=>b.count-a.count)[0] || null;
 
-  // Monthly volume
+  // Monthly volume — last 12 months
   const mBuckets = [];
-  for(let i=5;i>=0;i--){
+  for(let i=11;i>=0;i--){
     const d = new Date(now.getFullYear(),now.getMonth()-i,1);
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     const mJobs = jobs.filter(j=>(j.poDate||'').startsWith(key) && isServiceJob(j));
@@ -2085,15 +2085,15 @@ function buildPrintReport() {
 
       <!-- ── COL 2: MONTHLY VOLUME CHART ── -->
       <div>
-        ${sHead('Monthly Jobs','#1e2024','last 6 months')}
+        ${sHead('Monthly Jobs','#1e2024','last 12 months')}
         <!-- Numbers sit above chart, then bars, then labels — no overlap -->
-        <div style="display:flex;gap:3px;margin-bottom:0">
+        <div style="display:flex;gap:2px;margin-bottom:0">
           ${mBuckets.map(b => {
             const isLatest = b === mBuckets[mBuckets.length-1];
-            return `<div style="flex:1;text-align:center;font-size:8px;font-weight:${isLatest?'800':'500'};color:${isLatest?'#1e2024':'#9ba3af'};padding-bottom:2px">${b.count}</div>`;
+            return `<div style="flex:1;text-align:center;font-size:6.5px;font-weight:${isLatest?'800':'500'};color:${isLatest?'#1e2024':'#9ba3af'};padding-bottom:2px">${b.count}</div>`;
           }).join('')}
         </div>
-        <div style="display:flex;align-items:flex-end;gap:3px;height:38px">
+        <div style="display:flex;align-items:flex-end;gap:2px;height:38px">
           ${mBuckets.map(b => {
             const maxV = Math.max(...mBuckets.map(x=>x.count),1);
             const pct = Math.max(Math.round(b.count/maxV*100),4);
@@ -2102,8 +2102,8 @@ function buildPrintReport() {
             return `<div style="flex:1;height:${pct}%;background:${isLatest?'#3d4043':isPrev?'#9ba3af':'#d1d5db'};border-radius:2px 2px 0 0"></div>`;
           }).join('')}
         </div>
-        <div style="display:flex;gap:3px;margin-top:2px">
-          ${mBuckets.map(b => `<div style="flex:1;text-align:center;font-size:6px;color:#9ba3af">${b.label}</div>`).join('')}
+        <div style="display:flex;gap:2px;margin-top:2px">
+          ${mBuckets.map(b => `<div style="flex:1;text-align:center;font-size:5px;color:#9ba3af">${b.label}</div>`).join('')}
         </div>
 
         ${sHead('Avg Job Age by Status','#1e2024')}
