@@ -82,7 +82,7 @@ function renderDashboard() {
   if (heroEl) {
     // Compute quick wins for dashboard (reuse same logic as print report)
     const dashWins = [];
-    const _weekDoneWithDur = done.filter(j => getTotalDays(j) !== null && (j.history?.[j.history.length-1]?.date||'') >= weekStartStr);
+    const _weekDoneWithDur = done.filter(j => getTotalDays(j) !== null && ([...(j.history||[])].sort((a,b)=>(a.date||'')<(b.date||'')?-1:1).pop()?.date||'') >= weekStartStr);
     const _fastest = _weekDoneWithDur.length ? _weekDoneWithDur.reduce((a,b) => getTotalDays(a)<getTotalDays(b)?a:b) : null;
     const _allOpenNow = jobs.filter(isOpenService);
     const _critical = _allOpenNow.filter(j=>daysBetween(j.poDate,null)>=30);
@@ -731,7 +731,7 @@ function renderJobs() {
   }
 
   document.getElementById('jobs-tbody').innerHTML = filtered.map(j => {
-    const open    = daysBetween(j.poDate, (j.status === 'Job Done' || j.status === 'Awaiting Closeout') ? j.history?.[j.history.length-1]?.date : null);
+    const open    = daysBetween(j.poDate, (j.status === 'Job Done' || j.status === 'Awaiting Closeout') ? [...(j.history||[])].sort((a,b)=>(a.date||'')<(b.date||'')?-1:1).pop()?.date : null);
     const dw      = getDwellTimes(j);
     const inStage = dw[j.status] !== undefined ? dw[j.status] : null;
     const isDone  = j.status === 'Job Done';
@@ -944,7 +944,8 @@ function deleteReport(id) {
 function openJobModal(id) {
   const j = jobs.find(x => x.id === id);
   if (!j) return;
-  const hist  = j.history || [];
+  // Always sort history oldest→newest for display and dwell calculation
+  const hist  = [...(j.history || [])].sort((a,b) => (a.date||'') < (b.date||'') ? -1 : (a.date||'') > (b.date||'') ? 1 : 0);
   const total = getTotalDays(j);
 
   const poEl = document.getElementById('modal-po');
@@ -960,10 +961,10 @@ function openJobModal(id) {
 
   const tlHtml = hist.map((h, i) => {
     const next      = hist[i+1];
-    const end       = next ? next.date : (j.status==='Job Done' ? hist[hist.length-1]?.date : null);
-    const days      = end ? daysBetween(h.date,end) : daysBetween(h.date,null);
-    const isCurrent = i === hist.length-1 && j.status !== 'Job Done';
     const isDone    = j.status === 'Job Done';
+    const end       = next ? next.date : (isDone ? hist[hist.length-1]?.date : null);
+    const days      = end ? daysBetween(h.date,end) : daysBetween(h.date,null);
+    const isCurrent = i === hist.length-1 && !isDone;
     const dotClass  = isDone ? 'done' : isCurrent ? 'current' : '';
     const chipCls   = isDone ? 'ok' : days > 14 ? 'danger' : days > 7 ? 'warn' : '';
     const isFinalDone = h.status === 'Job Done' && i === hist.length - 1;
@@ -1034,7 +1035,7 @@ function openSupplierModal(supplier, filter) {
           <th style="width:90px">Value</th>
         </tr></thead>
         <tbody>${filtered.map(j => {
-          const open = daysBetween(j.poDate, (j.status === 'Job Done' || j.status === 'Awaiting Closeout') ? j.history?.[j.history.length-1]?.date : null);
+          const open = daysBetween(j.poDate, (j.status === 'Job Done' || j.status === 'Awaiting Closeout') ? [...(j.history||[])].sort((a,b)=>(a.date||'')<(b.date||'')?-1:1).pop()?.date : null);
           const isDone = j.status === 'Job Done';
           const isCloseout = j.status === 'Awaiting Closeout';
           const flagged = !isDone && !isCloseout && (open||0) > 14;

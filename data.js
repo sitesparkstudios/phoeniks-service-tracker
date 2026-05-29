@@ -608,13 +608,26 @@ function daysUntil(target) {
 }
 
 function getDwellTimes(job) {
-  const hist  = job.history || [];
-  const dwell = {};
+  const raw   = job.history || [];
+  if (!raw.length) return {};
+  // Always sort history oldest→newest before calculating dwell
+  const hist  = [...raw].sort((a, b) => (a.date||'') < (b.date||'') ? -1 : (a.date||'') > (b.date||'') ? 1 : 0);
+  const isDone = job.status === 'Job Done';
+  const dwell  = {};
   hist.forEach((h, i) => {
     const next = hist[i + 1];
-    const end  = next ? next.date : (job.status === 'Job Done' ? hist[hist.length-1]?.date : null);
+    let end;
+    if (next) {
+      end = next.date;
+    } else if (isDone) {
+      // Last entry in a completed job — end is the completion date (last history entry)
+      end = hist[hist.length - 1].date;
+    } else {
+      // Still open — count days from this status to today
+      end = null;
+    }
     const days = end ? daysBetween(h.date, end) : daysBetween(h.date, null);
-    dwell[h.status] = (dwell[h.status] || 0) + (days || 0);
+    dwell[h.status] = (dwell[h.status] || 0) + Math.max(days || 0, 0);
   });
   return dwell;
 }
@@ -622,18 +635,13 @@ function getDwellTimes(job) {
 function getTotalDays(job) {
   if (!job.poDate) return null;
   if (job.status === 'Job Done') {
-    const hist = job.history || [];
-    // Multi-entry history: use first → last date
-    if (hist.length > 1) {
+    const raw = job.history || [];
+    if (raw.length > 1) {
+      const hist = [...raw].sort((a,b) => (a.date||'') < (b.date||'') ? -1 : 1);
       const lastDate = hist[hist.length - 1]?.date;
-      if (lastDate && lastDate !== job.poDate) {
-        return daysBetween(job.poDate, lastDate);
-      }
-      // History entries exist but same date — job done same day, count as 1
+      if (lastDate && lastDate !== job.poDate) return daysBetween(job.poDate, lastDate);
       if (lastDate === job.poDate) return 1;
     }
-    // Single history entry (Odoo import with no chatter): we don't know completion date
-    // Return null so it's excluded from duration averages rather than skewing them to 0
     return null;
   }
   return daysBetween(job.poDate, null);
@@ -874,8 +882,23 @@ function parseChatter(text) {
 
 function buildHistoryFromTransitions(poDate, transitions) {
   if (!transitions.length) return null;
-  const hist = [{ status: transitions[0].from, date: poDate }];
-  transitions.forEach(t => hist.push({ status: t.to, date: t.date }));
+  // Sort transitions oldest → newest before building history
+  // Odoo chatter is newest-first so this is almost always needed
+  const sorted = [...transitions].sort((a, b) => {
+    if (!a.date || !b.date) return 0;
+    return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+  });
+  const hist = [{ status: sorted[0].from, date: poDate }];
+  sorted.forEach(t => {
+    // Only push if date is >= previous entry (guard against duplicate/bad dates)
+    const prev = hist[hist.length - 1];
+    if (!prev || t.date >= prev.date) {
+      hist.push({ status: t.to, date: t.date });
+    } else {
+      // Date went backwards — use previous date to avoid negative dwell
+      hist.push({ status: t.to, date: prev.date });
+    }
+  });
   return hist;
 }
 
