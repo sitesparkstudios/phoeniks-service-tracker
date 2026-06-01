@@ -472,7 +472,8 @@ async function renderAdmin() {
     if (listEl) {
       listEl.innerHTML = allUsers.map(u => {
         const isSelf = u.email === currentEmail || u.is_self;
-        const date = u.invited_at
+        const role   = u.role || 'editor';
+        const date   = u.invited_at
           ? new Date(u.invited_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
           : '—';
         return `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap">
@@ -485,13 +486,17 @@ async function renderAdmin() {
                 ${esc(u.email || '—')}
                 ${isSelf ? '<span style="background:#fef9c3;color:#854d0e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:6px">You</span>' : ''}
               </div>
-              <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
-                <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;background:${(u.role||'editor')=='editor'?'#fef9c3':'var(--surface3)'};color:${(u.role||'editor')=='editor'?'#854d0e':'var(--text3)'}">${(u.role||'editor')=='editor'?'Full edit':'View only'}</span>
-                <span style="font-size:11px;color:var(--text3)">Added ${date}</span>
-              </div>
+              <div style="font-size:11px;color:var(--text3);margin-top:3px">Added ${date}</div>
             </div>
           </div>
-          ${!isSelf ? `<button onclick="adminRemoveUser('${esc(u.email)}')" style="font-size:11px;padding:4px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--red);cursor:pointer;flex-shrink:0">Remove</button>` : ''}
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <select onchange="adminChangeRole('${esc(u.email)}', this.value)"
+              style="font-size:12px;padding:5px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:${role==='editor'?'#fef9c3':'var(--surface2)'};color:${role==='editor'?'#854d0e':'var(--text2)'};font-family:var(--font);font-weight:600;cursor:pointer">
+              <option value="editor" ${role==='editor'?'selected':''}>Full edit</option>
+              <option value="viewer" ${role==='viewer'?'selected':''}>View only</option>
+            </select>
+            ${!isSelf ? `<button onclick="adminRemoveUser('${esc(u.email)}')" style="font-size:11px;padding:5px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--red);cursor:pointer">Remove</button>` : '<span style="font-size:11px;color:var(--text3)">Your account</span>'}
+          </div>
         </div>`;
       }).join('');
     }
@@ -552,6 +557,28 @@ async function adminInviteFromInput() {
 function adminInvitePrompt() {
   // Legacy — redirect to inline invite
   document.getElementById('admin-invite-email')?.focus();
+}
+
+async function adminChangeRole(email, newRole) {
+  if (!email || !newRole) return;
+  try {
+    const { error } = await _sb.from('invited_users')
+      .update({ role: newRole })
+      .eq('email', email);
+    if (error) throw error;
+    showToast(`${email} updated to ${newRole === 'editor' ? 'Full edit' : 'View only'}`);
+    // If changing own role, update in-memory role too
+    const currentEmail = _currentSession?.user?.email;
+    if (email === currentEmail) {
+      window._userRole = newRole;
+      if (newRole === 'viewer') document.body.classList.add('viewer-mode');
+      else document.body.classList.remove('viewer-mode');
+    }
+    renderAdmin();
+  } catch(err) {
+    showToast('Failed to update role — ' + (err.message||'unknown error'));
+    renderAdmin(); // re-render to reset the dropdown
+  }
 }
 
 async function adminRemoveUser(email) {
