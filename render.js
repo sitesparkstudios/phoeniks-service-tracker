@@ -84,29 +84,36 @@ function renderDashboard() {
   const statusCountEl = document.getElementById('dash-status-counts');
   if (statusCountEl) {
     const STATUS_DEF = [
-      { key:'Incoming Job',      color:'#2563eb', bg:'#eff6ff', border:'#bfdbfe' },
-      { key:'Job Booked',        color:'#7c3aed', bg:'#f5f3ff', border:'#ddd6fe' },
-      { key:'Waiting for Parts', color:'#d97706', bg:'#fffbeb', border:'#fde68a' },
-      { key:'Revisiting',        color:'#b8960a', bg:'#fefce8', border:'#fef08a' },
-      { key:'Awaiting Closeout', color:'#0d9488', bg:'#f0fdfa', border:'#99f6e4' },
-      { key:'Job Done',          color:'#16a34a', bg:'#f0fdf4', border:'#bbf7d0' },
-      { key:'Maintenance',       color:'#6b7280', bg:'#f9fafb', border:'#e5e7eb' },
+      { key:'Incoming Job',      color:'#2563eb', bg:'#eff6ff', border:'#bfdbfe', open:true  },
+      { key:'Job Booked',        color:'#7c3aed', bg:'#f5f3ff', border:'#ddd6fe', open:true  },
+      { key:'Waiting for Parts', color:'#d97706', bg:'#fffbeb', border:'#fde68a', open:true  },
+      { key:'Revisiting',        color:'#b8960a', bg:'#fefce8', border:'#fef08a', open:true  },
+      { key:'Awaiting Closeout', color:'#0d9488', bg:'#f0fdfa', border:'#99f6e4', open:true  },
+      { key:'Job Done',          color:'#16a34a', bg:'#f0fdf4', border:'#bbf7d0', open:false },
+      { key:'Maintenance',       color:'#6b7280', bg:'#f9fafb', border:'#e5e7eb', open:false },
     ];
     const counts = {};
-    jobs.forEach(j => { counts[j.status] = (counts[j.status]||0)+1; });
-    const total = jobs.length;
+    const ageSum = {};
+    jobs.forEach(j => {
+      counts[j.status] = (counts[j.status]||0) + 1;
+      if (j.status !== 'Job Done' && j.status !== 'Maintenance') {
+        ageSum[j.status] = (ageSum[j.status]||0) + daysBetween(j.poDate, null);
+      }
+    });
 
     statusCountEl.innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px">
         ${STATUS_DEF.map(s => {
-          const n = counts[s.key]||0;
-          const pct = total ? Math.round(n/total*100) : 0;
+          const n   = counts[s.key]||0;
+          const avg = s.open && n > 0 ? Math.round((ageSum[s.key]||0)/n) : null;
+          const sub = avg !== null ? `avg ${avg}d open` : n > 0 ? `${n} total` : 'none';
+          const subColor = avg !== null && avg > 21 ? '#dc2626' : avg !== null && avg > 14 ? '#d97706' : `${s.color}99`;
           return `<div onclick="showPage('jobs');setTimeout(()=>{const cb=document.querySelector('.fs-cb[value=\\'${s.key}\\']');if(cb){document.querySelectorAll('.fs-cb').forEach(x=>x.checked=false);cb.checked=true;statusFilterChange();}},150)"
             style="background:${s.bg};border:1px solid ${s.border};border-radius:10px;padding:12px 10px;cursor:pointer;transition:transform 0.1s;text-align:center"
             onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
-            <div style="font-size:26px;font-weight:800;color:${s.color};line-height:1;letter-spacing:-1px">${n}</div>
+            <div style="font-size:28px;font-weight:800;color:${n===0?s.color+'40':s.color};line-height:1;letter-spacing:-1px">${n}</div>
             <div style="font-size:9.5px;font-weight:700;color:${s.color};margin-top:4px;line-height:1.3">${s.key}</div>
-            <div style="font-size:9px;color:${s.color}99;margin-top:2px">${pct}% of all</div>
+            <div style="font-size:9px;font-weight:600;color:${subColor};margin-top:3px">${sub}</div>
           </div>`;
         }).join('')}
       </div>`;
@@ -2149,9 +2156,13 @@ function buildPrintReport() {
         if (j.status !== lastStatus) {
           const grp = sorted.filter(x=>x.status===j.status);
           const ga  = grp.length ? Math.round(grp.reduce((a,x)=>a+daysBetween(x.poDate,null),0)/grp.length) : 0;
-          rows += `<tr><td colspan="6" style="padding:5px 6px 2px;background:#f8f9fa;border-top:2px solid ${sc}30;border-bottom:1px solid #efefef">
-            <span style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:${sc}">${j.status}</span>
-            <span style="font-size:7.5px;color:#9ba3af;margin-left:8px">${grp.length} job${grp.length!==1?'s':''} · avg ${ga}d open</span>
+          const gaColor = ga>21?'#dc2626':ga>14?'#d97706':'#16a34a';
+          rows += `<tr><td colspan="5" style="padding:7px 6px 3px;background:#f0f1f3;border-top:2.5px solid ${sc};border-bottom:1px solid #e5e7eb">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:${sc}">${j.status}</span>
+              <span style="font-size:11px;font-weight:800;color:${sc};background:white;padding:1px 8px;border-radius:8px;border:1.5px solid ${sc}40">${grp.length} job${grp.length!==1?'s':''}</span>
+              <span style="font-size:9.5px;font-weight:700;color:${gaColor}">avg ${ga}d open</span>
+            </div>
           </td></tr>`;
           lastStatus = j.status;
         }
