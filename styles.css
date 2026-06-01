@@ -685,3 +685,17 @@ select {
   /* Confirm box */
   .confirm-box { padding: 20px; }
 }
+
+/* ── VIEWER MODE — hide all edit/admin controls ── */
+body.viewer-mode #nav-admin,
+body.viewer-mode .btn-danger,
+body.viewer-mode [onclick*="showPage('add')"],
+body.viewer-mode [onclick*="editJob"],
+body.viewer-mode [onclick*="deleteJob"],
+body.viewer-mode [onclick*="adminInvite"],
+body.viewer-mode #page-import,
+body.viewer-mode [data-page="import"],
+body.viewer-mode .nav-item[onclick*="import"],
+body.viewer-mode #page-add {
+  display: none !important;
+}

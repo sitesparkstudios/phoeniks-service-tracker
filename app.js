@@ -403,8 +403,24 @@ function updateSidebarDate() {
   if (remaining > 0) await new Promise(r => setTimeout(r, remaining));
 
   updateAuthUI();
+
+  // Fetch current user's role from invited_users table
+  window._userRole = 'editor'; // default
+  if (isAuthed()) {
+    try {
+      const userEmail = _sb.auth.getUser ? (await _sb.auth.getUser()).data?.user?.email : null;
+      if (userEmail) {
+        const { data: invRow } = await _sb.from('invited_users').select('role').eq('email', userEmail).single();
+        if (invRow?.role) window._userRole = invRow.role;
+      }
+    } catch(e) { /* non-fatal */ }
+  }
+
+  const isViewer = () => window._userRole === 'viewer';
+  if (isViewer()) document.body.classList.add('viewer-mode');
+
   const navAdmin = document.getElementById('nav-admin');
-  if (navAdmin) navAdmin.style.display = isAuthed() ? 'flex' : 'none';
+  if (navAdmin) navAdmin.style.display = (isAuthed() && !isViewer()) ? 'flex' : 'none';
   updateSidebarDate();
   updateNavBadges();
 
@@ -422,6 +438,7 @@ function updateSidebarDate() {
 // Stored invited users list (Supabase doesn't expose user list to anon key, so we track in DB)
 async function renderAdmin() {
   if (!isAuthed()) { showPage('dashboard'); showToast('Sign in to access admin'); return; }
+  if (window._userRole === 'viewer') { showPage('dashboard'); showToast('Admin access is restricted to editors'); return; }
 
   const navAdmin = document.getElementById('nav-admin');
   if (navAdmin) navAdmin.style.display = 'flex';
