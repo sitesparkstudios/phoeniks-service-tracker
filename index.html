@@ -192,22 +192,8 @@
         </div>
       </div>
 
-      <!-- COLOUR LEGEND -->
-      <div class="colour-legend card" style="padding:14px 20px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:20px;align-items:center">
-        <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em">Status</span>
-        <span class="badge b-incoming"><span class="badge-dot"></span>Incoming Job</span>
-        <span class="badge b-booked"><span class="badge-dot"></span>Job Booked</span>
-        <span class="badge b-waiting"><span class="badge-dot"></span>Waiting for Parts</span>
-        <span class="badge b-revisiting"><span class="badge-dot"></span>Revisiting</span>
-        <span class="badge b-closeout"><span class="badge-dot"></span>Awaiting Closeout</span>
-        <span class="badge b-done"><span class="badge-dot"></span>Job Done</span>
-        <div style="width:1px;height:20px;background:var(--border)"></div>
-        <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em">Days open</span>
-        <span class="day-chip" style="background:var(--surface2)">0–14d <span style="font-size:9px;color:var(--text3)">on track</span></span>
-        <span class="day-chip warn">15–21d <span style="font-size:9px">watch</span></span>
-        <span class="day-chip danger">&gt;21d <span style="font-size:9px">overdue</span></span>
-        <span class="day-chip ok">Xd <span style="font-size:9px">completed</span></span>
-      </div>
+      <!-- STATUS COUNTS STRIP — filled by renderDashboard() -->
+      <div id="dash-status-counts" style="margin-bottom:20px"></div>
 
       <!-- WINS HERO — filled by renderDashboard() -->
       <div id="dash-wins-hero" style="display:none;margin-bottom:20px"></div>

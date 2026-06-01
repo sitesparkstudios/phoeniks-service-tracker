@@ -80,7 +80,37 @@ function renderDashboard() {
     return last && last.date >= weekStartStr;
   });
 
-  // ── WINS HERO BANNER ──
+  // ── STATUS COUNTS STRIP ──
+  const statusCountEl = document.getElementById('dash-status-counts');
+  if (statusCountEl) {
+    const STATUS_DEF = [
+      { key:'Incoming Job',      color:'#2563eb', bg:'#eff6ff', border:'#bfdbfe' },
+      { key:'Job Booked',        color:'#7c3aed', bg:'#f5f3ff', border:'#ddd6fe' },
+      { key:'Waiting for Parts', color:'#d97706', bg:'#fffbeb', border:'#fde68a' },
+      { key:'Revisiting',        color:'#b8960a', bg:'#fefce8', border:'#fef08a' },
+      { key:'Awaiting Closeout', color:'#0d9488', bg:'#f0fdfa', border:'#99f6e4' },
+      { key:'Job Done',          color:'#16a34a', bg:'#f0fdf4', border:'#bbf7d0' },
+      { key:'Maintenance',       color:'#6b7280', bg:'#f9fafb', border:'#e5e7eb' },
+    ];
+    const counts = {};
+    jobs.forEach(j => { counts[j.status] = (counts[j.status]||0)+1; });
+    const total = jobs.length;
+
+    statusCountEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px">
+        ${STATUS_DEF.map(s => {
+          const n = counts[s.key]||0;
+          const pct = total ? Math.round(n/total*100) : 0;
+          return `<div onclick="showPage('jobs');setTimeout(()=>{const cb=document.querySelector('.fs-cb[value=\\'${s.key}\\']');if(cb){document.querySelectorAll('.fs-cb').forEach(x=>x.checked=false);cb.checked=true;statusFilterChange();}},150)"
+            style="background:${s.bg};border:1px solid ${s.border};border-radius:10px;padding:12px 10px;cursor:pointer;transition:transform 0.1s;text-align:center"
+            onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+            <div style="font-size:26px;font-weight:800;color:${s.color};line-height:1;letter-spacing:-1px">${n}</div>
+            <div style="font-size:9.5px;font-weight:700;color:${s.color};margin-top:4px;line-height:1.3">${s.key}</div>
+            <div style="font-size:9px;color:${s.color}99;margin-top:2px">${pct}% of all</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }
   const heroEl = document.getElementById('dash-wins-hero');
   if (heroEl) {
     // Compute quick wins for dashboard (reuse same logic as print report)
