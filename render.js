@@ -771,8 +771,14 @@ function renderChatterLog() {
   const el = document.getElementById('chatter-log-body');
   if (!el) return;
 
-  // A job "has chatter" if it has status transitions OR notes were captured from a chatter paste
-  const hasChatter = j => (j.history||[]).length > 1 || (j.notes && j.notes.trim().length > 20);
+  // Auto-generated Odoo lines that don't count as real chatter
+  const ODOO_BOILERPLATE = ['purchase order created','rfq','purchase order(status)','rfq purchase order'];
+  const isRealNotes = notes => {
+    if (!notes || notes.trim().length <= 20) return false;
+    const n = notes.trim().toLowerCase();
+    return !ODOO_BOILERPLATE.some(b => n === b || n.replace(/[^a-z ]/g,'') === b);
+  };
+  const hasChatter = j => (j.history||[]).length > 1 || isRealNotes(j.notes);
 
   // Open jobs only — exclude Job Done and Maintenance
   const open = jobs
@@ -808,8 +814,10 @@ function renderChatterLog() {
 
     let indicator, indicatorText, rowBg;
     if (!hist) {
-      // Never had chatter pasted — genuinely needs updating
-      indicator = '#dc2626'; indicatorText = 'No chatter logged'; rowBg = 'rgba(220,38,38,0.03)';
+      const isNew = j.status === 'Incoming Job' && daysBetween(j.poDate,null) <= 7;
+      indicator = isNew ? '#9ba3af' : '#dc2626';
+      indicatorText = isNew ? 'New — awaiting first update' : 'No chatter logged';
+      rowBg = isNew ? '' : 'rgba(220,38,38,0.03)';
     } else if (stale) {
       indicator = '#d97706'; indicatorText = `Last update ${daysSinceUpdate}d ago — worth checking`; rowBg = 'rgba(217,119,6,0.03)';
     } else {

@@ -153,9 +153,15 @@ function updateNavBadges() {
 }
 
 function updateChatterBadge() {
+  const ODOO_BOILERPLATE = ['purchase order created','rfq','purchase order(status)','rfq purchase order'];
+  const isRealNotes = notes => {
+    if (!notes || notes.trim().length <= 20) return false;
+    const n = notes.trim().toLowerCase();
+    return !ODOO_BOILERPLATE.some(b => n === b || n.replace(/[^a-z ]/g,'') === b);
+  };
   const noHistory = jobs.filter(j =>
     j.status !== 'Job Done' && j.status !== 'Maintenance' &&
-    (j.history||[]).length <= 1 && !(j.notes && j.notes.trim().length > 20)
+    (j.history||[]).length <= 1 && !isRealNotes(j.notes)
   ).length;
   const badge = document.getElementById('chatter-needs-badge');
   if (badge) {
