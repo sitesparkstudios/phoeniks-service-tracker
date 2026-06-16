@@ -533,6 +533,9 @@ select {
 
 .hidden { display: none !important; }
 
+/* Hide print report on screen — shown only via @media print */
+@media screen { #print-report { display: none !important; } }
+
 /* ══════════════════════════════════════════════════════
    MOBILE & TABLET — Responsive overrides
    Breakpoints: tablet ≤ 900px, mobile ≤ 600px
