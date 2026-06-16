@@ -467,19 +467,8 @@ select {
 
 /* ── PRINT ── */
 @media print {
-  @page {
-    size: A4 portrait;
-    margin: 8mm;
-  }
+  @page { size: A4 portrait; margin: 8mm; }
   html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
-}
-
-/* When body.printing is set, hide app and show report */
-body.printing .app { display: none !important; }
-body.printing #print-report { display: block !important; }
-
-/* Also apply during actual print */
-@media print {
   .app { display: none !important; }
   #print-report {
     display: block !important;
@@ -488,27 +477,13 @@ body.printing #print-report { display: block !important; }
     font-family: 'Plus Jakarta Sans', sans-serif !important;
     font-size: 10px !important;
     color: #1e2024 !important;
-    background: #fff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  #print-report * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    box-sizing: border-box !important;
-  }
-  #print-report table {
-    table-layout: auto !important;
-    width: 100% !important;
-    word-break: break-word !important;
-  }
-  #print-report td, #print-report th {
-    overflow: visible !important;
-    white-space: normal !important;
-  }
-  #print-report .job-block {
-    page-break-inside: avoid;
-  }
+  #print-report * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+  #print-report table { table-layout: auto !important; width: 100% !important; word-break: break-word !important; }
+  #print-report td, #print-report th { overflow: visible !important; white-space: normal !important; }
+  #print-report .job-block { page-break-inside: avoid; }
 }
 
 .modal-title[title]:hover {

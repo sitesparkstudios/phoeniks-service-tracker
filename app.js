@@ -476,9 +476,11 @@ async function handleSignOut() {
 /* ── PRINT REPORT ── */
 async function printReport() {
   await buildPrintReport();
-  document.body.classList.add('printing');
+  const el = document.getElementById('print-report');
+  el.removeAttribute('style');
+  window.onbeforeprint = () => {};
+  window.onafterprint = () => { el.style.display = 'none'; };
   window.print();
-  document.body.classList.remove('printing');
 }
 
 
