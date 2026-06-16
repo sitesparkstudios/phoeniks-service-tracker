@@ -612,7 +612,7 @@ async function loadRecentAudit(days = 7) {
       .gte('changed_at', cutoff.toISOString())
       .order('changed_at', { ascending: false })
       .limit(200);
-    if (error) return [];
+    if (error) return [];   // table may not exist yet — non-fatal
     return data || [];
   } catch(e) { return []; }
 }

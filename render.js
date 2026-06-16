@@ -1809,8 +1809,12 @@ function renderUrgent() {
    One A4 page, portrait, all key info at a glance
    ══════════════════════════════════════════════════════ */
 async function buildPrintReport() {
-  // Load audit log for "Changes this week" section
-  window._printAudit = await loadRecentAudit(7);
+  // Load audit log for "Changes this week" — silently skip if table doesn't exist yet
+  try {
+    window._printAudit = await loadRecentAudit(7);
+  } catch(e) {
+    window._printAudit = [];
+  }
 
   const now     = new Date();
   const ordinal = n => { const s=['th','st','nd','rd'],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); };
