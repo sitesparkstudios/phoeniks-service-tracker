@@ -2168,26 +2168,63 @@ async function buildPrintReport() {
       <span style="font-size:9px;font-weight:700;color:#16a34a">✅ All jobs tracking normally — no critical issues this week</span>
     </div>`}
 
-    <!-- ══ SINCE LAST REPORT DELTA ══ -->
+    <!-- ══ WEEK-ON-WEEK ACTIVITY DELTA ══ -->
     ${(() => {
-      const lastRpt = reportsData && reportsData.length ? reportsData[0] : null;
-      if (!lastRpt) return '';
-      const deltaOpen = allOpen.length - (lastRpt.openJobs || 0);
-      const deltaDone = done.length - (lastRpt.doneJobs || 0);
-      const deltaStuck = urgent.length - (lastRpt.stuck || 0);
-      const rptDate = lastRpt.date ? new Date(lastRpt.date + 'T12:00:00').toLocaleDateString('en-AU', { day:'numeric', month:'short' }) : '?';
+      // This week = last 7 days. Last week = 7-14 days ago. Calculated from job history.
+      const now = new Date();
+      const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+      const twoWeeksAgo = new Date(now); twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+      const thisWeekStr = weekAgo.toISOString().split('T')[0];
+      const lastWeekStr = twoWeeksAgo.toISOString().split('T')[0];
+      const todayStr = now.toISOString().split('T')[0];
+
+      // Completions: jobs whose last history entry falls in each window
+      const completedThisWk = done.filter(j => {
+        const last = j.history?.[j.history.length-1]?.date || '';
+        return last >= thisWeekStr && last <= todayStr;
+      });
+      const completedLastWk = done.filter(j => {
+        const last = j.history?.[j.history.length-1]?.date || '';
+        return last >= lastWeekStr && last < thisWeekStr;
+      });
+
+      // New jobs added this week vs last week (by addedDate or poDate)
+      const newThisWk = jobs.filter(j => (j.addedDate || j.poDate || '') >= thisWeekStr).length;
+      const newLastWk = jobs.filter(j => {
+        const d = j.addedDate || j.poDate || '';
+        return d >= lastWeekStr && d < thisWeekStr;
+      }).length;
+
+      // Status moves this week from audit log
+      const movesThisWk = window._printAudit
+        ? window._printAudit.filter(e => e.action === 'status_change' && e.job_id !== 'IMPORT').length
+        : '—';
+
+      // Overdue count change: jobs that became overdue (crossed 21d) in the last 7 days
+      const nowOverdue = allOpen.filter(j => daysBetween(j.poDate,null) >= 21).length;
+      const wasOverdue = allOpen.filter(j => {
+        // A week ago, this job would have had 7 fewer days on it
+        const daysAWeekAgo = daysBetween(j.poDate, thisWeekStr);
+        return daysAWeekAgo !== null && daysAWeekAgo >= 21;
+      }).length;
+      const deltaOverdue = nowOverdue - wasOverdue;
+
       const fmt = (n, goodIsNeg=false) => {
-        if (n === 0) return `<span style="color:#6b7280">±0</span>`;
+        if (n === 0 || n === '—') return `<span style="color:#6b7280">${n === '—' ? '—' : '±0'}</span>`;
         const good = goodIsNeg ? n < 0 : n > 0;
         const color = good ? '#16a34a' : '#dc2626';
-        return `<span style="color:${color};font-weight:700">${n > 0 ? '+' : ''}${n}</span>`;
+        return `<span style="color:${color};font-weight:700">${typeof n === 'number' && n > 0 ? '+' : ''}${n}</span>`;
       };
-      return `<div style="margin-bottom:10px;padding:7px 12px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:6px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-        <span style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#6b7280;white-space:nowrap">Since ${rptDate}</span>
-        <span style="font-size:9.5px;color:#374151">Open jobs: ${fmt(deltaOpen, true)}</span>
-        <span style="font-size:9.5px;color:#374151">Completed total: ${fmt(deltaDone)}</span>
-        <span style="font-size:9.5px;color:#374151">Overdue 21d+: ${fmt(deltaStuck, true)}</span>
-      </div>`;
+
+      return \`<div style="margin-bottom:10px;padding:7px 14px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:6px">
+        <div style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#6b7280;margin-bottom:5px">Week on week — last 7 days vs previous 7 days</div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <span style="font-size:9.5px;color:#374151">Completed: <strong>\${completedThisWk.length}</strong> <span style="color:#9ba3af">(vs \${completedLastWk.length} prev)</span> \${fmt(completedThisWk.length - completedLastWk.length)}</span>
+          <span style="font-size:9.5px;color:#374151">New jobs: <strong>\${newThisWk}</strong> <span style="color:#9ba3af">(vs \${newLastWk} prev)</span> \${fmt(newThisWk - newLastWk)}</span>
+          <span style="font-size:9.5px;color:#374151">Status moves: <strong>\${movesThisWk}</strong></span>
+          <span style="font-size:9.5px;color:#374151">Overdue 21d+: <strong>\${nowOverdue}</strong> \${fmt(deltaOverdue, true)}</span>
+        </div>
+      </div>\`;
     })()}
 
     <!-- ══ CHANGES THIS WEEK (from audit log) ══ -->
@@ -2217,51 +2254,7 @@ async function buildPrintReport() {
       </div>`;
     })()}
 
-    <!-- ══ PARTS ETA SUMMARY ══ -->
-    ${(() => {
-      const waitingJobs = jobs.filter(j => j.status === 'Waiting for Parts');
-      if (!waitingJobs.length) return '';
-      const sorted = [...waitingJobs].sort((a,b) => {
-        const ea = partsData[a.id]?.eta || '9999';
-        const eb = partsData[b.id]?.eta || '9999';
-        return ea.localeCompare(eb);
-      });
-      return `<div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 5px;padding-bottom:4px;border-bottom:2px solid #d97706">
-          <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#d97706">⏳ Parts ETA — ${sorted.length} job${sorted.length!==1?'s':''} waiting</span>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:9px">
-          <thead><tr>
-            <th style="padding:3px 5px;text-align:left;border-bottom:1px solid #e5e7eb;color:#6b7280;font-weight:700;font-size:8px;text-transform:uppercase">PO</th>
-            <th style="padding:3px 5px;text-align:left;border-bottom:1px solid #e5e7eb;color:#6b7280;font-weight:700;font-size:8px;text-transform:uppercase">Reference</th>
-            <th style="padding:3px 5px;text-align:left;border-bottom:1px solid #e5e7eb;color:#6b7280;font-weight:700;font-size:8px;text-transform:uppercase">Service Co.</th>
-            <th style="padding:3px 5px;text-align:left;border-bottom:1px solid #e5e7eb;color:#6b7280;font-weight:700;font-size:8px;text-transform:uppercase">Part / Notes</th>
-            <th style="padding:3px 5px;text-align:right;border-bottom:1px solid #e5e7eb;color:#6b7280;font-weight:700;font-size:8px;text-transform:uppercase">ETA</th>
-            <th style="padding:3px 5px;text-align:right;border-bottom:1px solid #e5e7eb;color:#6b7280;font-weight:700;font-size:8px;text-transform:uppercase">Waiting</th>
-          </tr></thead>
-          <tbody>${sorted.map(j => {
-            const pd = partsData[j.id] || {};
-            const eta = pd.eta || '';
-            const etaDays = eta ? daysUntil(eta) : null;
-            const etaColor = etaDays !== null && etaDays < 0 ? '#dc2626' : etaDays !== null && etaDays <= 3 ? '#d97706' : '#374151';
-            const etaLabel = !eta ? '<span style="color:#d1d5db">No ETA set</span>'
-              : etaDays !== null && etaDays < 0 ? `<strong style="color:#dc2626">${eta} (${Math.abs(etaDays)}d overdue)</strong>`
-              : etaDays === 0 ? `<strong style="color:#d97706">${eta} (today)</strong>`
-              : `<span style="color:${etaColor}">${eta}</span>`;
-            const waiting = daysBetween(j.poDate, null);
-            const waitCol = waiting > 21 ? '#dc2626' : waiting > 14 ? '#d97706' : '#374151';
-            return `<tr style="border-bottom:1px solid #f3f4f6">
-              <td style="padding:3px 5px;font-family:'DM Mono',monospace;font-size:8px;color:#6b7280">${esc(j.po)}</td>
-              <td style="padding:3px 5px;font-size:9px;font-weight:600">${esc(j.ref||'—')}</td>
-              <td style="padding:3px 5px;font-size:8.5px;color:#6b7280">${esc(j.supplier)}</td>
-              <td style="padding:3px 5px;font-size:8.5px;color:#374151">${esc(pd.notes||'—')}</td>
-              <td style="padding:3px 5px;text-align:right">${etaLabel}</td>
-              <td style="padding:3px 5px;text-align:right;font-weight:700;color:${waitCol}">${waiting}d</td>
-            </tr>`;
-          }).join('')}</tbody>
-        </table>
-      </div>`;
-    })()}
+
 
     <!-- ══ ALL OPEN JOBS — full width ══ -->
     ${(() => {
