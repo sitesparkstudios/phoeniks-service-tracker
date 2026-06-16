@@ -2174,61 +2174,34 @@ async function buildPrintReport() {
 
     <!-- ══ WEEK-ON-WEEK ACTIVITY DELTA ══ -->
     ${(() => {
-      // This week = last 7 days. Last week = 7-14 days ago. Calculated from job history.
-      const now = new Date();
-      const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
-      const twoWeeksAgo = new Date(now); twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-      const thisWeekStr = weekAgo.toISOString().split('T')[0];
-      const lastWeekStr = twoWeeksAgo.toISOString().split('T')[0];
-      const todayStr = now.toISOString().split('T')[0];
-
-      // Completions: jobs whose last history entry falls in each window
-      const completedThisWk = done.filter(j => {
-        const last = j.history?.[j.history.length-1]?.date || '';
-        return last >= thisWeekStr && last <= todayStr;
-      });
-      const completedLastWk = done.filter(j => {
-        const last = j.history?.[j.history.length-1]?.date || '';
-        return last >= lastWeekStr && last < thisWeekStr;
-      });
-
-      // New jobs added this week vs last week (by addedDate or poDate)
-      const newThisWk = jobs.filter(j => (j.addedDate || j.poDate || '') >= thisWeekStr).length;
-      const newLastWk = jobs.filter(j => {
-        const d = j.addedDate || j.poDate || '';
-        return d >= lastWeekStr && d < thisWeekStr;
-      }).length;
-
-      // Status moves this week from audit log
-      const movesThisWk = window._printAudit
-        ? window._printAudit.filter(e => e.action === 'status_change' && e.job_id !== 'IMPORT').length
-        : '—';
-
-      // Overdue count change: jobs that became overdue (crossed 21d) in the last 7 days
-      const nowOverdue = allOpen.filter(j => daysBetween(j.poDate,null) >= 21).length;
-      const wasOverdue = allOpen.filter(j => {
-        // A week ago, this job would have had 7 fewer days on it
-        const daysAWeekAgo = daysBetween(j.poDate, thisWeekStr);
-        return daysAWeekAgo !== null && daysAWeekAgo >= 21;
-      }).length;
-      const deltaOverdue = nowOverdue - wasOverdue;
-
-      const fmt = (n, goodIsNeg=false) => {
-        if (n === 0 || n === '—') return `<span style="color:#6b7280">${n === '—' ? '—' : '±0'}</span>`;
-        const good = goodIsNeg ? n < 0 : n > 0;
-        const color = good ? '#16a34a' : '#dc2626';
-        return `<span style="color:${color};font-weight:700">${typeof n === 'number' && n > 0 ? '+' : ''}${n}</span>`;
+      const _wNow = new Date();
+      const _wAgo = new Date(_wNow); _wAgo.setDate(_wAgo.getDate() - 7);
+      const _w2Ago = new Date(_wNow); _w2Ago.setDate(_w2Ago.getDate() - 14);
+      const _thisWk = _wAgo.toISOString().split('T')[0];
+      const _lastWk = _w2Ago.toISOString().split('T')[0];
+      const _today  = _wNow.toISOString().split('T')[0];
+      const _cTW = done.filter(j => { const d = j.history?.[j.history.length-1]?.date||''; return d >= _thisWk && d <= _today; });
+      const _cLW = done.filter(j => { const d = j.history?.[j.history.length-1]?.date||''; return d >= _lastWk && d < _thisWk; });
+      const _nTW = jobs.filter(j => (j.addedDate||j.poDate||'') >= _thisWk).length;
+      const _nLW = jobs.filter(j => { const d=j.addedDate||j.poDate||''; return d>=_lastWk&&d<_thisWk; }).length;
+      const _moves = window._printAudit ? window._printAudit.filter(e => e.action==='status_change'&&e.job_id!=='IMPORT').length : '—';
+      const _nowOD = allOpen.filter(j => daysBetween(j.poDate,null) >= 21).length;
+      const _wasOD = allOpen.filter(j => { const d=daysBetween(j.poDate,_thisWk); return d!==null&&d>=21; }).length;
+      const _dOD   = _nowOD - _wasOD;
+      const _fmtD  = (n, inv=false) => {
+        if (n===0) return '<span style="color:#6b7280">±0</span>';
+        const good = inv ? n<0 : n>0;
+        const col  = good ? '#16a34a' : '#dc2626';
+        return '<span style="color:' + col + ';font-weight:700">' + (n>0?'+':'') + n + '</span>';
       };
-
-      return \`<div style="margin-bottom:10px;padding:7px 14px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:6px">
-        <div style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#6b7280;margin-bottom:5px">Week on week — last 7 days vs previous 7 days</div>
-        <div style="display:flex;gap:20px;flex-wrap:wrap">
-          <span style="font-size:9.5px;color:#374151">Completed: <strong>\${completedThisWk.length}</strong> <span style="color:#9ba3af">(vs \${completedLastWk.length} prev)</span> \${fmt(completedThisWk.length - completedLastWk.length)}</span>
-          <span style="font-size:9.5px;color:#374151">New jobs: <strong>\${newThisWk}</strong> <span style="color:#9ba3af">(vs \${newLastWk} prev)</span> \${fmt(newThisWk - newLastWk)}</span>
-          <span style="font-size:9.5px;color:#374151">Status moves: <strong>\${movesThisWk}</strong></span>
-          <span style="font-size:9.5px;color:#374151">Overdue 21d+: <strong>\${nowOverdue}</strong> \${fmt(deltaOverdue, true)}</span>
-        </div>
-      </div>\`;
+      return '<div style="margin-bottom:10px;padding:7px 14px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:6px">'
+        + '<div style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#6b7280;margin-bottom:5px">Week on week — last 7 days vs previous 7 days</div>'
+        + '<div style="display:flex;gap:20px;flex-wrap:wrap">'
+        + '<span style="font-size:9.5px;color:#374151">Completed: <strong>' + _cTW.length + '</strong> <span style="color:#9ba3af">(vs ' + _cLW.length + ' prev)</span> ' + _fmtD(_cTW.length - _cLW.length) + '</span>'
+        + '<span style="font-size:9.5px;color:#374151">New jobs: <strong>' + _nTW + '</strong> <span style="color:#9ba3af">(vs ' + _nLW + ' prev)</span> ' + _fmtD(_nTW - _nLW) + '</span>'
+        + '<span style="font-size:9.5px;color:#374151">Status moves: <strong>' + _moves + '</strong></span>'
+        + '<span style="font-size:9.5px;color:#374151">Overdue 21d+: <strong>' + _nowOD + '</strong> ' + _fmtD(_dOD, true) + '</span>'
+        + '</div></div>';
     })()}
 
     <!-- ══ CHANGES THIS WEEK (from audit log) ══ -->
