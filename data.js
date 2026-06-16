@@ -156,6 +156,7 @@ function dbRowToJob(row) {
     amountToInvoice:  row.amount_to_invoice,
     sourceDoc:        row.source_doc,
     notes:            row.notes,
+    internalNotes:    row.internal_notes || '',
     addedDate:        row.added_date,
     history:          row.history || [],
   };
@@ -180,6 +181,7 @@ function jobToDbRow(j) {
     amount_to_invoice: j.amountToInvoice || '',
     source_doc:       j.sourceDoc        || '',
     notes:            j.notes            || '',
+    internal_notes:   j.internalNotes    || '',
     added_date:       j.addedDate        || null,
     history:          j.history          || [],
   };
@@ -802,6 +804,7 @@ function processCSVFile(file) {
     });
     await saveData();   // bulk upsert via Supabase
     renderAll();
+    setLastImportNow();
     const skipNote = noStatus > 0 ? ` · ${noStatus} skipped (no Job Status — procurement POs)` : skipped > 0 ? ` · ${skipped} skipped` : '';
     showImportResult('success', `Import complete — ${added} new job${added!==1?'s':''} added, ${updated} updated${skipNote}.`);
     showToast(`Import: +${added} new, ${updated} updated`);
@@ -811,6 +814,29 @@ function processCSVFile(file) {
 
 function showImportResult(type, msg) {
   document.getElementById('import-result').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+}
+
+/* ── LAST IMPORT TIMESTAMP ──────────────────────────────────
+   Stored in localStorage (non-sensitive UI preference).
+   ─────────────────────────────────────────────────────────── */
+function setLastImportNow() {
+  try { localStorage.setItem('phoeniks_last_import', new Date().toISOString()); } catch(e) {}
+  renderLastImportStamp();
+}
+
+function getLastImport() {
+  try { return localStorage.getItem('phoeniks_last_import'); } catch(e) { return null; }
+}
+
+function renderLastImportStamp() {
+  const el = document.getElementById('last-import-stamp');
+  if (!el) return;
+  const raw = getLastImport();
+  if (!raw) { el.textContent = 'Never imported — drop a CSV above to get started.'; return; }
+  const d = new Date(raw);
+  const fmt = d.toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short', year:'numeric' })
+    + ' at ' + d.toLocaleTimeString('en-AU', { hour:'2-digit', minute:'2-digit' });
+  el.textContent = `Last import: ${fmt}`;
 }
 
 function copyOdooTemplate() {

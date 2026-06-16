@@ -893,6 +893,8 @@ function renderChatterLog() {
 }
 
 function renderJobs() {
+  if (typeof _bulkSelected !== 'undefined') _bulkSelected.clear();
+  if (typeof updateBulkBar === 'function') updateBulkBar();
   const selectedStatuses = getSelectedStatuses();
   const fsu = document.getElementById('filter-supplier')?.value || '';
   const fq  = (document.getElementById('filter-search')?.value || '').toLowerCase();
@@ -945,14 +947,15 @@ function renderJobs() {
     const isDone  = j.status === 'Job Done';
     const isCloseout = j.status === 'Awaiting Closeout';
     const flagged = !isDone && !isCloseout && (open||0) > 14;
-    return `<tr class="${flagged?'flagged':''}" onclick="openJobModal('${j.id}')">
-      <td><span class="po-link">${esc(j.po)}</span></td>
-      <td class="ref-cell">${esc(j.ref||'—')}</td>
-      <td>${esc(j.supplier)}</td>
-      <td>${badge(j.status)}</td>
-      <td>${dayChip(open,isDone)}</td>
-      <td>${!isDone && inStage !== null ? dayChip(inStage,false) : '<span class="text-muted text-sm">—</span>'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text3)">${fmtValue(j.value)}</td>
+    return `<tr class="${flagged?'flagged':''}">
+      <td onclick="event.stopPropagation()" style="width:36px;padding:0 0 0 12px"><input type="checkbox" class="job-row-cb" data-id="${j.id}" onchange="toggleBulkSelect('${j.id}',this)" style="cursor:pointer;width:15px;height:15px"></td>
+      <td onclick="openJobModal('${j.id}')" style="cursor:pointer"><span class="po-link">${esc(j.po)}</span></td>
+      <td onclick="openJobModal('${j.id}')" class="ref-cell" style="cursor:pointer">${esc(j.ref||'—')}</td>
+      <td onclick="openJobModal('${j.id}')" style="cursor:pointer">${esc(j.supplier)}</td>
+      <td onclick="openJobModal('${j.id}')" style="cursor:pointer">${badge(j.status)}</td>
+      <td onclick="openJobModal('${j.id}')" style="cursor:pointer">${dayChip(open,isDone)}</td>
+      <td onclick="openJobModal('${j.id}')" style="cursor:pointer">${!isDone && inStage !== null ? dayChip(inStage,false) : '<span class="text-muted text-sm">—</span>'}</td>
+      <td onclick="openJobModal('${j.id}')" style="cursor:pointer;font-family:'DM Mono',monospace;font-size:12px;color:var(--text3)">${fmtValue(j.value)}</td>
       <td onclick="event.stopPropagation()" style="text-align:right">
         ${window._userRole !== 'viewer' ? `
         <button class="btn btn-ghost btn-sm btn-icon" title="Edit" onclick="editJob('${j.id}')">
@@ -1275,12 +1278,14 @@ function openJobModal(id) {
       <div><div class="text-muted text-sm mb-4">Total Open</div><div class="mono" style="font-weight:700;color:var(--text)">${total !== null ? total+' days' : '—'}</div></div>
       ${j.value ? `<div><div class="text-muted text-sm mb-4">Value</div><div class="mono" style="color:var(--text)">${fmtValue(j.value)}</div></div>` : ''}
       ${j.buyer ? `<div><div class="text-muted text-sm mb-4">Buyer</div><div style="color:var(--text)">${esc(j.buyer)}</div></div>` : ''}
+      ${j.deadline ? `<div><div class="text-muted text-sm mb-4">Deadline</div><div class="mono" style="color:${daysUntil(j.deadline) !== null && daysUntil(j.deadline) < 0 ? 'var(--red)' : daysUntil(j.deadline) !== null && daysUntil(j.deadline) <= 3 ? 'var(--amber)' : 'var(--text)'};font-weight:600">${j.deadline}${daysUntil(j.deadline) !== null ? ' (' + (daysUntil(j.deadline) < 0 ? Math.abs(daysUntil(j.deadline)) + 'd overdue' : daysUntil(j.deadline) === 0 ? 'today' : daysUntil(j.deadline) + 'd away') + ')' : ''}</div></div>` : ''}
       ${j.sourceDoc ? `<div><div class="text-muted text-sm mb-4">Source Doc</div><div class="mono" style="color:var(--text);font-size:12px">${esc(j.sourceDoc)}</div></div>` : ''}
       ${j.billingStatus ? `<div><div class="text-muted text-sm mb-4">Billing Status</div><div style="font-weight:600;color:${j.billingStatus==='Fully Billed'?'var(--green)':j.billingStatus==='Waiting Bills'?'var(--amber)':'var(--text2)'}">${esc(j.billingStatus)}</div></div>` : ''}
       ${j.amountToInvoice && parseFloat(j.amountToInvoice) < 0 ? `<div><div class="text-muted text-sm mb-4">Amount Overbilled</div><div class="mono" style="color:var(--red);font-weight:700">${fmtValue(Math.abs(parseFloat(j.amountToInvoice)))}</div></div>` : ''}
       ${j.amountToInvoice && parseFloat(j.amountToInvoice) > 0 ? `<div><div class="text-muted text-sm mb-4">Amount to Invoice</div><div class="mono" style="color:var(--amber);font-weight:700">${fmtValue(j.amountToInvoice)}</div></div>` : ''}
     </div>
-    ${j.notes ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--text2);margin-bottom:16px;white-space:pre-wrap">${esc(j.notes)}</div>` : ''}
+    ${j.notes ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--text2);margin-bottom:8px;white-space:pre-wrap"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:6px">Odoo Notes</div>${esc(j.notes)}</div>` : ''}
+    ${j.internalNotes ? `<div style="background:#fefce8;border:1px solid rgba(202,138,4,0.25);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--text2);margin-bottom:16px;white-space:pre-wrap"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--amber);margin-bottom:6px">Internal Notes</div>${esc(j.internalNotes)}</div>` : ''}
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:12px">Status history</div>
     <div class="timeline">${tlHtml}</div>
   `;
@@ -1761,18 +1766,38 @@ function renderUrgent() {
   const tbody = document.getElementById('urgent-tbody');
   if (tbody) {
     tbody.innerHTML = !urgentJobs.length
-      ? '<tr><td colspan="7"><div class="empty-state"><p>✓ No overdue jobs at this threshold.</p></div></td></tr>'
+      ? '<tr><td colspan="8"><div class="empty-state"><p>✓ No overdue jobs at this threshold.</p></div></td></tr>'
       : urgentJobs.map(j => {
           const days    = daysBetween(j.poDate, null);
           const chipCls = days > 30 ? 'danger' : days > 21 ? 'warn' : '';
           const rowCls  = days > 30 ? 'flagged' : '';
+          const pd      = partsData[j.id] || {};
+          const eta     = pd.eta || '';
+          const etaDays = eta ? daysUntil(eta) : null;
+          let etaCell = '<span class="text-muted text-sm">—</span>';
+          if (eta) {
+            const etaCls = etaDays !== null && etaDays < 0 ? 'danger' : etaDays === 0 ? 'warn' : '';
+            const etaLbl = etaDays !== null && etaDays < 0
+              ? `${Math.abs(etaDays)}d overdue`
+              : etaDays === 0 ? 'Today'
+              : etaDays !== null ? `${etaDays}d`
+              : eta;
+            etaCell = `<span class="day-chip ${etaCls}" style="font-size:11px">${etaLbl}</span>`;
+          }
+          const deadlineDays = j.deadline ? daysUntil(j.deadline) : null;
+          let deadlineCell = '<span class="text-muted text-sm">—</span>';
+          if (j.deadline) {
+            const dlCls = deadlineDays !== null && deadlineDays < 0 ? 'danger' : deadlineDays !== null && deadlineDays <= 3 ? 'warn' : '';
+            deadlineCell = `<span class="day-chip ${dlCls}" style="font-size:11px" title="${j.deadline}">${deadlineDays !== null ? (deadlineDays < 0 ? `${Math.abs(deadlineDays)}d over` : deadlineDays === 0 ? 'Today' : `${deadlineDays}d`) : j.deadline}</span>`;
+          }
           return `<tr class="${rowCls}" onclick="openJobModal('${j.id}')" style="cursor:pointer">
             <td><span class="po-link">${esc(j.po)}</span></td>
             <td class="ref-cell">${esc(j.ref || '—')}</td>
             <td>${esc(j.supplier)}</td>
             <td>${badge(j.status)}</td>
             <td><span class="day-chip ${chipCls}">${days}d</span></td>
-            <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text3)">${fmtValue(j.value)}</td>
+            <td>${j.status === 'Waiting for Parts' ? etaCell : '<span class="text-muted text-sm">—</span>'}</td>
+            <td>${deadlineCell}</td>
             <td style="font-size:11px;color:var(--text3);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(j.notes||'')}">${esc(j.notes||'—')}</td>
           </tr>`;
         }).join('');

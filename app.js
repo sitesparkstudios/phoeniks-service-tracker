@@ -109,6 +109,7 @@ function showPage(name) {
   if (name === 'sites')      renderSites();
   if (name === 'supplier-tags') { renderSupplierTags(); }
   if (name === 'reports')    renderReports();
+  if (name === 'import')     { renderLastImportStamp(); }
   if (name === 'add')        populateSupplierDatalist();
   if (name === 'admin')      renderAdmin();
 }
@@ -177,6 +178,115 @@ function populateSupplierDatalist() {
   dl.innerHTML = suppliers.map(s => `<option value="${esc(s)}">`).join('');
 }
 
+/* ── GLOBAL SEARCH ── */
+function openGlobalSearch() {
+  const overlay = document.getElementById('global-search-overlay');
+  const input   = document.getElementById('global-search-input');
+  if (overlay) overlay.classList.remove('hidden');
+  if (input)   { input.value = ''; input.focus(); }
+  renderGlobalSearchResults('');
+}
+
+function closeGlobalSearch() {
+  const overlay = document.getElementById('global-search-overlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+function onGlobalSearchInput(val) {
+  renderGlobalSearchResults(val);
+}
+
+function renderGlobalSearchResults(q) {
+  const el = document.getElementById('global-search-results');
+  if (!el) return;
+  q = (q || '').toLowerCase().trim();
+  if (!q) { el.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:13px;text-align:center">Type to search jobs…</div>'; return; }
+  const matches = jobs.filter(j =>
+    (j.po||'').toLowerCase().includes(q) ||
+    (j.ref||'').toLowerCase().includes(q) ||
+    (j.supplier||'').toLowerCase().includes(q) ||
+    (j.equipment||'').toLowerCase().includes(q) ||
+    (j.notes||'').toLowerCase().includes(q)
+  ).slice(0, 20);
+  if (!matches.length) {
+    el.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:13px;text-align:center">No jobs found.</div>';
+    return;
+  }
+  el.innerHTML = matches.map(j => `
+    <div class="gs-result" onclick="closeGlobalSearch();showPage('jobs');openJobModal('${j.id}')">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:var(--text)">${esc(j.po)}</span>
+        ${badge(j.status)}
+        <span style="font-size:12px;color:var(--text3)">${esc(j.supplier)}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-top:3px">${esc(j.ref||'—')}</div>
+    </div>
+  `).join('');
+}
+
+/* ── BULK STATUS UPDATE ── */
+let _bulkSelected = new Set();
+
+function toggleBulkSelect(id, cb) {
+  if (cb.checked) _bulkSelected.add(id);
+  else _bulkSelected.delete(id);
+  updateBulkBar();
+}
+
+function toggleSelectAll(cb) {
+  const checkboxes = document.querySelectorAll('.job-row-cb');
+  checkboxes.forEach(c => {
+    c.checked = cb.checked;
+    if (cb.checked) _bulkSelected.add(c.dataset.id);
+    else _bulkSelected.delete(c.dataset.id);
+  });
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar    = document.getElementById('bulk-action-bar');
+  const countEl = document.getElementById('bulk-count');
+  if (!bar) return;
+  const count = _bulkSelected.size;
+  bar.style.display = count > 0 ? 'flex' : 'none';
+  if (countEl) countEl.textContent = count + ' job' + (count !== 1 ? 's' : '') + ' selected';
+}
+
+function clearBulkSelection() {
+  _bulkSelected.clear();
+  document.querySelectorAll('.job-row-cb').forEach(c => c.checked = false);
+  const allCb = document.getElementById('bulk-select-all');
+  if (allCb) allCb.checked = false;
+  updateBulkBar();
+}
+
+async function applyBulkStatus() {
+  if (!isAuthed()) { showToast('Sign in to edit jobs'); return; }
+  const newStatus = document.getElementById('bulk-status-select')?.value;
+  if (!newStatus || _bulkSelected.size === 0) return;
+  const count = _bulkSelected.size;
+  const confirmed = await showConfirm(
+    `Update ${count} job${count !== 1 ? 's' : ''}?`,
+    `Set all selected jobs to "${newStatus}".`,
+    'Update'
+  );
+  if (!confirmed) return;
+  const ids = [..._bulkSelected];
+  ids.forEach(id => {
+    const j = jobs.find(x => x.id === id);
+    if (!j) return;
+    if (j.status !== newStatus) {
+      if (!j.history || !j.history.length) j.history = [{ status: j.status, date: j.poDate || today() }];
+      j.history.push({ status: newStatus, date: today() });
+      j.status = newStatus;
+    }
+  });
+  await saveData();
+  clearBulkSelection();
+  renderAll();
+  showToast(`${count} job${count !== 1 ? 's' : ''} updated to ${newStatus}`);
+}
+
 /* ── CRUD ── */
 async function saveJob() {
   if (!isAuthed()) { showToast('Sign in to add or edit jobs'); openAuthModal(); return; }
@@ -186,6 +296,7 @@ async function saveJob() {
   const poDate  = document.getElementById('f-po-date').value;
   const status  = document.getElementById('f-status').value;
   const notes   = document.getElementById('f-notes').value.trim();
+  const internalNotes = document.getElementById('f-internal-notes').value.trim();
   const ref     = document.getElementById('f-ref').value.trim();
   const equip   = document.getElementById('f-equipment').value.trim();
   const value   = document.getElementById('f-value').value.trim();
@@ -209,11 +320,18 @@ async function saveJob() {
     const j = jobs.find(x => x.id === editingId);
     if (j) {
       j.po = po; j.supplier = supplier; j.ref = ref; j.equipment = equip;
-      j.poDate = poDate; j.notes = allNotes; j.value = value; j.buyer = buyer;
+      j.poDate = poDate; j.notes = allNotes; j.internalNotes = internalNotes; j.value = value; j.buyer = buyer;
       if (transitions.length) {
         j.history = buildHistoryFromTransitions(poDate, transitions);
         j.status  = j.history[j.history.length-1].status;
       } else if (j.status !== status) {
+        // Confirm status change
+        const confirmed = await showConfirm(
+          `Change status?`,
+          `${j.status}  →  ${status}`,
+          'Confirm'
+        );
+        if (!confirmed) return;
         if (!j.history || !j.history.length) j.history = [{ status: j.status, date: j.poDate }];
         j.history.push({ status, date: today() });
         j.status = status;
@@ -227,7 +345,7 @@ async function saveJob() {
     savedJob = {
       id:        'j' + Date.now(),
       po, supplier, ref, equipment: equip, poDate,
-      notes: allNotes, value, buyer,
+      notes: allNotes, internalNotes, value, buyer,
       addedDate: today(),
       status:    transitions.length ? transitions[transitions.length-1].to : status,
       history:   transitions.length ? buildHistoryFromTransitions(poDate, transitions) : [{ status, date: poDate }],
@@ -261,6 +379,7 @@ function editJob(id) {
   document.getElementById('f-po-date').value   = j.poDate    || '';
   document.getElementById('f-status').value    = j.status;
   document.getElementById('f-notes').value     = j.notes     || '';
+  document.getElementById('f-internal-notes').value = j.internalNotes || '';
   document.getElementById('f-value').value     = j.value     || '';
   document.getElementById('f-buyer').value     = j.buyer     || '';
   document.getElementById('f-chatter').value   = '';
@@ -273,7 +392,7 @@ function clearForm() {
   document.getElementById('form-page-title').textContent = 'Add New Job';
   document.getElementById('save-btn-label').textContent  = 'Save job';
   document.getElementById('form-validation-msg').style.display = 'none';
-  ['f-po','f-supplier','f-ref','f-equipment','f-notes','f-chatter','f-value','f-buyer']
+  ['f-po','f-supplier','f-ref','f-equipment','f-notes','f-internal-notes','f-chatter','f-value','f-buyer']
     .forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-po-date').value = '';
   document.getElementById('f-status').value  = 'Incoming Job';
@@ -362,7 +481,13 @@ document.addEventListener('keydown', e => {
     closeModal();
     closeMeeting();
     closeAuthModal();
+    closeGlobalSearch();
     document.getElementById('confirm-overlay').classList.add('hidden');
+  }
+  // Cmd+K / Ctrl+K → global search
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    openGlobalSearch();
   }
   if (document.getElementById('meeting-overlay').classList.contains('active')) {
     if (e.key === 'ArrowRight') meetingNext();
@@ -509,48 +634,68 @@ async function renderAdmin() {
 }
 
 async function adminInviteFromInput() {
-  const input  = document.getElementById('admin-invite-email');
-  const roleEl = document.getElementById('admin-invite-role');
-  const result = document.getElementById('admin-invite-result');
-  const btn    = document.querySelector('#page-admin .btn-primary');
-  const email  = input ? input.value.trim() : '';
-  const role   = roleEl ? roleEl.value : 'viewer';
+  const input    = document.getElementById('admin-invite-email');
+  const roleEl   = document.getElementById('admin-invite-role');
+  const result   = document.getElementById('admin-invite-result');
+  const btn      = document.querySelector('#page-admin .btn-primary');
+  const email    = input ? input.value.trim() : '';
+  const role     = roleEl ? roleEl.value : 'viewer';
 
   if (!email || !email.includes('@')) {
     if (result) { result.style.color = 'var(--red)'; result.textContent = 'Please enter a valid email address.'; }
     return;
   }
 
-  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  // Generate a random temp password
+  const tempPass = 'Phoeniks-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
   if (result) { result.style.color = 'var(--text3)'; result.textContent = ''; }
 
   try {
-    // 1. Send magic link (creates user + sends email)
-    const { error: otpErr } = await _sb.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: window.location.origin + window.location.pathname,
-        shouldCreateUser: true
-      }
-    });
+    // 1. Create user with temp password via admin API
+    //    Supabase free plan: use signUp — user is created and can sign in immediately
+    const { error: signUpErr } = await _sb.auth.admin
+      ? await _sb.auth.admin.createUser({ email, password: tempPass, email_confirm: true })
+      : await _sb.auth.signUp({ email, password: tempPass, options: { emailRedirectTo: null } });
 
-    if (otpErr) throw otpErr;
+    // Fallback: if admin API not available (anon key), use signUp which sends a confirmation email
+    // We suppress the error if user already exists — just update their role
+    if (signUpErr && !signUpErr.message?.toLowerCase().includes('already')) throw signUpErr;
 
-    // 2. Record in invited_users table so we can list/remove them
+    // 2. Record in invited_users table
     await _sb.from('invited_users').upsert({ email, role, invited_at: new Date().toISOString() }, { onConflict: 'email' });
 
-    if (result) { result.style.color = 'var(--green)'; result.textContent = `✓ Invite sent to ${email} — they'll receive a magic link shortly.`; }
-    if (input)  input.value = '';
-    showToast('Invite sent to ' + email);
+    // 3. Show temp password to copy
+    if (result) {
+      result.innerHTML = `
+        <div style="color:var(--green);font-weight:700;margin-bottom:6px">✓ User created — ${esc(email)}</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Share this temporary password with them. They should change it after first sign-in.</div>
+        <div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:8px 12px">
+          <code style="font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:var(--text);flex:1">${esc(tempPass)}</code>
+          <button onclick="navigator.clipboard.writeText('${esc(tempPass)}').then(()=>showToast('Copied!'))" style="font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);cursor:pointer;font-family:var(--font)">Copy</button>
+        </div>
+      `;
+    }
+    if (input) input.value = '';
+    showToast('User created: ' + email);
     renderAdmin();
   } catch(err) {
     const msg = (err.message || '').toLowerCase();
     let friendly = err.message;
-    if (msg.includes('rate') || msg.includes('429')) friendly = 'Rate limit reached — wait 60 min and try again.';
-    if (result) { result.style.color = 'var(--red)'; result.textContent = 'Error: ' + friendly; }
+    if (msg.includes('rate') || msg.includes('429')) friendly = 'Rate limit reached — wait a moment and try again.';
+    if (msg.includes('already registered') || msg.includes('already exists')) {
+      // User exists — just update role record
+      await _sb.from('invited_users').upsert({ email, role, invited_at: new Date().toISOString() }, { onConflict: 'email' });
+      if (result) { result.style.color = 'var(--amber)'; result.textContent = `${email} already exists — role updated to ${role === 'editor' ? 'Full edit' : 'View only'}.`; }
+      if (input) input.value = '';
+      renderAdmin();
+      return;
+    }
+    if (result) { result.innerHTML = `<span style="color:var(--red)">Error: ${esc(friendly)}</span>`; }
     showToast('Error: ' + friendly);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Send invite'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Create user'; }
   }
 }
 

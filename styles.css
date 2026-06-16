@@ -699,3 +699,60 @@ body.viewer-mode .nav-item[onclick*="import"],
 body.viewer-mode #page-add {
   display: none !important;
 }
+
+/* ── GLOBAL SEARCH ── */
+.search-label { display: inline; }
+.search-kbd {
+  display: inline;
+  font-size: 10px;
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: 'DM Mono', monospace;
+  color: var(--text3);
+}
+.gs-result {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.gs-result:hover { background: var(--surface2); }
+.gs-result:last-child { border-bottom: none; }
+
+/* ── BULK ACTION BAR ── */
+#bulk-action-bar { animation: slideDown 0.15s ease; }
+@keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── INTERNAL NOTES ── */
+textarea#f-internal-notes:focus {
+  outline: none;
+  border-color: rgba(202,138,4,0.5);
+  box-shadow: 0 0 0 3px rgba(202,138,4,0.1);
+}
+
+/* ── PRINT: URGENT PAGE ── */
+@media print {
+  .sidebar, .topbar, .topbar-actions, .btn-meeting,
+  #bulk-action-bar, .filter-row, #global-search-overlay,
+  .nav-item, .sidebar-overlay { display: none !important; }
+
+  .main { margin-left: 0 !important; }
+  .page { display: block !important; padding: 0 !important; }
+  .page:not([id="page-urgent"]) { display: none !important; }
+
+  body[data-print-page="Urgent — Jobs Needing Attention"] #page-urgent { display: block !important; }
+
+  #urgent-kpis { display: grid !important; grid-template-columns: repeat(5,1fr) !important; }
+  .card { box-shadow: none !important; border: 1px solid #ddd !important; }
+  .day-chip.danger { background: #fee2e2 !important; color: #b91c1c !important; }
+  .day-chip.warn   { background: #fef3c7 !important; color: #92400e !important; }
+  table { font-size: 11px !important; }
+}
+
+/* ── MOBILE: hide search kbd hint on small screens ── */
+@media (max-width: 768px) {
+  .search-kbd  { display: none; }
+  .search-label { display: none; }
+}
