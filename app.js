@@ -480,8 +480,8 @@ async function printReport() {
   el.style.display = 'block';
   setTimeout(() => {
     window.print();
-    setTimeout(() => { el.style.display = 'none'; }, 1000);
-  }, 200);
+    setTimeout(() => { el.style.display = 'none'; }, 2000);
+  }, 500);
 }
 
 

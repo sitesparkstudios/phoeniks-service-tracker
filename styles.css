@@ -473,14 +473,24 @@ select {
   }
 
   html, body { margin: 0 !important; padding: 0 !important; }
-  body > * { display: none !important; }
-  #sidebar-overlay { display: none !important; }
 
-  #print-report,
-  body > #print-report {
+  /* Hide everything except the print report */
+  .app,
+  .sidebar,
+  .main,
+  .topbar,
+  .modal-overlay,
+  .confirm-overlay,
+  .meeting-overlay,
+  #sidebar-overlay,
+  #loading-screen,
+  #auth-modal-overlay,
+  #global-search-overlay,
+  #toast { display: none !important; }
+
+  /* Show only the print report */
+  #print-report {
     display: block !important;
-    /* Scale the entire report to 78% so it reliably fits A4 at 100% print scale.
-       Users no longer need to touch the browser scale slider. */
     zoom: 0.78;
     width: 100% !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
