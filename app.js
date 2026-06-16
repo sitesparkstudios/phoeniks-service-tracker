@@ -473,7 +473,28 @@ async function handleSignOut() {
   showToast('Signed out');
 }
 
-/* ── TOAST ── */
+/* ── PRINT REPORT ── */
+async function printReport() {
+  await buildPrintReport();
+  const html = document.getElementById('print-report').innerHTML;
+  const css = `
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 10px; color: #1e2024; background: #fff; padding: 8px; }
+    @page { size: A4 portrait; margin: 8mm; }
+    @media print { body { zoom: 0.78; } }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { overflow: visible; white-space: normal; }
+  `;
+  const fonts = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap';
+  const w = window.open('', '_blank', 'width=1000,height=800');
+  if (!w) { showToast('Allow popups for this site to use Print'); return; }
+  w.document.write(`<!DOCTYPE html><html><head><title>Phoeniks Service Report</title><link rel="stylesheet" href="${fonts}"><style>${css}</style></head><body>${html}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { w.print(); }, 1200);
+}
+
+
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;

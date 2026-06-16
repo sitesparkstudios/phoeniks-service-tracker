@@ -12,7 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f5c842'/%3E%3Ccircle cx='10' cy='10' r='4' fill='%233d4043'/%3E%3Ccircle cx='22' cy='10' r='4' fill='%233d4043'/%3E%3Ccircle cx='10' cy='22' r='4' fill='%233d4043'/%3E%3Ccircle cx='22' cy='22' r='4' fill='none' stroke='%233d4043' stroke-width='2.5'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=20260627">
+<link rel="stylesheet" href="styles.css?v=20260628">
 
   <script>
     // Unregister any old service workers that may be causing caching issues
@@ -173,7 +173,10 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
         </button>
-        <button class="btn btn-ghost btn-sm" onclick="buildPrintReport().then(() => { const html = document.getElementById('print-report').innerHTML; const w = window.open('','_blank','width=900,height=700'); w.document.write('<html><head><title>Phoeniks Service Report</title><style>*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Plus Jakarta Sans,sans-serif;font-size:10px;color:#1e2024;background:#fff;padding:0}@page{size:A4 portrait;margin:8mm}@media print{body{zoom:0.78}}table{border-collapse:collapse;width:100%}td,th{overflow:visible;white-space:normal}</style><link href=\"https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap\" rel=\"stylesheet\"></head><body>' + html + '</body></html>'); w.document.close(); w.focus(); setTimeout(() => { w.print(); }, 800); })">
+        <button class="btn btn-ghost btn-sm" onclick="printReport()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print
+        </button>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           Print
         </button>
@@ -1112,10 +1115,10 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="data.js?v=20260627"></script>
-<script src="render.js?v=20260627"></script>
-<script src="meeting.js?v=20260627"></script>
-<script src="app.js?v=20260627"></script>
+<script src="data.js?v=20260628"></script>
+<script src="render.js?v=20260628"></script>
+<script src="meeting.js?v=20260628"></script>
+<script src="app.js?v=20260628"></script>
 
   <!-- ═══════════════════════════════════════════════
        PRINT REPORT — hidden on screen, print only
