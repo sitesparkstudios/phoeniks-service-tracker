@@ -475,12 +475,15 @@ async function handleSignOut() {
 
 /* ── PRINT REPORT ── */
 async function printReport() {
-  await buildPrintReport();
-  const el = document.getElementById('print-report');
-  el.removeAttribute('style');
-  window.onbeforeprint = () => {};
-  window.onafterprint = () => { el.style.display = 'none'; };
-  window.print();
+  // Pre-load audit data, then build report synchronously and print
+  try { window._printAudit = await loadRecentAudit(7); } catch(e) { window._printAudit = []; }
+  buildPrintReport();
+  setTimeout(() => {
+    const t = document.title;
+    document.title = '';
+    window.print();
+    document.title = t;
+  }, 120);
 }
 
 

@@ -469,7 +469,7 @@ select {
 @media print {
   @page { size: A4 portrait; margin: 8mm; }
   html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
-  .app { display: none !important; }
+  body > * { display: none !important; }
   #print-report {
     display: block !important;
     zoom: 0.78;

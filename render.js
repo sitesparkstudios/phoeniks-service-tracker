@@ -1808,14 +1808,8 @@ function renderUrgent() {
    PRINT REPORT — Monday Morning Summary
    One A4 page, portrait, all key info at a glance
    ══════════════════════════════════════════════════════ */
-async function buildPrintReport() {
+function buildPrintReport() {
   try {
-  // Load audit log for "Changes this week" — silently skip if table doesn't exist yet
-  try {
-    window._printAudit = await loadRecentAudit(7);
-  } catch(e) {
-    window._printAudit = [];
-  }
 
   const now     = new Date();
   const ordinal = n => { const s=['th','st','nd','rd'],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); };
@@ -2443,7 +2437,6 @@ async function buildPrintReport() {
   document.getElementById('print-report').innerHTML = html;
   } catch(e) {
     console.error('buildPrintReport error:', e);
-    alert('Print report error: ' + e.message + '\nLine info: ' + (e.stack||'').split('\n')[1]);
   }
 }
 
