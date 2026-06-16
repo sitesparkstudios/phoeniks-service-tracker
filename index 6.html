@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phoeniks — Service Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f5c842'/%3E%3Ccircle cx='10' cy='10' r='4' fill='%233d4043'/%3E%3Ccircle cx='22' cy='10' r='4' fill='%233d4043'/%3E%3Ccircle cx='10' cy='22' r='4' fill='%233d4043'/%3E%3Ccircle cx='22' cy='22' r='4' fill='none' stroke='%233d4043' stroke-width='2.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css?v=20260627">
+
+  <script>
+    // Unregister any old service workers that may be causing caching issues
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(r => r.unregister());
+      });
+      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+    }
+  </script>
+</head>
+<body>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-inner">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;flex-shrink:0">
+            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#3d4043"></div>
+            <div style="width:8px;height:8px;border-radius:50%;border:2px solid #3d4043"></div>
+          </div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:21px;color:#3d4043;letter-spacing:1px;line-height:1">PHOENIKS</div>
+        </div>
+        <div style="font-size:10px;color:rgba(61,64,67,0.55);letter-spacing:0.06em;text-transform:uppercase;margin-top:6px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600">Electric Kitchen Specialists</div>
+      </div>
+    </div>
+
+    <div class="nav-section-label">Main</div>
+    <div class="sidebar-nav">
+      <div class="nav-item active" onclick="showPage('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" onclick="showPage('urgent')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Urgent
+        <span id="nav-badge-urgent" class="nav-badge" style="display:none;background:rgba(220,38,38,0.2);color:#dc2626"></span>
+      </div>
+      <div class="nav-item" onclick="showPage('activity')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Weekly Activity
+      </div>
+      <div class="nav-item" onclick="showPage('bottleneck')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Bottleneck Report
+      </div>
+      <div class="nav-item" onclick="showPage('performance')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        Performance
+      </div>
+      <div class="nav-item" onclick="showPage('jobs')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+        All Jobs
+        <span id="nav-badge-jobs" class="nav-badge" style="display:none"></span>
+      </div>
+      <div class="nav-item" onclick="showPage('parts')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/><path d="M14.83 9.17a4 4 0 010 5.66M9.17 9.17a4 4 0 000 5.66"/></svg>
+        Parts Tracker
+        <span id="nav-badge-parts" class="nav-badge nav-badge-amber" style="display:none"></span>
+      </div>
+      <div class="nav-item" onclick="showPage('suppliers')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        Service Cos.
+      </div>
+      <div class="nav-item" onclick="showPage('sites')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Recurring Sites
+      </div>
+      <div class="nav-item" onclick="showPage('reports')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13,2 13,9 20,9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
+        Reports
+      </div>
+      <div class="nav-section-label" style="padding-left:0">Data</div>
+      <div class="nav-item" onclick="showPage('import')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Odoo Import
+      </div>
+      <div class="nav-item" onclick="showPage('add')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Add / Edit Job
+      </div>
+      <div class="nav-item" id="nav-admin" onclick="showPage('admin')" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M17 14l1.5 1.5L21 13"/></svg>
+        Admin
+      </div>
+      <div class="nav-item" id="nav-audit" onclick="showPage('audit')" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>
+        Audit Log
+      </div>
+    </div>
+
+    <div id="sidebar-pulse" style="padding:10px 20px 0;flex-shrink:0">
+      <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;display:flex;flex-direction:column;gap:5px">
+        <div style="display:flex;justify-content:space-between;font-size:11px">
+          <span style="color:rgba(255,255,255,0.35)">Open jobs</span>
+          <span id="pulse-open" style="color:rgba(255,255,255,0.65);font-weight:600;font-family:'DM Mono',monospace">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px">
+          <span style="color:rgba(255,255,255,0.35)">Waiting on parts</span>
+          <span id="pulse-parts" style="color:#fcd34d;font-weight:600;font-family:'DM Mono',monospace">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px">
+          <span style="color:rgba(255,255,255,0.35)">Completed this week</span>
+          <span id="pulse-done" style="color:#86efac;font-weight:600;font-family:'DM Mono',monospace">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px">
+          <span style="color:rgba(255,255,255,0.35)">Maintenance (PPM)</span>
+          <span id="pulse-maint" style="color:rgba(255,255,255,0.45);font-weight:600;font-family:'DM Mono',monospace">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="sidebar-bottom">
+      <div id="sidebar-date-display"></div>
+      <div class="mono" style="margin-top:6px;color:rgba(255,255,255,0.25)">v4.0 · Supabase</div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08)">
+        <div id="auth-status-bar-signed-in" style="display:none">
+          <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-bottom:4px">Signed in as</div>
+          <div id="auth-email" style="font-size:11px;color:rgba(255,255,255,0.7);word-break:break-all;margin-bottom:6px"></div>
+          <button onclick="handleSignOut()" style="background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.55);font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer">Sign out</button>
+        </div>
+        <div id="auth-status-bar-signed-out">
+          <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-bottom:6px">👁 Read-only mode</div>
+          <button onclick="openAuthModal()" style="background:rgba(245,200,66,0.15);border:1px solid rgba(245,200,66,0.3);color:#f5c842;font-size:11px;padding:5px 12px;border-radius:5px;cursor:pointer;font-weight:600">Sign in to edit</button>
+        </div>
+      </div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08)">
+        Created by <strong style="color:rgba(255,255,255,0.55)">Sean</strong><br>
+        Technical Service Manager
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <div class="main">
+    <div class="topbar">
+      <button class="mob-menu-btn" onclick="toggleSidebar()" aria-label="Menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <button class="btn btn-ghost btn-sm" onclick="openGlobalSearch()" title="Search (Cmd+K)" style="display:flex;align-items:center;gap:6px;color:var(--text3);font-size:12px;margin-left:8px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span class="search-label">Search</span>
+        <span class="search-kbd">⌘K</span>
+      </button>
+      <div class="topbar-actions">
+        <button class="btn btn-meeting" onclick="openMeeting()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <span class="meeting-label">Monday Meeting</span>
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="exportCSV()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="buildPrintReport().then(() => { const html = document.getElementById('print-report').innerHTML; const w = window.open('','_blank','width=900,height=700'); w.document.write('<html><head><title>Phoeniks Service Report</title><style>*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Plus Jakarta Sans,sans-serif;font-size:10px;color:#1e2024;background:#fff;padding:0}@page{size:A4 portrait;margin:8mm}@media print{body{zoom:0.78}}table{border-collapse:collapse;width:100%}td,th{overflow:visible;white-space:normal}</style><link href=\"https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap\" rel=\"stylesheet\"></head><body>' + html + '</body></html>'); w.document.close(); w.focus(); setTimeout(() => { w.print(); }, 800); })">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print
+        </button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Overview</div>
+          <div class="section-sub" id="dash-date"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-sm btn-secondary dash-period active" data-days="30">30d</button>
+            <button class="btn btn-sm btn-secondary dash-period" data-days="180">6mo</button>
+            <button class="btn btn-sm btn-secondary dash-period" data-days="365">1yr</button>
+            <button class="btn btn-sm btn-secondary dash-period" data-days="all">All</button>
+          </div>
+          <button class="btn btn-primary" onclick="showPage('add')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Add job
+          </button>
+        </div>
+      </div>
+
+      <!-- STATUS COUNTS STRIP — filled by renderDashboard() -->
+      <div id="dash-status-counts" style="margin-bottom:20px"></div>
+
+      <!-- WINS HERO — filled by renderDashboard() -->
+      <div id="dash-wins-hero" style="display:none;margin-bottom:20px"></div>
+
+      <!-- OPS HEALTH + KPI GRID -->
+      <div id="ops-health-banner" style="display:none;background:rgba(220,38,38,0.05);border:1px solid rgba(220,38,38,0.15);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:12px;font-size:12px;gap:10px;align-items:flex-start"></div>
+      <div id="kpi-grid" class="metric-grid"></div>
+
+      <!-- Stage dwell — prominent at top -->
+      <div class="card mb-24" style="padding:24px">
+        <div class="chart-title">Stage dwell breakdown — where jobs are sitting right now</div>
+        <div id="stage-dwell-prominent"></div>
+      </div>
+
+      <div class="grid-2 mb-24">
+        <div class="card chart-card">
+          <div class="chart-title">Jobs by status</div>
+          <div class="chart-wrap" style="height:200px"><canvas id="statusChart"></canvas></div>
+        </div>
+        <div class="card" style="padding:20px">
+          <div class="chart-title">Current stage — avg days open</div>
+          <div id="stage-bars-dash"></div>
+        </div>
+      </div>
+
+      <div class="card chart-card mb-24">
+        <div class="chart-title">Monthly spend — last 12 months</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="spendChart"></canvas></div>
+      </div>
+
+      <!-- STATE BREAKDOWN -->
+      <div id="dash-state-breakdown" class="mb-24"></div>
+
+      <!-- BILLING HEALTH — down here near spend, not screaming at you on load -->
+      <div id="invoicing-health" style="display:none;background:rgba(217,119,6,0.06);border:1px solid rgba(217,119,6,0.25);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:12px;color:var(--amber);gap:10px;align-items:flex-start"></div>
+
+      <div class="card">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Needs attention
+          </div>
+          <span class="text-sm text-muted">Open &gt; 14 days</span>
+        </div>
+        <div id="attention-table" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <!-- WEEKLY ACTIVITY -->
+    <div id="page-activity" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Weekly Activity</div>
+          <div class="section-sub">What's changed this week — new jobs, status moves, completions</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <select id="activity-range" onchange="renderActivity()" style="width:auto">
+            <option value="7">Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2 mb-24">
+        <div class="metric-card accent-blue">
+          <div class="metric-label">New jobs</div>
+          <div class="metric-value" id="act-new">—</div>
+          <div class="metric-sub">Added this period</div>
+        </div>
+        <div class="metric-card accent-green">
+          <div class="metric-label">Completed</div>
+          <div class="metric-value" id="act-done">—</div>
+          <div class="metric-sub">Marked job done</div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:700">Activity feed</div>
+        </div>
+        <div style="padding:20px" id="activity-feed"></div>
+      </div>
+    </div>
+
+    <!-- BOTTLENECK -->
+
+    <!-- PERFORMANCE PAGE -->
+    <div id="page-performance" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Performance</div>
+          <div class="section-sub" id="perf-period-label">Tracking service job trends and quality metrics</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="perf-period" onchange="renderPerformance()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
+            <option value="1">This month</option>
+            <option value="3">Last 3 months</option>
+            <option value="6">Last 6 months</option>
+            <option value="12">Last 12 months</option>
+            <option value="all" selected>All time</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- DATA NOTE -->
+      <div id="perf-data-note" style="background:var(--blue-dim);border:1px solid rgba(37,99,235,0.2);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:16px;font-size:12px;color:var(--blue);display:flex;gap:10px;align-items:flex-start">
+        <span style="font-size:16px;flex-shrink:0">ℹ</span>
+        <span><strong>Duration metrics improve over time.</strong> Jobs imported from Odoo start with only their PO date — duration data becomes accurate as you track status changes in the app. Revisit rate and job counts are accurate from day one.</span>
+      </div>
+      <!-- KPI SCORECARD -->
+      <div id="perf-scorecard" class="kpi-grid" style="margin-bottom:24px"></div>
+
+      <!-- CHARTS ROW 1 -->
+      <div class="grid-2 mb-20">
+        <div class="card chart-card">
+          <div class="chart-title">Monthly jobs completed</div>
+          <div class="chart-sub" style="font-size:11px;color:var(--text3);margin-bottom:12px">Throughput trend over time</div>
+          <div class="chart-wrap" style="height:220px"><canvas id="perfThroughputChart"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="chart-title">First-time fix rate</div>
+          <div class="chart-sub" style="font-size:11px;color:var(--text3);margin-bottom:12px">% of jobs completed without revisiting — industry benchmark ~75%</div>
+          <div class="chart-wrap" style="height:220px"><canvas id="perfFixRateChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- CHARTS ROW 2 -->
+      <div class="grid-2 mb-20">
+        <div class="card chart-card">
+          <div class="chart-title">Avg job duration trend</div>
+          <div class="chart-sub" style="font-size:11px;color:var(--text3);margin-bottom:12px">Average days PO raised → completed, per month</div>
+          <div class="chart-wrap" style="height:220px"><canvas id="perfDurationChart"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="chart-title">Service co. league table</div>
+          <div class="chart-sub" style="font-size:11px;color:var(--text3);margin-bottom:12px">Ranked by avg completion time — completed jobs only</div>
+          <div class="chart-wrap" style="height:220px"><canvas id="perfSupplierChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- LEAGUE TABLE -->
+      <div class="card mb-20">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:13px;font-weight:700">Service co. detailed breakdown</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:var(--text3)">Completed jobs only · Sort:</span>
+            <select id="perf-supplier-sort" onchange="renderPerformance()" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
+              <option value="jobs">Jobs done</option>
+              <option value="avg">Avg duration</option>
+              <option value="fix">Fix rate</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Service Co.</th>
+              <th style="width:80px;text-align:center">Jobs done</th>
+              <th style="width:90px;text-align:center">Revisits</th>
+              <th style="width:100px;text-align:center">Fix rate</th>
+              <th style="width:90px;text-align:center">Avg days</th>
+              <th style="width:90px;text-align:center">Fastest</th>
+              <th style="width:90px;text-align:center">Slowest</th>
+            </tr></thead>
+            <tbody id="perf-supplier-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- REVISIT LOG -->
+      <div class="card">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:700">Revisited jobs</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">Jobs that required a second visit — these directly impact your fix rate</div>
+        </div>
+        <div id="perf-revisit-list" class="table-wrap">
+        </div>
+      </div>
+    </div>
+
+
+    <!-- URGENT PAGE -->
+    <div id="page-urgent" class="page">
+      <div class="section-header mb-16">
+        <div>
+          <div class="section-title" style="color:var(--red)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Urgent — Jobs Needing Attention
+          </div>
+          <div class="section-sub" id="urgent-sub">Jobs overrunning or stalled — review and take action</div>
+        </div>
+        <select id="urgent-threshold" onchange="renderUrgent()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
+          <option value="14">Overdue: 14+ days</option>
+          <option value="21" selected>Overdue: 21+ days</option>
+          <option value="30">Overdue: 30+ days</option>
+          <option value="7">Overdue: 7+ days</option>
+        </select>
+      </div>
+
+      <!-- URGENT KPIs -->
+      <div id="urgent-kpis" class="metric-grid" style="margin-bottom:20px"></div>
+
+      <!-- BY SERVICE CO. -->
+      <div class="card mb-20">
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:13px;font-weight:700">Overdue by service co.</div>
+          <div style="font-size:11px;color:var(--text3)">Click a row to see their jobs</div>
+        </div>
+        <div id="urgent-by-supplier" class="table-wrap"></div>
+      </div>
+
+      <!-- FULL URGENT LIST -->
+      <div class="card">
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:13px;font-weight:700">All overdue jobs</div>
+          <div style="font-size:11px;color:var(--text3)">Sorted by days open — longest first</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:110px">PO</th>
+              <th>Reference / Site</th>
+              <th style="width:140px">Service Co.</th>
+              <th style="width:110px">Status</th>
+              <th style="width:70px">Days open</th>
+              <th style="width:75px">Parts ETA</th>
+              <th style="width:80px">Deadline</th>
+              <th style="width:100px">Notes</th>
+            </tr></thead>
+            <tbody id="urgent-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-bottleneck" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Bottleneck Report</div>
+          <div class="section-sub" id="bottleneck-period-sub">Average time in each stage — find where jobs stall</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-sm btn-secondary bottleneck-period active" data-days="7">7d</button>
+          <button class="btn btn-sm btn-secondary bottleneck-period" data-days="30">30d</button>
+          <button class="btn btn-sm btn-secondary bottleneck-period" data-days="90">90d</button>
+          <button class="btn btn-sm btn-secondary bottleneck-period" data-days="365">1yr</button>
+          <button class="btn btn-sm btn-secondary bottleneck-period" data-days="all">All</button>
+        </div>
+      </div>
+      <div id="bottleneck-actions" style="margin-bottom:16px"></div>
+      <div class="card" style="padding:24px;margin-bottom:20px">
+        <div class="chart-title">Where time is being lost</div>
+        <div id="bottleneck-bars"></div>
+      </div>
+      <div class="grid-2 mb-20">
+        <div class="card chart-card">
+          <div class="chart-title">Avg dwell per stage</div>
+          <div class="chart-wrap" style="height:220px"><canvas id="dwellChart"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="chart-title">Avg total duration by service co.</div>
+          <div class="chart-wrap" style="height:220px"><canvas id="supplierChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;font-weight:700">Stage dwell breakdown — all jobs</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:90px">PO</th><th style="width:140px">Service Co.</th><th>Reference</th>
+              <th style="width:75px">Incoming</th><th style="width:68px">Booked</th>
+              <th style="width:75px">Waiting</th><th style="width:75px">Revisit</th>
+              <th style="width:75px">Closeout</th>
+              <th style="width:68px">Status</th><th style="width:65px">Total</th>
+            </tr></thead>
+            <tbody id="dwell-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALL JOBS -->
+    <div id="page-jobs" class="page">
+      <div class="section-header mb-16">
+        <div>
+          <div class="section-title">All Jobs</div>
+          <div class="section-sub" id="jobs-count"></div>
+        </div>
+        <button class="btn btn-primary" onclick="showPage('add')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          Add job
+        </button>
+      </div>
+
+      <!-- TAB BAR -->
+      <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px">
+        <button id="jobs-tab-all" onclick="switchJobsTab('all')" style="padding:8px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--text);margin-bottom:-2px;color:var(--text);font-family:var(--font)">All Jobs</button>
+        <button id="jobs-tab-chatter" onclick="switchJobsTab('chatter')" style="padding:8px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text3);font-family:var(--font)">
+          Chatter Log <span id="chatter-needs-badge" style="display:none;background:rgba(220,38,38,0.15);color:#dc2626;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:4px"></span>
+        </button>
+      </div>
+
+      <!-- ALL JOBS TAB -->
+      <div id="jobs-tab-all-content">
+        <div class="filter-row">
+          <div id="status-filter-wrap" style="position:relative;display:inline-block">
+            <button id="status-filter-btn" onclick="toggleStatusDropdown()" style="display:flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:12px;font-family:var(--font);cursor:pointer;white-space:nowrap">
+              <span id="status-filter-label">All statuses</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+            </button>
+            <div id="status-filter-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);z-index:100;min-width:180px;padding:6px 0">
+              <label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--text2);border-bottom:1px solid var(--border)">
+                <input type="checkbox" id="fs-all" checked onchange="statusFilterAll(this)"> All statuses
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" class="fs-cb" value="Incoming Job" onchange="statusFilterChange()" checked> Incoming Job</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" class="fs-cb" value="Job Booked" onchange="statusFilterChange()" checked> Job Booked</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" class="fs-cb" value="Waiting for Parts" onchange="statusFilterChange()" checked> Waiting for Parts</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" class="fs-cb" value="Revisiting" onchange="statusFilterChange()" checked> Revisiting</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" class="fs-cb" value="Awaiting Closeout" onchange="statusFilterChange()" checked> Awaiting Closeout</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" class="fs-cb" value="Job Done" onchange="statusFilterChange()" checked> Job Done</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" class="fs-cb" value="Maintenance" onchange="statusFilterChange()" checked> Maintenance</label>
+            </div>
+          </div>
+          <select id="filter-supplier" onchange="renderJobs()"><option value="">All service cos.</option></select>
+          <select id="filter-sort" onchange="renderJobs()" style="font-size:12px;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:var(--font)">
+            <option value="age-asc">Newest first</option>
+            <option value="age-desc">Oldest first</option>
+            <option value="closed-recent">Recently closed</option>
+            <option value="status">By status</option>
+            <option value="supplier">By service co.</option>
+          </select>
+          <input type="text" id="filter-search" placeholder="Search PO, reference, equipment..." oninput="renderJobs()" style="max-width:300px">
+        </div>
+        <!-- BULK ACTION BAR -->
+        <div id="bulk-action-bar" style="display:none;align-items:center;gap:10px;background:var(--phoenix-dim);border:1px solid var(--phoenix-glow);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;flex-wrap:wrap">
+          <span id="bulk-count" style="font-size:13px;font-weight:700;color:var(--phoenix-dark)"></span>
+          <select id="bulk-status-select" style="font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:white;color:var(--text);font-family:var(--font)">
+            <option value="">— Set status to… —</option>
+            <option>Incoming Job</option><option>Job Booked</option>
+            <option>Waiting for Parts</option><option>Revisiting</option>
+            <option>Awaiting Closeout</option><option>Job Done</option><option>Maintenance</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="applyBulkStatus()">Apply</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearBulkSelection()">Clear selection</button>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th style="width:36px;padding:0 0 0 12px"><input type="checkbox" id="bulk-select-all" onchange="toggleSelectAll(this)" style="cursor:pointer;width:15px;height:15px"></th>
+                <th style="width:90px">PO</th><th>Reference</th><th style="width:150px">Service Co.</th>
+                <th style="width:130px">Status</th><th style="width:70px">Open</th>
+                <th style="width:75px">In status</th><th style="width:100px">Value</th><th style="width:90px"></th>
+              </tr></thead>
+              <tbody id="jobs-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- STATE BREAKDOWN -->
+        <div id="jobs-state-breakdown" style="margin-top:20px"></div>
+      </div>
+
+      <!-- CHATTER LOG TAB -->
+      <div id="jobs-tab-chatter-content" style="display:none">
+        <div id="chatter-log-body"></div>
+      </div>
+    </div>
+
+    <!-- PARTS TRACKER -->
+    <div id="page-parts" class="page">
+      <div class="section-header mb-16">
+        <div>
+          <div class="section-title">Parts Tracker</div>
+          <div class="section-sub">Jobs waiting on parts — add ETA and notes manually</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:90px">PO</th>
+              <th>Reference</th>
+              <th style="width:140px">Service Co.</th>
+              <th style="width:80px">Waiting</th>
+              <th style="width:150px">Part / Notes</th>
+              <th style="width:140px">ETA</th>
+              <th style="width:80px">Status</th>
+            </tr></thead>
+            <tbody id="parts-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUPPLIERS -->
+    <div id="page-suppliers" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Service Co. Scorecards</div>
+          <div class="section-sub">Performance breakdown by repairer</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="supplier-sort" onchange="renderSuppliers()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
+            <option value="name">Sort: A–Z</option>
+            <option value="overdue">Sort: Most Overdue</option>
+            <option value="open">Sort: Most Open</option>
+            <option value="avg">Sort: Avg Duration</option>
+          </select>
+          <select id="supplier-state" onchange="renderSuppliers()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
+            <option value="">All States</option>
+            <option value="VIC">VIC</option>
+            <option value="NSW">NSW</option>
+            <option value="QLD">QLD</option>
+            <option value="SA">SA</option>
+            <option value="WA">WA</option>
+            <option value="TAS">TAS</option>
+            <option value="ACT">ACT</option>
+            <option value="NT">NT</option>
+            <option value="NAT">National</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="showPage('supplier-tags')" style="font-size:11px">Tag states ✎</button>
+        </div>
+      </div>
+      <div id="supplier-grid" class="supplier-grid"></div>
+    </div>
+
+    <!-- RECURRING SITES -->
+    <div id="page-sites" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Recurring Sites</div>
+          <div class="section-sub">Sites and locations with multiple service jobs — spot repeat issues</div>
+        </div>
+      </div>
+      <div id="sites-content"></div>
+    </div>
+
+    <!-- SUPPLIER TAG MANAGER -->
+    <div id="page-supplier-tags" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Tag Service Companies by State</div>
+          <div class="section-sub">Known companies are pre-tagged. Manually tag any others to enable state filtering on scorecards.</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="showPage('suppliers')">← Back to Scorecards</button>
+      </div>
+      <div id="supplier-tag-manager"></div>
+    </div>
+
+    <!-- REPORTS -->
+    <div id="page-reports" class="page">
+      <div class="section-header mb-24">
+        <div>
+          <div class="section-title">Meeting Reports</div>
+          <div class="section-sub">Saved snapshots from each Monday meeting — track progress week to week</div>
+        </div>
+        <button class="btn btn-primary" onclick="saveReport()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
+          Save this week's snapshot
+        </button>
+      </div>
+      <div id="reports-list"></div>
+    </div>
+
+    <!-- ODOO IMPORT -->
+    <div id="page-import" class="page">
+      <div class="section-header mb-20">
+        <div>
+          <div class="section-title">Odoo CSV Import</div>
+          <div class="section-sub">Upload your weekly Odoo export — app auto-maps fields and updates existing jobs</div>
+          <div id="last-import-stamp" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
+        </div>
+      </div>
+      <div class="import-panel mb-24">
+        <div class="import-panel-header">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:700">Odoo Export Fields</div>
+          <button class="btn btn-xs btn-secondary" onclick="copyOdooTemplate()">Copy field names</button>
+        </div>
+        <div class="import-panel-body">
+          <div style="font-size:12px;color:var(--text3);margin-bottom:14px">
+            In Odoo go to <strong style="color:var(--text2)">Purchases → Orders</strong>, select all rows, click <strong style="color:var(--text2)">Action → Export</strong> and add these columns. Click <em>Copy field names</em> to copy them ready to paste.
+          </div>
+          <div class="odoo-fields" style="margin-bottom:14px">
+            <span class="odoo-field odoo-field-required" title="PO number — used as unique job ID">Order Reference</span>
+            <span class="odoo-field odoo-field-required" title="Service company name">Vendor</span>
+            <span class="odoo-field odoo-field-required" title="Your job/site reference">Vendor Reference</span>
+            <span class="odoo-field odoo-field-required" title="Date PO was raised">Confirmation Date</span>
+            <span class="odoo-field odoo-field-required" title="Your custom job status field">Job Status</span>
+            <span class="odoo-field odoo-field-required" title="PO value">Total</span>
+            <span class="odoo-field odoo-field-required" title="Who raised the PO">Buyer</span>
+            <span class="odoo-field" title="Tax-exclusive PO value">Untaxed Amount</span>
+            <span class="odoo-field" title="Nothing to Bill / Waiting Bills / Fully Billed">Billing Status</span>
+            <span class="odoo-field" title="Amount still outstanding to be invoiced">Amount to Invoice</span>
+            <span class="odoo-field" title="Whether goods/services have been received">Receipt Status</span>
+            <span class="odoo-field" title="Target completion date">Order Deadline</span>
+            <span class="odoo-field" title="Original job/sales order reference">Source Document</span>
+            <span class="odoo-field" title="Internal PO notes">Terms and Conditions</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3)">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:4px;vertical-align:middle"></span>Highlighted fields are essential — the rest add useful detail but won't break the import if missing.
+          </div>
+        </div>
+      </div>
+      <div class="card" style="padding:24px;margin-bottom:20px">
+        <div class="chart-title" style="margin-bottom:16px">Upload CSV</div>
+        <div class="drop-zone" id="drop-zone"
+          ondragover="handleDragOver(event)" ondragleave="handleDragLeave()" ondrop="handleDrop(event)"
+          onclick="document.getElementById('csv-file').click()">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div style="font-weight:600;margin-bottom:4px;margin-top:10px">Drop CSV here or click to browse</div>
+          <div style="font-size:12px;color:var(--text3)">Exported from Odoo Purchase → Orders</div>
+        </div>
+        <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
+        <div id="import-result" style="margin-top:12px"></div>
+      </div>
+
+      <!-- INVOICE VALUE IMPORT -->
+      <div class="card" style="padding:24px;margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div>
+            <div class="chart-title" style="margin-bottom:4px">Invoice Value Import</div>
+            <div style="font-size:12px;color:var(--text3)">Upload warranty or non-warranty invoice export from Odoo Accounting → Journal Items.<br>
+            Matches on PO number and updates the job value. Jobs without a PO# in the file are skipped.</div>
+          </div>
+        </div>
+        <div class="import-panel-body" style="margin-bottom:16px">
+          <div class="odoo-fields">
+            <span class="odoo-field odoo-field-required" title="Invoice date">Date</span>
+            <span class="odoo-field odoo-field-required" title="Bill/invoice number">Number</span>
+            <span class="odoo-field odoo-field-required" title="Invoice amount">Debit</span>
+            <span class="odoo-field odoo-field-required" title="PO number reference e.g. P03312 (site description)">PO#</span>
+            <span class="odoo-field" title="Account code">Account</span>
+            <span class="odoo-field" title="Service company">Partner</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:8px">
+            Export from <strong style="color:var(--text2)">Odoo → Accounting → Journal Items</strong> — filter by account 57000 (warranty) or 57500 (non-warranty). Accepts XLSX or CSV.
+          </div>
+        </div>
+        <div class="drop-zone" id="invoice-drop-zone"
+          ondragover="handleDragOver(event)" ondragleave="handleDragLeave()"
+          ondrop="handleInvoiceDrop(event)"
+          onclick="document.getElementById('invoice-file').click()">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div style="font-weight:600;margin-bottom:4px;margin-top:8px">Drop invoice XLSX or CSV here</div>
+          <div style="font-size:12px;color:var(--text3)">Warranty and non-warranty both accepted</div>
+        </div>
+        <input type="file" id="invoice-file" accept=".xlsx,.csv" style="display:none" onchange="handleInvoiceImport(event)">
+        <div id="invoice-import-result" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- ADD / EDIT JOB -->
+    <div id="page-add" class="page">
+      <div class="section-header mb-20">
+        <div>
+          <div class="section-title" id="form-page-title">Add New Job</div>
+          <div class="section-sub">Fill in manually or paste Odoo chatter below to auto-extract status history</div>
+        </div>
+      </div>
+      <div class="form-card">
+        <div class="form-section">
+          <div class="form-section-title">Job Details</div>
+          <div class="form-grid">
+            <div class="form-group"><label>PO Number *</label><input type="text" id="f-po" placeholder="PO00123"></div>
+            <div class="form-group">
+              <label>Service Co. *</label>
+              <input type="text" id="f-supplier" placeholder="e.g. BakerGroup, Norfolk" list="supplier-datalist">
+              <datalist id="supplier-datalist"></datalist>
+            </div>
+            <div class="form-group"><label>Reference / Site</label><input type="text" id="f-ref" placeholder="e.g. KFC Ringwood — oven repair"></div>
+            <div class="form-group"><label>Equipment</label><input type="text" id="f-equipment" placeholder="e.g. Combi Oven 20GN"></div>
+            <div class="form-group"><label>PO Date *</label><input type="date" id="f-po-date"></div>
+            <div class="form-group">
+              <label>Current Job Status</label>
+              <select id="f-status">
+                <option>Incoming Job</option><option>Job Booked</option>
+                <option>Waiting for Parts</option><option>Revisiting</option>
+                <option>Awaiting Closeout</option>
+                <option>Job Done</option><option>Maintenance</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Order Value ($)</label><input type="text" id="f-value" placeholder="0.00"></div>
+            <div class="form-group"><label>Buyer</label><input type="text" id="f-buyer" placeholder="Peter Houchin"></div>
+            <div class="form-group full"><label>Notes <span style="font-size:10px;color:var(--text3);font-weight:400">(Odoo / external — visible in reports)</span></label><textarea id="f-notes" placeholder="Serial numbers, loan machine details, technician notes..."></textarea></div>
+            <div class="form-group full"><label style="color:var(--amber)">Internal Notes <span style="font-size:10px;color:var(--text3);font-weight:400">(private — not from Odoo)</span></label><textarea id="f-internal-notes" placeholder="Internal comments, follow-up actions, who to chase..." style="border-color:rgba(202,138,4,0.3);background:#fefce8"></textarea></div>
+          </div>
+        </div>
+        <div class="form-section" style="margin-bottom:0">
+          <div class="form-section-title" style="display:flex;justify-content:space-between;align-items:center">
+            <span>Odoo Chatter Log <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">(optional — auto-extracts status history)</span></span>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('f-chatter').value='';document.getElementById('chatter-preview-box').innerHTML=''">Clear</button>
+          </div>
+          <div class="chatter-box">
+            <div class="chatter-box-header">
+              <span>Paste the chatter section from the Odoo PO page</span>
+              <span class="text-sm" style="color:var(--text3)" id="chatter-parse-status"></span>
+            </div>
+            <textarea id="f-chatter" placeholder="Paste Odoo chatter here to auto-extract status transitions..." oninput="liveParseChatter()"></textarea>
+            <div id="chatter-preview-box"></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="saveJob()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
+          <span id="save-btn-label">Save job</span>
+        </button>
+        <button class="btn btn-secondary" onclick="clearForm()">Cancel</button>
+      </div>
+      <div id="form-validation-msg" style="margin-top:10px;font-size:13px;color:var(--red);display:none"></div>
+    </div>
+
+
+  <!-- ── ADMIN PAGE ── -->
+  <div class="page" id="page-admin">
+    <div class="section-header mb-24">
+      <div>
+        <div class="section-title">ADMIN</div>
+        <div class="section-sub">Manage access, view sign-in activity and tracker health</div>
+      </div>
+
+    </div>
+
+    <!-- Stats row -->
+    <div class="metric-grid" style="margin-bottom:24px">
+      <div class="card metric-card accent-yellow">
+        <div class="metric-label">Signed In As</div>
+        <div id="admin-your-email" style="font-size:13px;font-weight:700;color:var(--text);margin-top:6px;word-break:break-all">—</div>
+        <div class="metric-sub">Full edit access</div>
+      </div>
+      <div class="card metric-card accent-blue">
+        <div class="metric-label">Total Users</div>
+        <div class="metric-value" id="admin-user-count">—</div>
+        <div class="metric-sub">with tracker access</div>
+      </div>
+      <div class="card metric-card">
+        <div class="metric-label">Total Jobs in DB</div>
+        <div class="metric-value" id="admin-job-count">—</div>
+        <div class="metric-sub">across all statuses</div>
+      </div>
+      <div class="card metric-card accent-green">
+        <div class="metric-label">Database</div>
+        <div class="metric-value" style="font-size:16px;padding-top:4px">Supabase</div>
+        <div class="metric-sub">Sydney · ap-southeast-2</div>
+      </div>
+    </div>
+
+    <!-- Users table -->
+    <div class="card" style="margin-bottom:24px">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--text)">Users</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px" id="admin-users-meta">Loading…</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="renderAdmin()">↻ Refresh</button>
+      </div>
+      <div id="admin-users-list">
+        <div class="empty-state"><p>Loading users…</p></div>
+      </div>
+    </div>
+
+    <!-- Invite panel -->
+    <div class="card" style="margin-bottom:24px;padding:24px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">Invite a new user</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:16px">Creates a Supabase user with a temporary password. Copy the generated password and send it to them — they can change it after signing in.</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input id="admin-invite-email" type="email" placeholder="colleague@phoeniks.com.au" style="flex:2;min-width:180px;border:1px solid var(--border2);border-radius:var(--radius-sm);padding:9px 12px;font-size:13px;font-family:var(--font);background:var(--surface2);color:var(--text)" onkeydown="if(event.key==='Enter')adminInviteFromInput()">
+        <select id="admin-invite-role" style="flex:1;min-width:130px;border:1px solid var(--border2);border-radius:var(--radius-sm);padding:9px 12px;font-size:13px;font-family:var(--font);background:var(--surface2);color:var(--text)">
+          <option value="viewer">View only</option>
+          <option value="editor">Full edit access</option>
+        </select>
+        <button class="btn btn-primary" onclick="adminInviteFromInput()">Create user</button>
+      </div>
+      <div id="admin-invite-result" style="margin-top:10px;font-size:12px;min-height:16px"></div>
+    </div>
+
+    <!-- Access levels -->
+    <div class="card" style="padding:20px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:14px">Access levels</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:12px;background:var(--surface2);border-radius:var(--radius-sm)">
+          <span style="background:#fef9c3;color:#854d0e;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px">Admin</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">Full edit access</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px">Can add, edit and delete jobs, import CSVs, save reports. Must be invited via this page.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:12px;background:var(--surface2);border-radius:var(--radius-sm)">
+          <span style="background:var(--surface3);color:var(--text2);padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px">View only</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">Read access — login required</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px">Staff with the URL must sign in with their email to view data. No editing permissions.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── AUDIT TRAIL PAGE ── -->
+  <div id="page-audit" class="page">
+    <div class="section-header mb-24">
+      <div>
+        <div class="section-title">Audit Log</div>
+        <div class="section-sub">Who changed what and when — status changes, imports, additions and deletions</div>
+      </div>
+      <select id="audit-range" onchange="renderAudit()" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-family:var(--font)">
+        <option value="7">Last 7 days</option>
+        <option value="14">Last 14 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+    </div>
+    <div id="audit-content"></div>
+  </div>
+
+  </div><!-- /main -->
+
+
+<!-- ── MEETING MODE — BOLD YELLOW ── -->
+<div id="meeting-overlay" class="meeting-overlay">
+  <div class="meeting-header">
+    <div class="meeting-logo">
+      <div class="meeting-logo-inner">
+        <div class="meeting-logo-dots">
+          <div class="meeting-logo-dot"></div>
+          <div class="meeting-logo-dot"></div>
+          <div class="meeting-logo-dot"></div>
+          <div class="meeting-logo-dot"></div>
+          <div class="meeting-logo-dot"></div>
+          <div class="meeting-logo-dot hollow"></div>
+        </div>
+        <div>
+          <div class="meeting-logo-text-wrap">PHOENIKS</div>
+          <div class="meeting-logo-sub">Service Meeting</div>
+        </div>
+      </div>
+    </div>
+    <div class="meeting-date" id="meeting-date-display"></div>
+    <div class="meeting-close" onclick="closeMeeting()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </div>
+  </div>
+  <div class="meeting-body">
+    <div class="meeting-slide active" id="slide-0">
+      <div class="slide-label">Slide 1 of 5 — Weekly Overview</div>
+      <div class="meeting-section-title"><div class="dot"></div>This Week's Numbers</div>
+      <div class="meeting-kpi-grid" id="meeting-kpis"></div>
+      <div class="grid-2">
+        <div>
+          <div class="meeting-sub-title">Status Breakdown</div>
+          <div id="meeting-stage-bars"></div>
+        </div>
+        <div>
+          <div class="meeting-sub-title">Service Co. Workload</div>
+          <div id="meeting-supplier-list"></div>
+        </div>
+      </div>
+    </div>
+    <div class="meeting-slide" id="slide-1">
+      <div class="slide-label">Slide 2 of 5 — Needs Attention</div>
+      <div class="meeting-section-title">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3d4043" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Jobs Needing Attention
+      </div>
+      <div id="meeting-attention-content"></div>
+    </div>
+    <div class="meeting-slide" id="slide-2">
+      <div class="slide-label">Slide 3 of 5 — Active Jobs by Stage</div>
+      <div class="meeting-section-title"><div class="dot"></div>Active Jobs by Stage</div>
+      <div class="status-columns" id="meeting-stage-columns" style="grid-template-columns:repeat(4,1fr)"></div>
+    </div>
+    <div class="meeting-slide" id="slide-3">
+      <div class="slide-label">Slide 4 of 5 — Performance</div>
+      <div class="meeting-section-title"><div class="dot"></div>Where Are We Losing Time?</div>
+      <div class="meeting-bottleneck" id="meeting-bottleneck-content"></div>
+    </div>
+    <div class="meeting-slide" id="slide-4">
+      <div class="slide-label">Slide 5 of 5 — Ops Health</div>
+      <div class="meeting-section-title"><div class="dot"></div>Operations Health Check</div>
+      <div id="meeting-health-content" style="margin-top:16px"></div>
+    </div>
+  </div>
+  <div class="meeting-nav">
+    <button class="btn btn-secondary btn-sm" onclick="meetingPrev()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      Prev
+    </button>
+    <div class="meeting-nav-dots" id="meeting-dots"></div>
+    <button class="btn btn-secondary btn-sm" onclick="meetingNext()">
+      Next
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+  </div>
+</div>
+
+
+<!-- Supplier jobs modal -->
+<div id="supplier-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeSupplierModal()">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div>
+        <div id="supplier-modal-title" class="modal-title"></div>
+        <div id="supplier-modal-sub" class="modal-subtitle"></div>
+      </div>
+      <button class="modal-close-btn" onclick="closeSupplierModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="supplier-modal-body" style="max-height:440px;overflow-y:auto;padding:0"></div>
+  </div>
+</div>
+
+<!-- Job detail modal -->
+<div id="job-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-po"></div>
+        <div class="modal-subtitle" id="modal-ref"></div>
+      </div>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="modal-del-btn">Delete</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+      <button class="btn btn-primary" id="modal-edit-btn">Edit job</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm dialog -->
+<div id="confirm-overlay" class="confirm-overlay hidden">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">Are you sure?</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-secondary" onclick="confirmResolve(false)">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmResolve(true)" id="confirm-ok-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── LOADING SCREEN ── -->
+<div id="loading-screen" style="position:fixed;inset:0;background:#FFD100;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999">
+  <!-- Phoeniks Logo -->
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;flex-shrink:0">
+      <div style="width:12px;height:12px;border-radius:50%;background:#3d4043"></div>
+      <div style="width:12px;height:12px;border-radius:50%;background:#3d4043"></div>
+      <div style="width:12px;height:12px;border-radius:50%;background:#3d4043"></div>
+      <div style="width:12px;height:12px;border-radius:50%;background:#3d4043"></div>
+      <div style="width:12px;height:12px;border-radius:50%;background:#3d4043"></div>
+      <div style="width:12px;height:12px;border-radius:50%;border:2.5px solid #3d4043;box-sizing:border-box"></div>
+    </div>
+    <div>
+      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:32px;color:#3d4043;letter-spacing:2px;line-height:1">PHOENIKS</div>
+      <div style="font-size:11px;color:rgba(61,64,67,0.6);letter-spacing:0.12em;text-transform:uppercase;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;margin-top:3px">Electric Kitchen Specialists</div>
+    </div>
+  </div>
+  <!-- Divider -->
+  <div style="width:60px;height:2px;background:rgba(61,64,67,0.2);border-radius:2px;margin-bottom:20px"></div>
+  <!-- Loading message -->
+  <div id="loading-msg" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:rgba(61,64,67,0.7);text-align:center;min-height:20px"></div>
+  <!-- Credit -->
+  <div style="position:absolute;bottom:28px;font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;color:rgba(61,64,67,0.45);text-align:center;line-height:1.6">
+    Created by <strong style="color:rgba(61,64,67,0.65)">Sean Pickford</strong> · Technical Service Manager<br>
+    Tracking Phoeniks service levels, one job at a time 🔥
+  </div>
+</div>
+
+<!-- ── AUTH MODAL ── -->
+<div id="auth-modal-overlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)closeAuthModal()">
+  <div style="background:white;border-radius:14px;padding:32px;width:360px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="font-size:20px;font-weight:700;margin-bottom:6px">Sign in</div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:20px">Enter your email and we'll send a magic link. No password needed.</div>
+    <div id="auth-modal-form">
+      <input id="auth-modal-email" type="email" placeholder="you@example.com" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:12px" onkeydown="if(event.key==='Enter')submitMagicLink()">
+      <button id="auth-modal-submit" onclick="submitMagicLink()" style="width:100%;background:#1d4ed8;color:white;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:600;cursor:pointer">Send magic link</button>
+    </div>
+    <div id="auth-magic-sent" class="hidden" style="text-align:center;padding:12px 0">
+      <div style="font-size:28px;margin-bottom:8px">📧</div>
+      <div style="font-weight:600;margin-bottom:4px">Check your email</div>
+      <div style="font-size:13px;color:#6b7280">Click the link in your email to sign in. You can close this.</div>
+    </div>
+    <button onclick="closeAuthModal()" style="margin-top:12px;width:100%;background:none;border:1px solid #e5e7eb;border-radius:8px;padding:9px;font-size:13px;color:#6b7280;cursor:pointer">Cancel</button>
+  </div>
+</div>
+
+<!-- ── GLOBAL SEARCH ── -->
+<div id="global-search-overlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;display:flex;align-items:flex-start;justify-content:center;padding-top:80px" onclick="if(event.target===this)closeGlobalSearch()">
+  <div style="background:var(--bg2);border-radius:var(--radius);box-shadow:0 24px 64px rgba(0,0,0,0.2);width:560px;max-width:90vw;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="global-search-input" type="text" placeholder="Search PO, reference, site, equipment…" oninput="onGlobalSearchInput(this.value)" style="flex:1;border:none;outline:none;font-size:15px;font-family:var(--font);background:transparent;color:var(--text)">
+      <span style="font-size:11px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 6px">Esc</span>
+    </div>
+    <div id="global-search-results" style="max-height:400px;overflow-y:auto"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="data.js?v=20260627"></script>
+<script src="render.js?v=20260627"></script>
+<script src="meeting.js?v=20260627"></script>
+<script src="app.js?v=20260627"></script>
+
+  <!-- ═══════════════════════════════════════════════
+       PRINT REPORT — hidden on screen, print only
+       Rendered by buildPrintReport() before window.print()
+  ═══════════════════════════════════════════════════ -->
+  <div id="print-report" style="display:none">
+    <!-- content injected by buildPrintReport() -->
+  </div>
+
+
+</body>
+</html>
