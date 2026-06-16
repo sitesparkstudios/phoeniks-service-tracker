@@ -1809,6 +1809,7 @@ function renderUrgent() {
    One A4 page, portrait, all key info at a glance
    ══════════════════════════════════════════════════════ */
 async function buildPrintReport() {
+  try {
   // Load audit log for "Changes this week" — silently skip if table doesn't exist yet
   try {
     window._printAudit = await loadRecentAudit(7);
@@ -2440,6 +2441,10 @@ async function buildPrintReport() {
   </div>`;
 
   document.getElementById('print-report').innerHTML = html;
+  } catch(e) {
+    console.error('buildPrintReport error:', e);
+    alert('Print report error: ' + e.message + '\nLine info: ' + (e.stack||'').split('\n')[1]);
+  }
 }
 
 
