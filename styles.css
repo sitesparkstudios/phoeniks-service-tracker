@@ -476,7 +476,8 @@ select {
   body > * { display: none !important; }
   #sidebar-overlay { display: none !important; }
 
-  #print-report {
+  #print-report,
+  body > #print-report {
     display: block !important;
     /* Scale the entire report to 78% so it reliably fits A4 at 100% print scale.
        Users no longer need to touch the browser scale slider. */
@@ -532,9 +533,6 @@ select {
 .colour-legend .badge { cursor: default; }
 
 .hidden { display: none !important; }
-
-/* Hide print report on screen — shown only via @media print */
-@media screen { #print-report { display: none !important; } }
 
 /* ══════════════════════════════════════════════════════
    MOBILE & TABLET — Responsive overrides

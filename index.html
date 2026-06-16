@@ -12,7 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f5c842'/%3E%3Ccircle cx='10' cy='10' r='4' fill='%233d4043'/%3E%3Ccircle cx='22' cy='10' r='4' fill='%233d4043'/%3E%3Ccircle cx='10' cy='22' r='4' fill='%233d4043'/%3E%3Ccircle cx='22' cy='22' r='4' fill='none' stroke='%233d4043' stroke-width='2.5'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=20260622">
+<link rel="stylesheet" href="styles.css?v=20260623">
 
   <script>
     // Unregister any old service workers that may be causing caching issues
@@ -173,7 +173,7 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export
         </button>
-        <button class="btn btn-ghost btn-sm" onclick="buildPrintReport().then(() => { const t = document.title; document.title = ''; window.print(); document.title = t; }).catch(e => { console.error('Print error:', e); window.print(); })">
+        <button class="btn btn-ghost btn-sm" onclick="buildPrintReport().then(() => { const el=document.getElementById('print-report'); el.style.display='block'; const t=document.title; document.title=''; window.print(); document.title=t; setTimeout(()=>{el.style.display='none';},500); }).catch(e => { console.error('Print error:',e); window.print(); })">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           Print
         </button>
@@ -1112,16 +1112,16 @@
 <div id="toast" class="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="data.js?v=20260622"></script>
-<script src="render.js?v=20260622"></script>
-<script src="meeting.js?v=20260622"></script>
-<script src="app.js?v=20260622"></script>
+<script src="data.js?v=20260623"></script>
+<script src="render.js?v=20260623"></script>
+<script src="meeting.js?v=20260623"></script>
+<script src="app.js?v=20260623"></script>
 
   <!-- ═══════════════════════════════════════════════
        PRINT REPORT — hidden on screen, print only
        Rendered by buildPrintReport() before window.print()
   ═══════════════════════════════════════════════════ -->
-  <div id="print-report">
+  <div id="print-report" style="display:none">
     <!-- content injected by buildPrintReport() -->
   </div>
 
