@@ -733,24 +733,6 @@ textarea#f-internal-notes:focus {
 }
 
 /* ── PRINT: URGENT PAGE ── */
-@media print {
-  .sidebar, .topbar, .topbar-actions, .btn-meeting,
-  #bulk-action-bar, .filter-row, #global-search-overlay,
-  .nav-item, .sidebar-overlay { display: none !important; }
-
-  .main { margin-left: 0 !important; }
-  .page { display: block !important; padding: 0 !important; }
-  .page:not([id="page-urgent"]) { display: none !important; }
-
-  body[data-print-page="Urgent — Jobs Needing Attention"] #page-urgent { display: block !important; }
-
-  #urgent-kpis { display: grid !important; grid-template-columns: repeat(5,1fr) !important; }
-  .card { box-shadow: none !important; border: 1px solid #ddd !important; }
-  .day-chip.danger { background: #fee2e2 !important; color: #b91c1c !important; }
-  .day-chip.warn   { background: #fef3c7 !important; color: #92400e !important; }
-  table { font-size: 11px !important; }
-}
-
 /* ── MOBILE: hide search kbd hint on small screens ── */
 @media (max-width: 768px) {
   .search-kbd  { display: none; }
