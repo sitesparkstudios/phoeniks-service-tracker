@@ -1808,7 +1808,10 @@ function renderUrgent() {
    PRINT REPORT — Monday Morning Summary
    One A4 page, portrait, all key info at a glance
    ══════════════════════════════════════════════════════ */
-function buildPrintReport() {
+async function buildPrintReport() {
+  // Load audit log for "Changes this week" section
+  window._printAudit = await loadRecentAudit(7);
+
   const now     = new Date();
   const ordinal = n => { const s=['th','st','nd','rd'],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); };
   const dateStr = `${ordinal(now.getDate())} ${now.toLocaleDateString('en-AU',{month:'long',year:'numeric'})}`;
@@ -2164,6 +2167,101 @@ function buildPrintReport() {
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:7px 12px;margin-bottom:10px">
       <span style="font-size:9px;font-weight:700;color:#16a34a">✅ All jobs tracking normally — no critical issues this week</span>
     </div>`}
+
+    <!-- ══ SINCE LAST REPORT DELTA ══ -->
+    ${(() => {
+      const lastRpt = reportsData && reportsData.length ? reportsData[0] : null;
+      if (!lastRpt) return '';
+      const deltaOpen = allOpen.length - (lastRpt.openJobs || 0);
+      const deltaDone = done.length - (lastRpt.doneJobs || 0);
+      const deltaStuck = urgent.length - (lastRpt.stuck || 0);
+      const rptDate = lastRpt.date ? new Date(lastRpt.date + 'T12:00:00').toLocaleDateString('en-AU', { day:'numeric', month:'short' }) : '?';
+      const fmt = (n, goodIsNeg=false) => {
+        if (n === 0) return `<span style="color:#6b7280">±0</span>`;
+        const good = goodIsNeg ? n < 0 : n > 0;
+        const color = good ? '#16a34a' : '#dc2626';
+        return `<span style="color:${color};font-weight:700">${n > 0 ? '+' : ''}${n}</span>`;
+      };
+      return `<div style="margin-bottom:10px;padding:7px 12px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:6px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <span style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#6b7280;white-space:nowrap">Since ${rptDate}</span>
+        <span style="font-size:9.5px;color:#374151">Open jobs: ${fmt(deltaOpen, true)}</span>
+        <span style="font-size:9.5px;color:#374151">Completed total: ${fmt(deltaDone)}</span>
+        <span style="font-size:9.5px;color:#374151">Overdue 21d+: ${fmt(deltaStuck, true)}</span>
+      </div>`;
+    })()}
+
+    <!-- ══ CHANGES THIS WEEK (from audit log) ══ -->
+    ${(() => {
+      if (!window._printAudit || !window._printAudit.length) return '';
+      const statusChanges = window._printAudit.filter(e => e.action === 'status_change' && e.job_id !== 'IMPORT');
+      const added  = window._printAudit.filter(e => e.action === 'job_added');
+      const deleted = window._printAudit.filter(e => e.action === 'job_deleted');
+      if (!statusChanges.length && !added.length && !deleted.length) return '';
+      const fmt = (e) => {
+        const j = jobs.find(x => x.id === e.job_id);
+        const ref = esc(e.job_ref || e.job_po || '—');
+        const by = (e.changed_by || '').split('@')[0];
+        return `<span style="font-size:9px;padding:2px 8px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;display:inline-block;margin:2px">
+          <strong style="font-family:'DM Mono',monospace;font-size:8px;color:#6b7280">${esc(e.job_po||'')}</strong>
+          ${ref !== e.job_po ? `<span style="color:#374151"> ${ref}</span>` : ''}
+          <span style="color:#9ba3af"> → </span>
+          <strong style="color:#1e2024">${esc(e.to_val||'')}</strong>
+          <span style="color:#d1d5db"> · ${by}</span>
+        </span>`;
+      };
+      return `<div style="margin-bottom:10px;padding:8px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px">
+        <div style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#1d4ed8;margin-bottom:5px">📋 Changes This Week</div>
+        ${statusChanges.length ? `<div style="margin-bottom:4px"><span style="font-size:8px;font-weight:700;color:#6b7280;margin-right:6px">Status moves (${statusChanges.length}):</span>${statusChanges.slice(0,12).map(fmt).join('')}${statusChanges.length>12?`<span style="font-size:8px;color:#9ba3af"> +${statusChanges.length-12} more</span>`:''}</div>` : ''}
+        ${added.length ? `<div style="margin-bottom:2px"><span style="font-size:8px;font-weight:700;color:#16a34a;margin-right:6px">+${added.length} new job${added.length!==1?'s':''}</span>${added.slice(0,6).map(e=>`<span style="font-size:9px;font-family:'DM Mono',monospace;color:#374151;margin-right:6px">${esc(e.job_po)}</span>`).join('')}</div>` : ''}
+        ${deleted.length ? `<div><span style="font-size:8px;font-weight:700;color:#dc2626;margin-right:6px">−${deleted.length} deleted</span>${deleted.slice(0,4).map(e=>`<span style="font-size:9px;font-family:'DM Mono',monospace;color:#dc2626;margin-right:6px">${esc(e.job_po)}</span>`).join('')}</div>` : ''}
+      </div>`;
+    })()}
+
+    <!-- ══ PARTS ETA SUMMARY ══ -->
+    ${(() => {
+      const waitingJobs = jobs.filter(j => j.status === 'Waiting for Parts');
+      if (!waitingJobs.length) return '';
+      const sorted = [...waitingJobs].sort((a,b) => {
+        const ea = partsData[a.id]?.eta || '9999';
+        const eb = partsData[b.id]?.eta || '9999';
+        return ea.localeCompare(eb);
+      });
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 5px;padding-bottom:4px;border-bottom:2px solid #d97706">
+          <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#d97706">⏳ Parts ETA — ${sorted.length} job${sorted.length!==1?'s':''} waiting</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:9px">
+          <thead><tr>
+            <th style="padding:3px 5px;text-align:left;border-bottom:1px solid #e5e7eb;color:#6b7280;font-weight:700;font-size:8px;text-transform:uppercase">PO</th>
+            <th style="padding:3px 5px;text-align:left;border-bottom:1px solid #e5e7eb;color:#6b7280;font-weight:700;font-size:8px;text-transform:uppercase">Reference</th>
+            <th style="padding:3px 5px;text-align:left;border-bottom:1px solid #e5e7eb;color:#6b7280;font-weight:700;font-size:8px;text-transform:uppercase">Service Co.</th>
+            <th style="padding:3px 5px;text-align:left;border-bottom:1px solid #e5e7eb;color:#6b7280;font-weight:700;font-size:8px;text-transform:uppercase">Part / Notes</th>
+            <th style="padding:3px 5px;text-align:right;border-bottom:1px solid #e5e7eb;color:#6b7280;font-weight:700;font-size:8px;text-transform:uppercase">ETA</th>
+            <th style="padding:3px 5px;text-align:right;border-bottom:1px solid #e5e7eb;color:#6b7280;font-weight:700;font-size:8px;text-transform:uppercase">Waiting</th>
+          </tr></thead>
+          <tbody>${sorted.map(j => {
+            const pd = partsData[j.id] || {};
+            const eta = pd.eta || '';
+            const etaDays = eta ? daysUntil(eta) : null;
+            const etaColor = etaDays !== null && etaDays < 0 ? '#dc2626' : etaDays !== null && etaDays <= 3 ? '#d97706' : '#374151';
+            const etaLabel = !eta ? '<span style="color:#d1d5db">No ETA set</span>'
+              : etaDays !== null && etaDays < 0 ? `<strong style="color:#dc2626">${eta} (${Math.abs(etaDays)}d overdue)</strong>`
+              : etaDays === 0 ? `<strong style="color:#d97706">${eta} (today)</strong>`
+              : `<span style="color:${etaColor}">${eta}</span>`;
+            const waiting = daysBetween(j.poDate, null);
+            const waitCol = waiting > 21 ? '#dc2626' : waiting > 14 ? '#d97706' : '#374151';
+            return `<tr style="border-bottom:1px solid #f3f4f6">
+              <td style="padding:3px 5px;font-family:'DM Mono',monospace;font-size:8px;color:#6b7280">${esc(j.po)}</td>
+              <td style="padding:3px 5px;font-size:9px;font-weight:600">${esc(j.ref||'—')}</td>
+              <td style="padding:3px 5px;font-size:8.5px;color:#6b7280">${esc(j.supplier)}</td>
+              <td style="padding:3px 5px;font-size:8.5px;color:#374151">${esc(pd.notes||'—')}</td>
+              <td style="padding:3px 5px;text-align:right">${etaLabel}</td>
+              <td style="padding:3px 5px;text-align:right;font-weight:700;color:${waitCol}">${waiting}d</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>`;
+    })()}
 
     <!-- ══ ALL OPEN JOBS — full width ══ -->
     ${(() => {
@@ -2661,4 +2759,80 @@ function renderSites() {
       </div>
     </div>`;
   }).join('');
+}
+
+/* ── AUDIT TRAIL PAGE ─────────────────────────────────────── */
+async function renderAudit() {
+  const el = document.getElementById('audit-content');
+  if (!el) return;
+  el.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:13px">Loading audit log…</div>';
+
+  const days = parseInt(document.getElementById('audit-range')?.value || 7);
+  const entries = await loadRecentAudit(days);
+
+  if (!entries.length) {
+    el.innerHTML = '<div class="empty-state"><p>No audit entries in this period. Changes you make will appear here.</p></div>';
+    return;
+  }
+
+  const ACTION_LABELS = {
+    'status_change':          'Status changed',
+    'job_added':              'Job added',
+    'job_deleted':            'Job deleted',
+    'internal_notes_edited':  'Internal notes edited',
+    'csv_import':             'CSV import',
+  };
+
+  const ACTION_COLOR = {
+    'status_change':          'var(--blue)',
+    'job_added':              'var(--green)',
+    'job_deleted':            'var(--red)',
+    'internal_notes_edited':  'var(--amber)',
+    'csv_import':             'var(--purple)',
+  };
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th style="width:140px">When</th>
+            <th style="width:90px">PO</th>
+            <th>Reference</th>
+            <th style="width:140px">Action</th>
+            <th style="width:180px">Detail</th>
+            <th style="width:160px">By</th>
+          </tr></thead>
+          <tbody>
+            ${entries.map(e => {
+              const when = new Date(e.changed_at);
+              const whenStr = when.toLocaleDateString('en-AU', { day:'numeric', month:'short' })
+                + ' ' + when.toLocaleTimeString('en-AU', { hour:'2-digit', minute:'2-digit' });
+              const color = ACTION_COLOR[e.action] || 'var(--text3)';
+              const label = ACTION_LABELS[e.action] || e.action;
+              let detail = '';
+              if (e.action === 'status_change' && e.from_val && e.to_val) {
+                detail = `<span style="color:var(--text3)">${esc(e.from_val)}</span> → <span style="font-weight:700;color:var(--text)">${esc(e.to_val)}</span>`;
+                if (e.meta?.source === 'bulk') detail += ' <span style="font-size:10px;color:var(--text3)">(bulk)</span>';
+                if (e.meta?.source === 'csv_import') detail += ' <span style="font-size:10px;color:var(--text3)">(import)</span>';
+              } else if (e.action === 'csv_import' && e.meta) {
+                detail = `+${e.meta.added||0} new · ${e.meta.updated||0} updated`;
+              } else if (e.action === 'job_deleted') {
+                detail = `<span style="color:var(--red)">Was: ${esc(e.from_val||'')}</span>`;
+              }
+              const isImport = e.job_id === 'IMPORT';
+              return `<tr>
+                <td style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">${whenStr}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:12px">${isImport ? '—' : esc(e.job_po||'—')}</td>
+                <td style="font-size:12px;color:var(--text2)">${isImport ? 'Odoo CSV' : esc(e.job_ref||'—')}</td>
+                <td><span style="font-size:11px;font-weight:700;color:${color}">${label}</span></td>
+                <td style="font-size:12px">${detail}</td>
+                <td style="font-size:11px;color:var(--text3)">${esc(e.changed_by||'—')}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }

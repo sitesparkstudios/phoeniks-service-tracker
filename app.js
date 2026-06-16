@@ -24,9 +24,10 @@ const PAGE_TITLES = {
   import:     'Odoo Import',
   add:        'Add / Edit Job',
   admin:      'Admin',
+  audit:      'Audit Log',
 };
 
-const NAV_ORDER = ['dashboard','urgent','activity','bottleneck','performance','jobs','parts','suppliers','sites','reports','import','add','admin'];
+const NAV_ORDER = ['dashboard','urgent','activity','bottleneck','performance','jobs','parts','suppliers','sites','reports','import','add','admin','audit'];
 
 function toggleStatusDropdown() {
   const dd = document.getElementById('status-filter-dropdown');
@@ -112,6 +113,7 @@ function showPage(name) {
   if (name === 'import')     { renderLastImportStamp(); }
   if (name === 'add')        populateSupplierDatalist();
   if (name === 'admin')      renderAdmin();
+  if (name === 'audit')      renderAudit();
 }
 
 /* ── NAV BADGES ── */
@@ -272,16 +274,19 @@ async function applyBulkStatus() {
   );
   if (!confirmed) return;
   const ids = [..._bulkSelected];
+  const auditEntries = [];
   ids.forEach(id => {
     const j = jobs.find(x => x.id === id);
     if (!j) return;
     if (j.status !== newStatus) {
+      auditEntries.push({ jobId: j.id, jobPo: j.po, jobRef: j.ref, action: 'status_change', fromVal: j.status, toVal: newStatus, meta: { source: 'bulk' } });
       if (!j.history || !j.history.length) j.history = [{ status: j.status, date: j.poDate || today() }];
       j.history.push({ status: newStatus, date: today() });
       j.status = newStatus;
     }
   });
   await saveData();
+  auditBulk(auditEntries);
   clearBulkSelection();
   renderAll();
   showToast(`${count} job${count !== 1 ? 's' : ''} updated to ${newStatus}`);
@@ -324,6 +329,13 @@ async function saveJob() {
       if (transitions.length) {
         j.history = buildHistoryFromTransitions(poDate, transitions);
         j.status  = j.history[j.history.length-1].status;
+        // Audit each transition from chatter
+        const auditEntries = transitions.map(t => ({
+          jobId: j.id, jobPo: j.po, jobRef: j.ref,
+          action: 'status_change', fromVal: t.from, toVal: t.to,
+          meta: { source: 'chatter', date: t.date }
+        }));
+        auditBulk(auditEntries);
       } else if (j.status !== status) {
         // Confirm status change
         const confirmed = await showConfirm(
@@ -332,11 +344,18 @@ async function saveJob() {
           'Confirm'
         );
         if (!confirmed) return;
+        const prevStatus = j.status;
         if (!j.history || !j.history.length) j.history = [{ status: j.status, date: j.poDate }];
         j.history.push({ status, date: today() });
         j.status = status;
+        auditLog('status_change', j.id, j.po, j.ref, prevStatus, status);
       } else {
         j.status = status;
+      }
+      // Audit internal notes edit if changed
+      const origNotes = jobs.find(x => x.id === editingId)?.internalNotes || '';
+      if (internalNotes !== origNotes) {
+        auditLog('internal_notes_edited', j.id, j.po, j.ref, null, null);
       }
       savedJob = j;
     }
@@ -351,6 +370,7 @@ async function saveJob() {
       history:   transitions.length ? buildHistoryFromTransitions(poDate, transitions) : [{ status, date: poDate }],
     };
     jobs.push(savedJob);
+    auditLog('job_added', savedJob.id, savedJob.po, savedJob.ref, null, savedJob.status);
   }
 
   await saveOneJob(savedJob);   // fast single-row upsert
@@ -404,6 +424,8 @@ async function deleteJob(id) {
   if (!isAuthed()) { showToast('Sign in to delete jobs'); return; }
   const confirmed = await showConfirm('Delete this job?', 'This action cannot be undone.');
   if (!confirmed) return;
+  const j = jobs.find(x => x.id === id);
+  if (j) auditLog('job_deleted', j.id, j.po, j.ref, j.status, null);
   jobs = jobs.filter(j => j.id !== id);
   delete partsData[id];
   await deleteJobFromDB(id);    // Supabase delete (parts cascade)
@@ -546,6 +568,8 @@ function updateSidebarDate() {
 
   const navAdmin = document.getElementById('nav-admin');
   if (navAdmin) navAdmin.style.display = (isAuthed() && !isViewer()) ? 'flex' : 'none';
+  const navAudit = document.getElementById('nav-audit');
+  if (navAudit) navAudit.style.display = (isAuthed() && !isViewer()) ? 'flex' : 'none';
   updateSidebarDate();
   updateNavBadges();
 

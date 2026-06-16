@@ -558,9 +558,66 @@ async function saveReport() {
   renderReports();
 }
 
-/* ── MONTHLY SPEND ──────────────────────────────────────────
-   Unchanged — pure computation from in-memory jobs array
+/* ── AUDIT LOG ─────────────────────────────────────────────
+   Writes a record to audit_log for every meaningful change.
+   Silently no-ops if not authenticated or on any error.
    ─────────────────────────────────────────────────────────── */
+async function auditLog(action, jobId, jobPo, jobRef, fromVal, toVal, meta = {}) {
+  if (!isAuthed()) return;
+  const email = _currentSession?.user?.email || 'unknown';
+  try {
+    await _sb.from('audit_log').insert({
+      job_id:     jobId || '',
+      job_po:     jobPo || '',
+      job_ref:    jobRef || '',
+      action,
+      from_val:   fromVal != null ? String(fromVal) : null,
+      to_val:     toVal   != null ? String(toVal)   : null,
+      changed_by: email,
+      meta,
+    });
+  } catch(e) { /* non-fatal — never block the main action */ }
+}
+
+async function auditBulk(entries) {
+  if (!isAuthed() || !entries.length) return;
+  const email = _currentSession?.user?.email || 'unknown';
+  try {
+    const rows = entries.map(e => ({
+      job_id:     e.jobId     || '',
+      job_po:     e.jobPo     || '',
+      job_ref:    e.jobRef    || '',
+      action:     e.action,
+      from_val:   e.fromVal != null ? String(e.fromVal) : null,
+      to_val:     e.toVal   != null ? String(e.toVal)   : null,
+      changed_by: email,
+      meta:       e.meta || {},
+    }));
+    const CHUNK = 100;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      await _sb.from('audit_log').insert(rows.slice(i, i + CHUNK));
+    }
+  } catch(e) { /* non-fatal */ }
+}
+
+/* Load recent audit entries for the print report / audit view */
+async function loadRecentAudit(days = 7) {
+  if (!isAuthed()) return [];
+  try {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const { data, error } = await _sb
+      .from('audit_log')
+      .select('*')
+      .gte('changed_at', cutoff.toISOString())
+      .order('changed_at', { ascending: false })
+      .limit(200);
+    if (error) return [];
+    return data || [];
+  } catch(e) { return []; }
+}
+
+
 function getMonthlySpend() {
   const now = new Date();
   const jobDates = jobs.filter(j => j.poDate).map(j => j.poDate).sort();
@@ -781,7 +838,11 @@ function processCSVFile(file) {
         if (existing.status !== newStatus && existing.status !== 'Job Done') {
           if (!existing.history) existing.history = [{ status: existing.status, date: existing.poDate || today() }];
           existing.history.push({ status: newStatus, date: today() });
+          const prevStatus = existing.status;
           existing.status = newStatus;
+          // Queue for bulk audit after save
+          if (!window._importAuditQueue) window._importAuditQueue = [];
+          window._importAuditQueue.push({ jobId: existing.id, jobPo: existing.po, jobRef: existing.ref, action: 'status_change', fromVal: prevStatus, toVal: newStatus, meta: { source: 'csv_import' } });
         }
         updated++;
       } else {
@@ -805,6 +866,12 @@ function processCSVFile(file) {
     await saveData();   // bulk upsert via Supabase
     renderAll();
     setLastImportNow();
+    // Flush status-change audit entries collected during import
+    if (window._importAuditQueue && window._importAuditQueue.length) {
+      auditBulk(window._importAuditQueue);
+      window._importAuditQueue = [];
+    }
+    auditLog('csv_import', 'IMPORT', 'CSV Import', '', null, null, { added, updated, skipped });
     const skipNote = noStatus > 0 ? ` · ${noStatus} skipped (no Job Status — procurement POs)` : skipped > 0 ? ` · ${skipped} skipped` : '';
     showImportResult('success', `Import complete — ${added} new job${added!==1?'s':''} added, ${updated} updated${skipNote}.`);
     showToast(`Import: +${added} new, ${updated} updated`);
