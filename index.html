@@ -1121,8 +1121,10 @@
        PRINT REPORT — hidden on screen, print only
        Rendered by buildPrintReport() before window.print()
   ═══════════════════════════════════════════════════ -->
-  <div id="print-report" style="display:none">
-    <!-- content injected by buildPrintReport() -->
+  <div id="print-report-wrap">
+    <div id="print-report">
+      <!-- content injected by buildPrintReport() -->
+    </div>
   </div>
 
 

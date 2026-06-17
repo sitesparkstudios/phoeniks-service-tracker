@@ -466,10 +466,15 @@ select {
 .flex-between{ display: flex; justify-content: space-between; align-items: center; }
 
 /* ── PRINT ── */
+@media screen { #print-report-wrap { display: none; } }
+
 @media print {
   @page { size: A4 portrait; margin: 8mm; }
   html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
   body > * { display: none !important; }
+  #print-report-wrap {
+    display: block !important;
+  }
   #print-report {
     display: block !important;
     zoom: 0.78;
