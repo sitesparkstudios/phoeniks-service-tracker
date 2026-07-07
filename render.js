@@ -2167,36 +2167,97 @@ function buildPrintReport() {
       <span style="font-size:9px;font-weight:700;color:#16a34a">✅ All jobs tracking normally — no critical issues this week</span>
     </div>`}
 
-    <!-- ══ WEEK-ON-WEEK ACTIVITY DELTA ══ -->
+    <!-- ══ WEEK-ON-WEEK SNAPSHOT ══ -->
     ${(() => {
-      const _wNow = new Date();
-      const _wAgo = new Date(_wNow); _wAgo.setDate(_wAgo.getDate() - 7);
-      const _w2Ago = new Date(_wNow); _w2Ago.setDate(_w2Ago.getDate() - 14);
+      const _wNow  = new Date();
+      const _wAgo  = new Date(_wNow);  _wAgo.setDate(_wAgo.getDate() - 7);
+      const _w2Ago = new Date(_wNow);  _w2Ago.setDate(_w2Ago.getDate() - 14);
       const _thisWk = _wAgo.toISOString().split('T')[0];
       const _lastWk = _w2Ago.toISOString().split('T')[0];
       const _today  = _wNow.toISOString().split('T')[0];
+
+      // Jobs closed this week vs last week
       const _cTW = done.filter(j => { const d = j.history?.[j.history.length-1]?.date||''; return d >= _thisWk && d <= _today; });
       const _cLW = done.filter(j => { const d = j.history?.[j.history.length-1]?.date||''; return d >= _lastWk && d < _thisWk; });
-      const _nTW = jobs.filter(j => (j.addedDate||j.poDate||'') >= _thisWk).length;
-      const _nLW = jobs.filter(j => { const d=j.addedDate||j.poDate||''; return d>=_lastWk&&d<_thisWk; }).length;
-      const _moves = window._printAudit ? window._printAudit.filter(e => e.action==='status_change'&&e.job_id!=='IMPORT').length : '—';
-      const _nowOD = allOpen.filter(j => daysBetween(j.poDate,null) >= 21).length;
-      const _wasOD = allOpen.filter(j => { const d=daysBetween(j.poDate,_thisWk); return d!==null&&d>=21; }).length;
-      const _dOD   = _nowOD - _wasOD;
-      const _fmtD  = (n, inv=false) => {
-        if (n===0) return '<span style="color:#6b7280">±0</span>';
-        const good = inv ? n<0 : n>0;
-        const col  = good ? '#16a34a' : '#dc2626';
-        return '<span style="color:' + col + ';font-weight:700">' + (n>0?'+':'') + n + '</span>';
+
+      // Open jobs now vs estimated last week
+      // A job was open last week if: it existed before _thisWk AND was not yet done (or was done after _thisWk)
+      const _openNow  = allOpen.length;
+      const _openLastWk = jobs.filter(isServiceJob).filter(j => {
+        const created = j.addedDate || j.poDate || '';
+        if (!created || created >= _thisWk) return false; // didn't exist yet last week
+        if (j.status !== 'Job Done') return true;         // still open
+        const lastHist = j.history?.[j.history.length-1]?.date || '';
+        return lastHist >= _thisWk; // was closed this week, so was open last week
+      }).length;
+      const _openDelta = _openNow - _openLastWk;
+
+      // New jobs added this week vs last
+      const _nTW = jobs.filter(j => isServiceJob(j) && (j.addedDate||j.poDate||'') >= _thisWk).length;
+      const _nLW = jobs.filter(j => { if (!isServiceJob(j)) return false; const d=j.addedDate||j.poDate||''; return d>=_lastWk&&d<_thisWk; }).length;
+
+      // Overdue delta
+      const _nowOD  = allOpen.filter(j => daysBetween(j.poDate,null) >= 21).length;
+      const _wasOD  = allOpen.filter(j => { const d=daysBetween(j.poDate,_thisWk); return d!==null&&d>=21; }).length;
+      const _dOD    = _nowOD - _wasOD;
+
+      // Status moves from audit
+      const _moves = window._printAudit ? window._printAudit.filter(e => e.action==='status_change'&&e.job_id!=='IMPORT').length : null;
+
+      // Arrow + colour helper
+      const _arrow = (n, inv=false) => {
+        if (n === 0) return '<span style="font-size:11px;color:#9ba3af">→</span>';
+        const good = inv ? n < 0 : n > 0;
+        return good
+          ? '<span style="font-size:12px;color:#16a34a;font-weight:800">↑</span>'
+          : '<span style="font-size:12px;color:#dc2626;font-weight:800">↓</span>';
       };
-      return '<div style="margin-bottom:10px;padding:7px 14px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:6px">'
-        + '<div style="font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#6b7280;margin-bottom:5px">Week on week — last 7 days vs previous 7 days</div>'
-        + '<div style="display:flex;gap:20px;flex-wrap:wrap">'
-        + '<span style="font-size:9.5px;color:#374151">Completed: <strong>' + _cTW.length + '</strong> <span style="color:#9ba3af">(vs ' + _cLW.length + ' prev)</span> ' + _fmtD(_cTW.length - _cLW.length) + '</span>'
-        + '<span style="font-size:9.5px;color:#374151">New jobs: <strong>' + _nTW + '</strong> <span style="color:#9ba3af">(vs ' + _nLW + ' prev)</span> ' + _fmtD(_nTW - _nLW) + '</span>'
-        + '<span style="font-size:9.5px;color:#374151">Status moves: <strong>' + _moves + '</strong></span>'
-        + '<span style="font-size:9.5px;color:#374151">Overdue 21d+: <strong>' + _nowOD + '</strong> ' + _fmtD(_dOD, true) + '</span>'
-        + '</div></div>';
+      const _deltaLabel = (n, inv=false) => {
+        if (n === 0) return '<span style="font-size:8.5px;color:#9ba3af;font-weight:600">no change</span>';
+        const good = inv ? n < 0 : n > 0;
+        const col  = good ? '#16a34a' : '#dc2626';
+        return `<span style="font-size:8.5px;color:${col};font-weight:700">${n>0?'+':''}${n} vs last week</span>`;
+      };
+      const _bigNum = (val, col='#1e2024') =>
+        `<div style="font-size:28px;font-weight:800;color:${col};line-height:1;letter-spacing:-1px">${val}</div>`;
+
+      // Open jobs colour
+      const _openCol = _openDelta > 0 ? '#dc2626' : _openDelta < 0 ? '#16a34a' : '#1e2024';
+      const _openBg  = _openDelta > 0 ? '#fff8f8' : _openDelta < 0 ? '#f0fdf4' : '#f8f9fa';
+      const _openBdr = _openDelta > 0 ? '#fecaca' : _openDelta < 0 ? '#bbf7d0' : '#e5e7eb';
+
+      // Closed this week colour
+      const _closeCol = _cTW.length > _cLW.length ? '#16a34a' : _cTW.length < _cLW.length ? '#d97706' : '#1e2024';
+
+      const _cell = (bigVal, bigCol, label, deltaHtml, arrowHtml, bg='#f8f9fa', border='#e5e7eb') =>
+        `<div style="background:${bg};border:1.5px solid ${border};border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px">
+          <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#9ba3af">${label}</div>
+          <div style="display:flex;align-items:flex-end;gap:6px;margin-top:2px">
+            ${_bigNum(bigVal, bigCol)}
+            ${arrowHtml}
+          </div>
+          <div style="margin-top:1px">${deltaHtml}</div>
+        </div>`;
+
+      return `
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;padding-bottom:4px;border-bottom:2.5px solid #FFD100">
+          <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#1e2024">Week-on-Week Snapshot</span>
+          <span style="font-size:8.5px;color:#9ba3af;font-weight:500">this week vs previous 7 days</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+          ${_cell(_openNow, _openCol, 'Open Jobs Now', _deltaLabel(_openDelta, true), _arrow(_openDelta, true), _openBg, _openBdr)}
+          ${_cell(_openLastWk, '#6b7280', 'Open Jobs Last Week', '<span style="font-size:8.5px;color:#9ba3af">estimated from history</span>', '', '#f8f9fa', '#e5e7eb')}
+          ${_cell(_cTW.length, _closeCol, 'Closed This Week', _deltaLabel(_cTW.length - _cLW.length), _arrow(_cTW.length - _cLW.length), _cTW.length > 0 ? '#f0fdf4' : '#f8f9fa', _cTW.length > 0 ? '#bbf7d0' : '#e5e7eb')}
+          ${_cell(_cLW.length, '#6b7280', 'Closed Last Week', _deltaLabel(0), '<span style="font-size:11px;color:#9ba3af">—</span>', '#f8f9fa', '#e5e7eb')}
+          ${_cell(_nowOD, _nowOD > 0 ? '#dc2626' : '#16a34a', 'Overdue 21d+', _deltaLabel(_dOD, true), _arrow(_dOD, true), _nowOD > 0 ? '#fff8f8' : '#f0fdf4', _nowOD > 0 ? '#fecaca' : '#bbf7d0')}
+        </div>
+        ${_nTW > 0 || _moves !== null ? `
+        <div style="display:flex;gap:16px;margin-top:6px;padding:6px 10px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:6px">
+          <span style="font-size:9px;color:#374151">New jobs this week: <strong>${_nTW}</strong> <span style="color:#9ba3af">(${_nLW} last week)</span></span>
+          ${_moves !== null ? `<span style="font-size:9px;color:#374151">Status changes logged: <strong>${_moves}</strong> <span style="color:#9ba3af">in last 7 days</span></span>` : ''}
+        </div>` : ''}
+      </div>`;
     })()}
 
     <!-- ══ CHANGES THIS WEEK (from audit log) ══ -->
