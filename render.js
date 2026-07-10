@@ -2146,7 +2146,21 @@ function buildPrintReport() {
       </div>
     </div>
 
-    <!-- ══ KPI STRIP ══ -->
+    <!-- ══ STALE DATA WARNING ══ -->
+    ${(() => {
+      const lastImportRaw = getLastImport();
+      const daysSinceImport = lastImportRaw ? Math.floor((now - new Date(lastImportRaw)) / 86400000) : null;
+      const isStale = daysSinceImport === null || daysSinceImport >= 7;
+      if (!isStale) return '';
+      const msg = lastImportRaw
+        ? `Data last imported ${daysSinceImport} day${daysSinceImport!==1?'s':''} ago (${new Date(lastImportRaw).toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'})}) — check whether a fresh Odoo export is needed before this meeting.`
+        : `No import on record on this device — check whether a fresh Odoo export is needed before this meeting.`;
+      return `
+    <div style="margin-bottom:10px;padding:8px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:14px;line-height:1">⚠️</span>
+      <span style="font-size:9.5px;font-weight:700;color:#b91c1c">${msg}</span>
+    </div>`;
+    })()}
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:10px">
       ${kpi(allOpen.length,'Open Jobs','#1e2024','all service jobs','#f8f9fa')}
       ${kpi(urgent.length,'Overdue 21d+',urgent.length>0?'#dc2626':'#16a34a',urgent.length>0?`${critical.length} critical`:'all on track',urgent.length>0?'#fff8f8':'#f0fdf4',urgent.length>0?'#fecaca':'#bbf7d0')}
