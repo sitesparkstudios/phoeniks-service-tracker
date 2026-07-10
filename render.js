@@ -1850,15 +1850,20 @@ function buildPrintReport() {
   const startOfYear = new Date(now.getFullYear(), 0, 1);
   const weekNum = Math.ceil(((now - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
 
-  // Completed this week
-  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay() + 1); weekStart.setHours(0,0,0,0);
+  // Completed this week — ROLLING 7-day window anchored to "now" (report generation time),
+  // not a calendar Monday-Sunday week. Sean imports the Odoo CSV 1-3x/week (typically Friday
+  // morning) then prints this report the following Monday for the team meeting. A Monday-anchored
+  // calendar week would reset to near-zero the moment it's printed Monday morning, pushing Friday's
+  // closures into "last week" instead. Rolling windows avoid that and match the Snapshot panel below.
+  const todayStr = now.toISOString().split('T')[0];
+  const weekStart = new Date(now); weekStart.setDate(weekStart.getDate() - 7);
   const weekStartStr = weekStart.toISOString().split('T')[0];
   const completedThisWeek = done.filter(j => {
     const last = j.history?.[j.history.length-1];
-    return last && last.date >= weekStartStr;
+    return last && last.date >= weekStartStr && last.date <= todayStr;
   });
 
-  // Last week comparison
+  // Previous 7-day window comparison
   const lastWeekStart = new Date(weekStart); lastWeekStart.setDate(lastWeekStart.getDate()-7);
   const lastWeekStartStr = lastWeekStart.toISOString().split('T')[0];
   const completedLastWeek = done.filter(j => {
@@ -2169,16 +2174,14 @@ function buildPrintReport() {
 
     <!-- ══ WEEK-ON-WEEK SNAPSHOT ══ -->
     ${(() => {
-      const _wNow  = new Date();
-      const _wAgo  = new Date(_wNow);  _wAgo.setDate(_wAgo.getDate() - 7);
-      const _w2Ago = new Date(_wNow);  _w2Ago.setDate(_w2Ago.getDate() - 14);
-      const _thisWk = _wAgo.toISOString().split('T')[0];
-      const _lastWk = _w2Ago.toISOString().split('T')[0];
-      const _today  = _wNow.toISOString().split('T')[0];
+      const _thisWk = weekStartStr;
+      const _lastWk = lastWeekStartStr;
+      const _today  = todayStr;
 
-      // Jobs closed this week vs last week
-      const _cTW = done.filter(j => { const d = j.history?.[j.history.length-1]?.date||''; return d >= _thisWk && d <= _today; });
-      const _cLW = done.filter(j => { const d = j.history?.[j.history.length-1]?.date||''; return d >= _lastWk && d < _thisWk; });
+      // Jobs closed this week vs last week — reuse the single shared calculation (same rolling
+      // 7-day window used by the "Closed This Week" list section below) so the two never disagree
+      const _cTW = completedThisWeek;
+      const _cLW = completedLastWeek;
 
       // Open jobs now vs estimated last week
       // A job was open last week if: it existed before _thisWk AND was not yet done (or was done after _thisWk)
