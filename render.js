@@ -2351,6 +2351,42 @@ function buildPrintReport() {
       </table>${!showNotes?`<div style="font-size:8px;color:#9ba3af;font-style:italic;margin:-8px 0 10px">Notes suppressed — ${sorted.length} jobs over single-page limit.</div>`:''}`;
     })()}
 
+    <!-- ══ CLOSED THIS WEEK ══ -->
+    ${completedThisWeek.length ? (() => {
+      const closedSorted = [...completedThisWeek].sort((a,b) => {
+        const da = a.history?.[a.history.length-1]?.date || '';
+        const db = b.history?.[b.history.length-1]?.date || '';
+        return db.localeCompare(da);
+      });
+      const rows = closedSorted.map(j => {
+        const closedDate = j.history?.[j.history.length-1]?.date || '';
+        const dur = getTotalDays(j);
+        const durLabel = dur !== null ? dur + 'd' : '—';
+        const dateLabel = closedDate ? new Date(closedDate+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short'}) : '—';
+        return `<tr style="border-bottom:1px solid #e8f5e9">
+          <td style="padding:3px 6px;white-space:nowrap"><span style="font-family:'DM Mono',monospace;font-size:8px;color:#6b7280">${esc(j.po)}</span></td>
+          <td style="padding:3px 6px"><span style="font-weight:600;font-size:9px;color:#1e2024">${esc(j.ref||'—')}</span></td>
+          <td style="padding:3px 6px"><span style="font-size:8.5px;color:#6b7280">${esc(j.supplier||'—')}</span></td>
+          <td style="padding:3px 6px;text-align:right;white-space:nowrap"><span style="font-size:8.5px;color:#374151">${dateLabel}</span></td>
+          <td style="padding:3px 6px;text-align:right;white-space:nowrap"><strong style="font-size:9px;color:#16a34a">${durLabel}</strong></td>
+        </tr>`;
+      }).join('');
+      const deltaSub = weekVsLastWeek !== 0
+        ? ' · ' + (weekVsLastWeek > 0 ? '+' : '') + weekVsLastWeek + ' vs last week'
+        : ' · same as last week';
+      return `${sHead('✅ Closed This Week','#16a34a', completedThisWeek.length + ' job' + (completedThisWeek.length!==1?'s':'') + ' completed' + deltaSub)}
+      <table style="width:100%;border-collapse:collapse;margin-bottom:12px;background:#f9fdf9">
+        <thead><tr>
+          ${th('PO','left','54px')}${th('Reference')}${th('Service Co.','left','22%')}${th('Closed','right','60px')}${th('Duration','right','54px')}
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    })() : `
+    ${sHead('✅ Closed This Week','#9ba3af')}
+    <div style="margin-bottom:12px;padding:8px 12px;background:#f8f9fa;border:1px solid #e5e7eb;border-radius:6px">
+      <span style="font-size:9px;color:#9ba3af;font-weight:600">No jobs closed this week yet</span>
+    </div>`}
+
     <!-- ══ TWO-COLUMN: SERVICE CO + STATS / CHART ══ -->
     <div style="display:grid;grid-template-columns:1.4fr 0.6fr;gap:12px;align-items:start">
 
