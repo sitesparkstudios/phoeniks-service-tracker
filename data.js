@@ -41,6 +41,17 @@ async function initAuth() {
   _sb.auth.onAuthStateChange((_event, session) => {
     _currentSession = session;
     updateAuthUI();
+
+    // If the user just signed in (password or magic link) while the login wall
+    // was blocking the app, actually unblock it and load their data. Previously
+    // this silently did nothing until the page was manually refreshed.
+    const wall = document.getElementById('login-wall');
+    if (session && wall) {
+      wall.remove();
+      const appEl = document.querySelector('.app');
+      if (appEl) appEl.style.display = '';
+      if (typeof reinitAfterSignIn === 'function') reinitAfterSignIn();
+    }
   });
 }
 
