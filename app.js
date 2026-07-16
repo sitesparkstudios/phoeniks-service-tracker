@@ -546,6 +546,43 @@ function updateSidebarDate() {
   `;
 }
 
+/* ── RE-INIT AFTER SIGN-IN ──────────────────────────────────
+   Runs the same post-auth setup as the normal page-load init
+   sequence below, but triggered live when someone signs in via
+   the login wall (password or magic link) instead of requiring
+   a manual page refresh to take effect.
+   ─────────────────────────────────────────────────────────── */
+async function reinitAfterSignIn() {
+  showLoadingScreen(true);
+  await loadData();
+
+  window._userRole = 'editor'; // default
+  try {
+    const userEmail = _sb.auth.getUser ? (await _sb.auth.getUser()).data?.user?.email : null;
+    if (userEmail) {
+      const { data: invRow } = await _sb.from('invited_users').select('role').eq('email', userEmail).single();
+      if (invRow?.role) window._userRole = invRow.role;
+    }
+  } catch(e) { /* non-fatal */ }
+
+  const isViewer = window._userRole === 'viewer';
+  document.body.classList.toggle('viewer-mode', isViewer);
+
+  const navAdmin = document.getElementById('nav-admin');
+  if (navAdmin) navAdmin.style.display = (isAuthed() && !isViewer) ? 'flex' : 'none';
+  const navAudit = document.getElementById('nav-audit');
+  if (navAudit) navAudit.style.display = (isAuthed() && !isViewer) ? 'flex' : 'none';
+
+  updateSidebarDate();
+  updateNavBadges();
+  showPage('dashboard');
+
+  if (typeof initDashPeriodFilter === 'function') initDashPeriodFilter();
+  if (typeof initBottleneckFilter === 'function') initBottleneckFilter();
+
+  showLoadingScreen(false);
+}
+
 /* ── INIT ── */
 (async () => {
   // Minimum 3 second loading screen so the fun messages can be seen
