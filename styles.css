@@ -557,9 +557,10 @@ select {
   .topbar { padding: 0 16px; gap: 8px; }
   .topbar-actions { gap: 6px; }
 
-  /* Hide Export and Print on mobile — use menu instead */
+  /* Export and Print stay visible on mobile, icon-only (label hidden, like search) */
   .topbar-actions .btn-secondary,
-  .topbar-actions .btn-ghost { display: none; }
+  .topbar-actions .btn-ghost { padding: 7px; }
+  .topbar-btn-label { display: none; }
 
   /* Page padding */
   .page { padding: 20px 16px; }
