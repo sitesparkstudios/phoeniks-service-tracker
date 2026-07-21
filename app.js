@@ -741,6 +741,7 @@ async function renderAdmin() {
               <option value="editor" ${role==='editor'?'selected':''}>Full edit</option>
               <option value="viewer" ${role==='viewer'?'selected':''}>View only</option>
             </select>
+            ${!isSelf ? `<button onclick="adminResetPassword('${esc(u.email)}')" style="font-size:11px;padding:5px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text2);cursor:pointer">Reset password</button>` : ''}
             ${!isSelf ? `<button onclick="adminRemoveUser('${esc(u.email)}')" style="font-size:11px;padding:5px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--red);cursor:pointer">Remove</button>` : '<span style="font-size:11px;color:var(--text3)">Your account</span>'}
           </div>
         </div>`;
@@ -837,13 +838,44 @@ async function adminChangeRole(email, newRole) {
 }
 
 async function adminRemoveUser(email) {
-  if (!confirm(`Remove ${email} from the tracker?\nThey will need to be re-invited to regain access.`)) return;
+  if (!confirm(`Remove ${email} from the tracker?\nThis fully deletes their login — they'll need to be re-invited from scratch to regain access.`)) return;
 
   try {
-    await _sb.from('invited_users').delete().eq('email', email);
+    const { data, error } = await _sb.functions.invoke('admin-create-user', {
+      body: { action: 'delete', email }
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
     showToast(`${email} removed`);
     renderAdmin();
   } catch(err) {
     showToast('Error removing user: ' + err.message);
+  }
+}
+
+async function adminResetPassword(email) {
+  if (!confirm(`Generate a new temporary password for ${email}?\nTheir current password will stop working.`)) return;
+
+  try {
+    const { data, error } = await _sb.functions.invoke('admin-create-user', {
+      body: { action: 'reset-password', email }
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    const result = document.getElementById('admin-invite-result');
+    if (result) {
+      result.innerHTML = `
+        <div style="color:var(--green);font-weight:700;margin-bottom:6px">✓ New password for ${esc(email)}</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Share this with them. They should change it after first sign-in.</div>
+        <div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:8px 12px">
+          <code style="font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:var(--text);flex:1">${esc(data.tempPassword)}</code>
+          <button onclick="navigator.clipboard.writeText('${esc(data.tempPassword)}').then(()=>showToast('Copied!'))" style="font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);cursor:pointer;font-family:var(--font)">Copy</button>
+        </div>
+      `;
+    }
+    showToast('Password reset for ' + email);
+  } catch(err) {
+    showToast('Error resetting password: ' + err.message);
   }
 }
