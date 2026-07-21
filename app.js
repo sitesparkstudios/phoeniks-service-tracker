@@ -724,45 +724,34 @@ async function adminInviteFromInput() {
   if (result) { result.style.color = 'var(--text3)'; result.textContent = ''; }
 
   try {
-    // 1. Create user with temp password via admin API
-    //    Supabase free plan: use signUp — user is created and can sign in immediately
-    const { error: signUpErr } = await _sb.auth.admin
-      ? await _sb.auth.admin.createUser({ email, password: tempPass, email_confirm: true })
-      : await _sb.auth.signUp({ email, password: tempPass, options: { emailRedirectTo: null } });
+    // User creation requires the Admin API, which needs the service-role key —
+    // that can never run in the browser, so it's handled by the admin-create-user
+    // Edge Function instead (using the caller's session to confirm they're an editor).
+    const { data, error } = await _sb.functions.invoke('admin-create-user', {
+      body: { email, role }
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
 
-    // Fallback: if admin API not available (anon key), use signUp which sends a confirmation email
-    // We suppress the error if user already exists — just update their role
-    if (signUpErr && !signUpErr.message?.toLowerCase().includes('already')) throw signUpErr;
-
-    // 2. Record in invited_users table
-    await _sb.from('invited_users').upsert({ email, role, invited_at: new Date().toISOString() }, { onConflict: 'email' });
-
-    // 3. Show temp password to copy
-    if (result) {
+    if (data.alreadyExisted) {
+      if (result) { result.style.color = 'var(--amber)'; result.textContent = `${email} already exists — role updated to ${role === 'editor' ? 'Full edit' : 'View only'}.`; }
+    } else if (result) {
       result.innerHTML = `
         <div style="color:var(--green);font-weight:700;margin-bottom:6px">✓ User created — ${esc(email)}</div>
         <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Share this temporary password with them. They should change it after first sign-in.</div>
         <div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:8px 12px">
-          <code style="font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:var(--text);flex:1">${esc(tempPass)}</code>
-          <button onclick="navigator.clipboard.writeText('${esc(tempPass)}').then(()=>showToast('Copied!'))" style="font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);cursor:pointer;font-family:var(--font)">Copy</button>
+          <code style="font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:var(--text);flex:1">${esc(data.tempPassword)}</code>
+          <button onclick="navigator.clipboard.writeText('${esc(data.tempPassword)}').then(()=>showToast('Copied!'))" style="font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);cursor:pointer;font-family:var(--font)">Copy</button>
         </div>
       `;
     }
     if (input) input.value = '';
-    showToast('User created: ' + email);
+    showToast(data.alreadyExisted ? 'Role updated: ' + email : 'User created: ' + email);
     renderAdmin();
   } catch(err) {
     const msg = (err.message || '').toLowerCase();
     let friendly = err.message;
     if (msg.includes('rate') || msg.includes('429')) friendly = 'Rate limit reached — wait a moment and try again.';
-    if (msg.includes('already registered') || msg.includes('already exists')) {
-      // User exists — just update role record
-      await _sb.from('invited_users').upsert({ email, role, invited_at: new Date().toISOString() }, { onConflict: 'email' });
-      if (result) { result.style.color = 'var(--amber)'; result.textContent = `${email} already exists — role updated to ${role === 'editor' ? 'Full edit' : 'View only'}.`; }
-      if (input) input.value = '';
-      renderAdmin();
-      return;
-    }
     if (result) { result.innerHTML = `<span style="color:var(--red)">Error: ${esc(friendly)}</span>`; }
     showToast('Error: ' + friendly);
   } finally {
