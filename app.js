@@ -473,6 +473,56 @@ async function handleSignOut() {
   showToast('Signed out');
 }
 
+/* ── CHANGE PASSWORD ── */
+function openChangePasswordModal() {
+  const el = document.getElementById('change-pw-modal-overlay');
+  if (el) el.classList.remove('hidden');
+  const p1 = document.getElementById('change-pw-new');
+  const p2 = document.getElementById('change-pw-confirm');
+  const msg = document.getElementById('change-pw-msg');
+  if (p1) p1.value = '';
+  if (p2) p2.value = '';
+  if (msg) msg.textContent = '';
+  setTimeout(() => p1?.focus(), 50);
+}
+
+function closeChangePasswordModal() {
+  const el = document.getElementById('change-pw-modal-overlay');
+  if (el) el.classList.add('hidden');
+}
+
+async function submitPasswordChange() {
+  const p1El = document.getElementById('change-pw-new');
+  const p2El = document.getElementById('change-pw-confirm');
+  const btn  = document.getElementById('change-pw-submit');
+  const msg  = document.getElementById('change-pw-msg');
+  const p1 = p1El ? p1El.value : '';
+  const p2 = p2El ? p2El.value : '';
+
+  if (!p1 || p1.length < 8) {
+    if (msg) { msg.style.color = '#dc2626'; msg.textContent = 'Password must be at least 8 characters.'; }
+    return;
+  }
+  if (p1 !== p2) {
+    if (msg) { msg.style.color = '#dc2626'; msg.textContent = "Passwords don't match."; }
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Updating…'; }
+  if (msg) { msg.style.color = '#6b7280'; msg.textContent = ''; }
+
+  try {
+    const { error } = await _sb.auth.updateUser({ password: p1 });
+    if (error) throw error;
+    closeChangePasswordModal();
+    showToast('Password updated');
+  } catch(err) {
+    if (msg) { msg.style.color = '#dc2626'; msg.textContent = 'Error: ' + (err.message || 'Something went wrong.'); }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Change password'; }
+  }
+}
+
 /* ── PRINT REPORT ── */
 async function printReport() {
   try { window._printAudit = await loadRecentAudit(7); } catch(e) { window._printAudit = []; }
