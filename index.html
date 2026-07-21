@@ -138,7 +138,10 @@
         <div id="auth-status-bar-signed-in" style="display:none">
           <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-bottom:4px">Signed in as</div>
           <div id="auth-email" style="font-size:11px;color:rgba(255,255,255,0.7);word-break:break-all;margin-bottom:6px"></div>
-          <button onclick="handleSignOut()" style="background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.55);font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer">Sign out</button>
+          <div style="display:flex;gap:8px">
+            <button onclick="handleSignOut()" style="background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.55);font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer">Sign out</button>
+            <button onclick="openChangePasswordModal()" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:11px;padding:4px 4px;cursor:pointer;text-decoration:underline">Change password</button>
+          </div>
         </div>
         <div id="auth-status-bar-signed-out">
           <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-bottom:6px">👁 Read-only mode</div>
@@ -1095,6 +1098,19 @@
       <div style="font-size:13px;color:#6b7280">Click the link in your email to sign in. You can close this.</div>
     </div>
     <button onclick="closeAuthModal()" style="margin-top:12px;width:100%;background:none;border:1px solid #e5e7eb;border-radius:8px;padding:9px;font-size:13px;color:#6b7280;cursor:pointer">Cancel</button>
+  </div>
+</div>
+
+<!-- ── CHANGE PASSWORD ── -->
+<div id="change-pw-modal-overlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)closeChangePasswordModal()">
+  <div style="background:white;border-radius:14px;padding:32px;width:360px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="font-size:20px;font-weight:700;margin-bottom:6px">Change password</div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:20px">Set a new password for your account.</div>
+    <input id="change-pw-new" type="password" placeholder="New password" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:10px" onkeydown="if(event.key==='Enter')submitPasswordChange()">
+    <input id="change-pw-confirm" type="password" placeholder="Confirm new password" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:10px 12px;font-size:14px;margin-bottom:12px" onkeydown="if(event.key==='Enter')submitPasswordChange()">
+    <button id="change-pw-submit" onclick="submitPasswordChange()" style="width:100%;background:#1d4ed8;color:white;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:600;cursor:pointer">Change password</button>
+    <div id="change-pw-msg" style="margin-top:10px;font-size:12px;min-height:16px"></div>
+    <button onclick="closeChangePasswordModal()" style="margin-top:4px;width:100%;background:none;border:1px solid #e5e7eb;border-radius:8px;padding:9px;font-size:13px;color:#6b7280;cursor:pointer">Cancel</button>
   </div>
 </div>
 
