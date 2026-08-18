@@ -118,6 +118,26 @@ function renderDashboard() {
         }).join('')}
       </div>`;
   }
+
+  // ── STALE IMPORT WARNING ──
+  // Open jobs whose PO wasn't present in the most recent Odoo CSV import —
+  // their status may not reflect what Odoo currently shows.
+  const staleEl = document.getElementById('stale-import-warning');
+  if (staleEl) {
+    const staleJobs = typeof getStaleOpenJobs === 'function' ? getStaleOpenJobs() : [];
+    if (staleJobs.length > 0) {
+      const list = staleJobs.slice(0, 8).map(j =>
+        `<span onclick="openJobModal('${j.id}')" style="cursor:pointer;text-decoration:underline;font-family:'DM Mono',monospace">${esc(j.po)}</span> (${esc(j.status)})`
+      ).join(', ');
+      const more = staleJobs.length > 8 ? ` …and ${staleJobs.length - 8} more` : '';
+      staleEl.style.display = 'flex';
+      staleEl.innerHTML = `<span style="font-size:15px;flex-shrink:0">⚠️</span>
+        <span><strong>${staleJobs.length} open job${staleJobs.length!==1?'s':''} not seen in the last Odoo import</strong> — their status may be out of date. Check these against Odoo directly: ${list}${more}</span>`;
+    } else {
+      staleEl.style.display = 'none';
+    }
+  }
+
   const heroEl = document.getElementById('dash-wins-hero');
   if (heroEl) {
     // Compute quick wins for dashboard (reuse same logic as print report)

@@ -814,6 +814,11 @@ function processCSVFile(file) {
     if (colIdx.po === undefined) { showImportResult('warn',`Could not find "Order Reference" column.`); return; }
     let added = 0, updated = 0, skipped = 0, noStatus = 0;
     const seenPOs = new Set();
+    // Raw "Job Status" text this import couldn't map to a known status (e.g. a typo,
+    // a new custom stage added in Odoo, extra whitespace). Rows with an unmapped
+    // status are skipped entirely today, so surfacing this is the only way to notice
+    // a job silently stopped being refreshed.
+    const unmappedStatuses = new Map();
     lines.slice(1).forEach(line => {
       const cols = parseCSVLine(line);
       const get  = key => colIdx[key] !== undefined ? (cols[colIdx[key]]||'').trim() : '';
@@ -823,7 +828,11 @@ function processCSVFile(file) {
       seenPOs.add(po);
       const rawStatus = get('status');
       const newStatus = mapOdooStatus(rawStatus);
-      if (!newStatus) { skipped++; noStatus++; return; }
+      if (!newStatus) {
+        skipped++; noStatus++;
+        if (rawStatus) unmappedStatuses.set(rawStatus, (unmappedStatuses.get(rawStatus) || 0) + 1);
+        return;
+      }
       const poDate    = normalizeOdooDate(get('poDate')) || today();
       const existing  = jobs.find(j => j.po.trim().toUpperCase() === po);
       if (existing) {
@@ -877,6 +886,7 @@ function processCSVFile(file) {
     await saveData();   // bulk upsert via Supabase
     renderAll();
     setLastImportNow();
+    saveLastImportPOs(seenPOs);
     // Flush status-change audit entries collected during import
     if (window._importAuditQueue && window._importAuditQueue.length) {
       auditBulk(window._importAuditQueue);
@@ -884,10 +894,51 @@ function processCSVFile(file) {
     }
     auditLog('csv_import', 'IMPORT', 'CSV Import', '', null, null, { added, updated, skipped });
     const skipNote = noStatus > 0 ? ` · ${noStatus} skipped (no Job Status — procurement POs)` : skipped > 0 ? ` · ${skipped} skipped` : '';
-    showImportResult('success', `Import complete — ${added} new job${added!==1?'s':''} added, ${updated} updated${skipNote}.`);
+    let unmappedNote = '';
+    if (unmappedStatuses.size) {
+      const list = [...unmappedStatuses.entries()]
+        .map(([txt, c]) => `"${esc(txt)}"${c > 1 ? ` ×${c}` : ''}`)
+        .join(', ');
+      unmappedNote = `<div style="margin-top:6px;font-size:11px;color:#b91c1c">⚠️ Unrecognized "Job Status" text — these rows were skipped and not applied: ${list}. If these are valid statuses, add them to <code>mapOdooStatus()</code> in data.js.</div>`;
+    }
+    const staleCount = getStaleOpenJobs().length;
+    const staleNote = staleCount > 0
+      ? `<div style="margin-top:6px;font-size:11px;color:#b91c1c">⚠️ ${staleCount} open job${staleCount!==1?'s':''} not present in this import — their status may be out of date. See the dashboard banner.</div>`
+      : '';
+    showImportResult('success', `Import complete — ${added} new job${added!==1?'s':''} added, ${updated} updated${skipNote}.${unmappedNote}${staleNote}`);
     showToast(`Import: +${added} new, ${updated} updated`);
+    renderDashboard();  // refresh the stale-job banner immediately
   };
   reader.readAsText(file);
+}
+
+/* ── STALE IMPORT TRACKING ──────────────────────────────────
+   Remembers which POs were present in the most recent CSV import
+   (stored locally in this browser — same tier as phoeniks_last_import).
+   Lets the dashboard flag any *open* job whose status wasn't touched
+   by the latest import, i.e. it may no longer reflect Odoo's current
+   Job Status (Odoo import bug fix, Aug 2026).
+   ─────────────────────────────────────────────────────────── */
+const LAST_IMPORT_POS_KEY = 'phoeniks_last_import_pos';
+
+function saveLastImportPOs(poSet) {
+  try { localStorage.setItem(LAST_IMPORT_POS_KEY, JSON.stringify([...poSet])); } catch(e) {}
+}
+
+function getLastImportPOs() {
+  try {
+    const raw = localStorage.getItem(LAST_IMPORT_POS_KEY);
+    return raw ? new Set(JSON.parse(raw)) : null;
+  } catch(e) { return null; }
+}
+
+// Open jobs (not Job Done / Maintenance) whose PO wasn't seen in the most
+// recent import. Returns [] if no import has run yet on this browser —
+// we don't want to flag everything as "stale" before a first snapshot exists.
+function getStaleOpenJobs() {
+  const seen = getLastImportPOs();
+  if (!seen) return [];
+  return jobs.filter(j => ACTIVE_STAGES.includes(j.status) && !seen.has((j.po || '').trim().toUpperCase()));
 }
 
 function showImportResult(type, msg) {

@@ -208,6 +208,10 @@
       <!-- STATUS COUNTS STRIP — filled by renderDashboard() -->
       <div id="dash-status-counts" style="margin-bottom:20px"></div>
 
+      <!-- STALE IMPORT WARNING — filled by renderDashboard(); jobs an open status that
+           the most recent Odoo CSV import didn't touch, i.e. their status may be out of date -->
+      <div id="stale-import-warning" style="display:none;background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:12px;color:#b91c1c;gap:10px;align-items:flex-start"></div>
+
       <!-- WINS HERO — filled by renderDashboard() -->
       <div id="dash-wins-hero" style="display:none;margin-bottom:20px"></div>
 
