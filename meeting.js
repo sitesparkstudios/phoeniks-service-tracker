@@ -92,7 +92,7 @@ function buildMeetingSlides() {
     : '<div style="padding:16px;color:#6b7280;font-size:13px">No open jobs.</div>';
 
   /* ── SLIDE 2: Needs Attention ── */
-  const attn = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 14)
+  const attn = jobs.filter(j => isOpenService(j) && daysBetween(j.poDate, null) > 14)
                    .sort((a,b) => daysBetween(b.poDate,null) - daysBetween(a.poDate,null));
   document.getElementById('meeting-attention-content').innerHTML = !attn.length
     ? `<div class="meeting-attn-empty">

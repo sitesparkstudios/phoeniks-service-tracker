@@ -60,7 +60,10 @@ function renderDashboard() {
   const allOpen    = jobs.filter(isOpenService);
   const open       = periodJobs.filter(isOpenService);
   const done       = periodJobs.filter(j => j.status === 'Job Done');
-  const stuck      = periodJobs.filter(j => isOpenService(j) && daysBetween(j.poDate, null) > 14);
+  // "Stuck" is current state (is this job open >14d right now?), not something that
+  // should disappear when a shorter period is selected — a job raised 45 days ago is
+  // still stuck today even outside a 30d window. Computed off all jobs, not periodJobs.
+  const stuck      = jobs.filter(j => isOpenService(j) && daysBetween(j.poDate, null) > 14);
   const maintenance = jobs.filter(j => j.status === 'Maintenance').length;
   const avgTotal   = done.length ? Math.round(done.reduce((a,j) => a + (getTotalDays(j)||0), 0) / done.length) : null;
   const yearSpend  = periodJobs.reduce((a,j) => a + (parseFloat(j.value)||0), 0);
@@ -91,18 +94,19 @@ function renderDashboard() {
       { key:'Awaiting Closeout', color:'#0d9488', bg:'#f0fdfa', border:'#99f6e4', open:true  },
       { key:'Job Done',          color:'#16a34a', bg:'#f0fdf4', border:'#bbf7d0', open:false },
       { key:'Maintenance',       color:'#6b7280', bg:'#f9fafb', border:'#e5e7eb', open:false },
+      { key:'Cancelled',         color:'#dc2626', bg:'#fef2f2', border:'#fecaca', open:false },
     ];
     const counts = {};
     const ageSum = {};
     jobs.forEach(j => {
       counts[j.status] = (counts[j.status]||0) + 1;
-      if (j.status !== 'Job Done' && j.status !== 'Maintenance') {
+      if (isOpenService(j)) {
         ageSum[j.status] = (ageSum[j.status]||0) + daysBetween(j.poDate, null);
       }
     });
 
     statusCountEl.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px">
+      <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:8px">
         ${STATUS_DEF.map(s => {
           const n   = counts[s.key]||0;
           const avg = s.open && n > 0 ? Math.round((ageSum[s.key]||0)/n) : null;
@@ -220,7 +224,7 @@ function renderDashboard() {
   document.getElementById('kpi-grid').innerHTML = `
     <div class="metric-card accent-blue">
       <div class="metric-label">Open Jobs</div>
-      <div class="metric-value">${open.length}</div>
+      <div class="metric-value">${allOpen.length}</div>
       <div class="metric-sub">${done.length} completed in period</div>
     </div>
     <div class="metric-card ${stuck.length > 0 ? 'warn' : 'accent-green'}">
@@ -291,7 +295,7 @@ function renderDashboard() {
   const sc = {};
   jobs.forEach(j => { sc[j.status] = (sc[j.status]||0) + 1; });
   const slabels = Object.keys(sc);
-  const sColors = { 'Incoming Job':'#2563eb','Job Booked':'#7c3aed','Waiting for Parts':'#d97706','Revisiting':'#b8960a','Awaiting Closeout':'#0d9488','Job Done':'#16a34a','Maintenance':'#6b7280' };
+  const sColors = { 'Incoming Job':'#2563eb','Job Booked':'#7c3aed','Waiting for Parts':'#d97706','Revisiting':'#b8960a','Awaiting Closeout':'#0d9488','Job Done':'#16a34a','Maintenance':'#6b7280','Cancelled':'#dc2626' };
   if (statusChartInst) statusChartInst.destroy();
   statusChartInst = new Chart(document.getElementById('statusChart'), {
     type: 'doughnut',
@@ -316,7 +320,7 @@ function renderDashboard() {
   }).join('') || '<div style="color:var(--text3);font-size:13px;padding:8px 0">No open jobs in active stages.</div>';
 
   /* Attention table */
-  const attn = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 14)
+  const attn = jobs.filter(j => isOpenService(j) && daysBetween(j.poDate, null) > 14)
                    .sort((a,b) => daysBetween(b.poDate,null) - daysBetween(a.poDate,null));
   document.getElementById('attention-table').innerHTML = !attn.length
     ? '<div class="empty-state"><p>✓ No jobs overdue — great work!</p></div>'
@@ -800,9 +804,9 @@ function renderChatterLog() {
   };
   const hasChatter = j => (j.history||[]).length > 1 || isRealNotes(j.notes);
 
-  // Open jobs only — exclude Job Done and Maintenance
+  // Open jobs only — exclude Job Done, Maintenance and Cancelled
   const open = jobs
-    .filter(j => j.status !== 'Job Done' && j.status !== 'Maintenance')
+    .filter(isOpenService)
     .sort((a, b) => {
       const aHist = hasChatter(a);
       const bHist = hasChatter(b);
@@ -941,7 +945,7 @@ function renderJobs() {
     if (j.status !== 'Job Done') return '';
     return [...(j.history||[])].sort((a,b)=>(a.date||'')<(b.date||'')?1:-1)[0]?.date || j.poDate || '';
   };
-  const STATUS_SORT_ORDER = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting','Awaiting Closeout','Job Done','Maintenance'];
+  const STATUS_SORT_ORDER = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting','Awaiting Closeout','Job Done','Maintenance','Cancelled'];
   filtered.sort((a,b) => {
     if (sortVal === 'age-asc')       return (b.poDate||'').localeCompare(a.poDate||'');  // newest PO first
     if (sortVal === 'age-desc')      return (a.poDate||'').localeCompare(b.poDate||'');  // oldest PO first
@@ -1132,7 +1136,7 @@ function renderSuppliers() {  const sortEl  = document.getElementById('supplier-
   const stats = suppliers.map(s => {
     const sj      = jobs.filter(j => j.supplier === s);
     const done    = sj.filter(j => j.status === 'Job Done');
-    const open    = sj.filter(j => j.status !== 'Job Done' && j.status !== 'Maintenance');
+    const open    = sj.filter(isOpenService);
     const overdue = open.filter(j => daysBetween(j.poDate,null) > 14).length;
     const critical= open.filter(j => daysBetween(j.poDate,null) > 30).length;
     const doneWithDur = done.filter(j => getTotalDays(j) !== null);
@@ -1317,11 +1321,11 @@ function openSupplierModal(supplier, filter) {
   const sj = jobs.filter(j => j.supplier === supplier);
   let filtered, subtitle;
   if (filter === 'overdue') {
-    filtered = sj.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 14)
+    filtered = sj.filter(j => isOpenService(j) && daysBetween(j.poDate, null) > 14)
                   .sort((a,b) => daysBetween(b.poDate,null) - daysBetween(a.poDate,null));
     subtitle = `${filtered.length} overdue job${filtered.length !== 1 ? 's' : ''} (open > 14 days)`;
   } else if (filter === 'open') {
-    filtered = sj.filter(j => j.status !== 'Job Done')
+    filtered = sj.filter(isOpenService)
                   .sort((a,b) => daysBetween(b.poDate,null) - daysBetween(a.poDate,null));
     subtitle = `${filtered.length} open job${filtered.length !== 1 ? 's' : ''}`;
   } else {
@@ -1405,7 +1409,7 @@ function renderPerformance() {
   const noHistory       = doneJobs.length - withHistory;
   const durPct          = doneJobs.length ? Math.round(withDuration / doneJobs.length * 100) : 0;
   const histPct         = doneJobs.length ? Math.round(withHistory / doneJobs.length * 100) : 0;
-  const openNoHistory   = jobs.filter(j => j.status !== 'Job Done' && (j.history||[]).length <= 1).length;
+  const openNoHistory   = jobs.filter(j => isOpenService(j) && (j.history||[]).length <= 1).length;
   const dataNote        = document.getElementById('perf-data-note');
   if (dataNote) {
     if (doneJobs.length === 0) {
@@ -1455,7 +1459,7 @@ function renderPerformance() {
   const prevAvgDur    = _prevDurJobs.length > 0 ? Math.round(_prevDurJobs.reduce((a, j) => a + getTotalDays(j), 0) / _prevDurJobs.length) : null;
 
   // Currently open jobs > 30 days
-  const longOpen = jobs.filter(j => j.status !== 'Job Done' && daysBetween(j.poDate, null) > 30).length;
+  const longOpen = jobs.filter(j => isOpenService(j) && daysBetween(j.poDate, null) > 30).length;
 
   // Avg parts wait — use open Waiting for Parts jobs (daysBetween poDate→now) + done jobs with dwell history
   const openPartsJobs = jobs.filter(j => j.status === 'Waiting for Parts' && (j.poDate||'') >= cutoffStr);
@@ -2537,7 +2541,7 @@ function buildPrintReport() {
         if (!siteMap[key]) siteMap[key] = { name:site, total:0, thisYear:0, open:0 };
         siteMap[key].total++;
         if ((j.poDate||'').startsWith(thisYear)) siteMap[key].thisYear++;
-        if (j.status !== 'Job Done') siteMap[key].open++;
+        if (isOpenService(j)) siteMap[key].open++;
       });
       const hotSites = Object.values(siteMap).filter(s => s.thisYear >= 2).sort((a,b) => b.thisYear - a.thisYear);
       if (!hotSites.length) return '';
@@ -2789,7 +2793,7 @@ function renderSites() {
   }
 
   el.innerHTML = recurring.map(site => {
-    const open    = site.jobs.filter(j => j.status !== 'Job Done');
+    const open    = site.jobs.filter(isOpenService);
     const done    = site.jobs.filter(j => j.status === 'Job Done');
     const urgent  = open.filter(j => daysBetween(j.poDate,null) >= 21);
     const revisits= site.jobs.filter(j => j.history?.some(h => h.status === 'Revisiting'));

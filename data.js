@@ -103,7 +103,7 @@ let confirmCallback = null;
 let _dataLoaded   = false;
 
 /* ── STATUS CONSTANTS ─────────────────────────────────────── */
-const STATUSES = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting','Awaiting Closeout','Job Done','Maintenance'];
+const STATUSES = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting','Awaiting Closeout','Job Done','Maintenance','Cancelled'];
 
 const STATUS_BADGE = {
   'Incoming Job':      'b-incoming',
@@ -113,13 +113,16 @@ const STATUS_BADGE = {
   'Job Done':          'b-done',
   'Awaiting Closeout': 'b-closeout',
   'Maintenance':       'b-maintenance',
+  'Cancelled':         'b-cancelled',
 };
 
-const STAGE_COLORS  = ['#3b82f6','#a855f7','#f59e0b','#ff5f1f','#0d9488','#22c55e','#6b7280'];
+// Appended (not inserted) so existing index-based lookups against the first
+// 7 entries are unaffected — 'Cancelled' is only ever looked up by name.
+const STAGE_COLORS  = ['#3b82f6','#a855f7','#f59e0b','#ff5f1f','#0d9488','#22c55e','#6b7280','#dc2626'];
 const ACTIVE_STAGES = ['Incoming Job','Job Booked','Waiting for Parts','Revisiting','Awaiting Closeout'];
 
 const isServiceJob  = j => j.status !== 'Maintenance';
-const isOpenService = j => j.status !== 'Job Done' && j.status !== 'Maintenance';
+const isOpenService = j => j.status !== 'Job Done' && j.status !== 'Maintenance' && j.status !== 'Cancelled';
 
 const ODOO_MAP = {
   'order reference':    'po',
@@ -543,9 +546,9 @@ async function saveReports() {
    ─────────────────────────────────────────────────────────── */
 async function saveReport() {
   if (!isAuthed()) { showToast('Sign in to save reports'); return; }
-  const open   = jobs.filter(j => j.status !== 'Job Done' && j.status !== 'Maintenance');
+  const open   = jobs.filter(isOpenService);
   const done   = jobs.filter(j => j.status === 'Job Done');
-  const stuck  = jobs.filter(j => j.status !== 'Job Done' && j.status !== 'Maintenance' && daysBetween(j.poDate, null) > 14);
+  const stuck  = jobs.filter(j => isOpenService(j) && daysBetween(j.poDate, null) > 14);
   const avgTotal = done.length ? Math.round(done.reduce((a,j) => a + (getTotalDays(j)||0), 0) / done.length) : null;
   const totalValue = open.reduce((a,j) => a + (parseFloat(j.value)||0), 0);
 
@@ -798,6 +801,7 @@ function mapOdooStatus(v) {
     'awaiting closeout':'Awaiting Closeout','closeout':'Awaiting Closeout',
     'job done':'Job Done','done':'Job Done','completed':'Job Done',
     'maintenance':'Maintenance',
+    'cancelled':'Cancelled','canceled':'Cancelled','cancel':'Cancelled',
   };
   return map[v.toLowerCase().trim()] || null;
 }
@@ -812,7 +816,7 @@ function processCSVFile(file) {
     const colIdx  = {};
     headers.forEach((h,i) => { const mapped = ODOO_MAP[h]; if (mapped) colIdx[mapped] = i; });
     if (colIdx.po === undefined) { showImportResult('warn',`Could not find "Order Reference" column.`); return; }
-    let added = 0, updated = 0, skipped = 0, noStatus = 0;
+    let added = 0, updated = 0, skipped = 0, noStatus = 0, cancelled = 0;
     const seenPOs = new Set();
     // Raw "Job Status" text this import couldn't map to a known status (e.g. a typo,
     // a new custom stage added in Odoo, extra whitespace). Rows with an unmapped
@@ -826,15 +830,26 @@ function processCSVFile(file) {
       if (!po) { skipped++; return; }
       if (seenPOs.has(po)) { skipped++; return; }
       seenPOs.add(po);
-      const rawStatus = get('status');
-      const newStatus = mapOdooStatus(rawStatus);
+      const rawStatus  = get('status');
+      let   newStatus  = mapOdooStatus(rawStatus);
+      const existingJob = jobs.find(j => j.po.trim().toUpperCase() === po);
       if (!newStatus) {
-        skipped++; noStatus++;
-        if (rawStatus) unmappedStatuses.set(rawStatus, (unmappedStatuses.get(rawStatus) || 0) + 1);
-        return;
+        // Odoo clears the custom "Job Status" field when a PO is cancelled, so a
+        // blank status on a PO we already track almost always means it was
+        // cancelled — not that nothing changed. Mark it Cancelled instead of
+        // silently freezing the job on whatever status it last had. A blank
+        // status on a PO we've never seen before (e.g. a fresh draft with no
+        // status assigned yet) is still skipped, same as before.
+        if (!rawStatus && existingJob && existingJob.status !== 'Job Done' && existingJob.status !== 'Cancelled') {
+          newStatus = 'Cancelled';
+        } else {
+          skipped++; noStatus++;
+          if (rawStatus) unmappedStatuses.set(rawStatus, (unmappedStatuses.get(rawStatus) || 0) + 1);
+          return;
+        }
       }
       const poDate    = normalizeOdooDate(get('poDate')) || today();
-      const existing  = jobs.find(j => j.po.trim().toUpperCase() === po);
+      const existing  = existingJob;
       if (existing) {
         if (get('supplier'))      existing.supplier      = get('supplier');
         if (get('ref'))           existing.ref           = get('ref');
@@ -860,9 +875,10 @@ function processCSVFile(file) {
           existing.history.push({ status: newStatus, date: today() });
           const prevStatus = existing.status;
           existing.status = newStatus;
+          if (newStatus === 'Cancelled') cancelled++;
           // Queue for bulk audit after save
           if (!window._importAuditQueue) window._importAuditQueue = [];
-          window._importAuditQueue.push({ jobId: existing.id, jobPo: existing.po, jobRef: existing.ref, action: 'status_change', fromVal: prevStatus, toVal: newStatus, meta: { source: 'csv_import' } });
+          window._importAuditQueue.push({ jobId: existing.id, jobPo: existing.po, jobRef: existing.ref, action: 'status_change', fromVal: prevStatus, toVal: newStatus, meta: { source: newStatus === 'Cancelled' ? 'csv_import_blank_status' : 'csv_import' } });
         }
         updated++;
       } else {
@@ -892,8 +908,9 @@ function processCSVFile(file) {
       auditBulk(window._importAuditQueue);
       window._importAuditQueue = [];
     }
-    auditLog('csv_import', 'IMPORT', 'CSV Import', '', null, null, { added, updated, skipped });
+    auditLog('csv_import', 'IMPORT', 'CSV Import', '', null, null, { added, updated, skipped, cancelled });
     const skipNote = noStatus > 0 ? ` · ${noStatus} skipped (no Job Status — procurement POs)` : skipped > 0 ? ` · ${skipped} skipped` : '';
+    const cancelNote = cancelled > 0 ? ` · ${cancelled} marked Cancelled (blank Job Status in Odoo)` : '';
     let unmappedNote = '';
     if (unmappedStatuses.size) {
       const list = [...unmappedStatuses.entries()]
@@ -905,8 +922,8 @@ function processCSVFile(file) {
     const staleNote = staleCount > 0
       ? `<div style="margin-top:6px;font-size:11px;color:#b91c1c">⚠️ ${staleCount} open job${staleCount!==1?'s':''} not present in this import — their status may be out of date. See the dashboard banner.</div>`
       : '';
-    showImportResult('success', `Import complete — ${added} new job${added!==1?'s':''} added, ${updated} updated${skipNote}.${unmappedNote}${staleNote}`);
-    showToast(`Import: +${added} new, ${updated} updated`);
+    showImportResult('success', `Import complete — ${added} new job${added!==1?'s':''} added, ${updated} updated${skipNote}${cancelNote}.${unmappedNote}${staleNote}`);
+    showToast(`Import: +${added} new, ${updated} updated${cancelled > 0 ? `, ${cancelled} cancelled` : ''}`);
     renderDashboard();  // refresh the stale-job banner immediately
   };
   reader.readAsText(file);

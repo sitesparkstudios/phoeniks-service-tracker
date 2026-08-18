@@ -533,6 +533,7 @@
               <label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" class="fs-cb" value="Awaiting Closeout" onchange="statusFilterChange()" checked> Awaiting Closeout</label>
               <label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" class="fs-cb" value="Job Done" onchange="statusFilterChange()" checked> Job Done</label>
               <label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" class="fs-cb" value="Maintenance" onchange="statusFilterChange()" checked> Maintenance</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" class="fs-cb" value="Cancelled" onchange="statusFilterChange()" checked> Cancelled</label>
             </div>
           </div>
           <select id="filter-supplier" onchange="renderJobs()"><option value="">All service cos.</option></select>
@@ -792,6 +793,7 @@
                 <option>Waiting for Parts</option><option>Revisiting</option>
                 <option>Awaiting Closeout</option>
                 <option>Job Done</option><option>Maintenance</option>
+                <option>Cancelled</option>
               </select>
             </div>
             <div class="form-group"><label>Order Value ($)</label><input type="text" id="f-value" placeholder="0.00"></div>

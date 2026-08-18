@@ -198,6 +198,7 @@ td.ref-cell { color: var(--text); max-width: 280px; overflow: hidden; text-overf
 .b-done       { background: var(--green-dim);  color: var(--green);  } .b-done       .badge-dot { background: var(--green); }
 .b-closeout   { background: rgba(13,148,136,0.1); color: #0d9488; } .b-closeout   .badge-dot { background: #0d9488; }
 .b-maintenance{ background: var(--surface3);   color: var(--text2);  } .b-maintenance .badge-dot { background: var(--text3); }
+.b-cancelled  { background: var(--red-dim);    color: var(--red);    } .b-cancelled  .badge-dot { background: var(--red); }
 
 /* ── DAY CHIPS ── */
 .day-chip {

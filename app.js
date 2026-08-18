@@ -163,7 +163,7 @@ function updateChatterBadge() {
     return !ODOO_BOILERPLATE.some(b => n === b || n.replace(/[^a-z ]/g,'') === b);
   };
   const noHistory = jobs.filter(j =>
-    j.status !== 'Job Done' && j.status !== 'Maintenance' &&
+    isOpenService(j) &&
     (j.history||[]).length <= 1 && !isRealNotes(j.notes)
   ).length;
   const badge = document.getElementById('chatter-needs-badge');
